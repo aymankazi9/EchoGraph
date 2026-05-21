@@ -1,11 +1,11 @@
-# EchoGraph
+# Nocturne
 
 ![Next.js 16.2.4](https://img.shields.io/badge/Next.js-16.2.4-black?logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
 ![Beta](https://img.shields.io/badge/status-beta-orange)
 ![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-green)
 
-EchoGraph is a study intelligence system for high-stakes learners in pre-med, engineering, law, and graduate STEM programs. It is not a note-taker. It analyzes what a professor emphasized — cross-referencing lecture recordings, slide decks, and the student's own study guide — and surfaces the highest-yield material for exam preparation.
+Nocturne is a study intelligence system for high-stakes learners in pre-med, engineering, law, and graduate STEM programs. It is not a note-taker. It analyzes what a professor emphasized — cross-referencing lecture recordings, slide decks, and the student's own study guide — and surfaces the highest-yield material for exam preparation.
 
 The core differentiator is privacy. All content (audio, PDFs, transcripts, keywords) is encrypted client-side before it touches the server. The server stores opaque `.bin` blobs it cannot read. The student's vault passphrase never leaves the browser.
 
@@ -108,7 +108,7 @@ ML workers run strictly sequentially — Whisper finishes before BERT starts —
 ## Project structure
 
 ```
-EchoGraph/
+Nocturne/
 ├── echograph/                        # Next.js application
 │   ├── src/
 │   │   ├── app/
@@ -290,7 +290,7 @@ supabase functions deploy confirm-newsletter
 
 ## Security
 
-EchoGraph's security model is built on two guarantees:
+Nocturne's security model is built on two guarantees:
 
 1. **The server cannot read your content.** PDFs, audio, transcripts, keywords, and filenames are all encrypted client-side before upload. The server sees opaque `.bin` blobs, file sizes, and upload timestamps.
 
@@ -298,7 +298,7 @@ EchoGraph's security model is built on two guarantees:
 
 There is no password reset flow. If a user loses their passphrase and their Recovery Kit, their data is permanently inaccessible. This is a deliberate design decision documented in onboarding.
 
-To report a security vulnerability: hello@echograph.app
+To report a security vulnerability: hello@nocturne.app <!-- TODO: confirm final domain before launch -->
 
 ---
 
