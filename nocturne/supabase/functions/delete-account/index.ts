@@ -51,7 +51,7 @@ Deno.serve(async (req: Request) => {
     // Service-role client — only available server-side in this edge function.
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      Deno.env.get('SERVICE_ROLE_KEY')!,
     )
 
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id)

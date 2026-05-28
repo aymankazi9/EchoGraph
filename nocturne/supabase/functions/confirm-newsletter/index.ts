@@ -66,29 +66,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'service_error' }, 500)
     }
 
-    // Add the fully confirmed contact to the Resend audience
-    const audienceId = Deno.env.get('RESEND_AUDIENCE_ID')
-    if (audienceId) {
-      const resendRes = await fetch(
-        `https://api.resend.com/audiences/${audienceId}/contacts`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
-          },
-          body: JSON.stringify({
-            email: confirmation.email,
-            unsubscribed: false,
-          }),
-        },
-      )
-
-      if (!resendRes.ok) {
-        // Log but don't fail — user is confirmed in our DB, Resend sync is best-effort
-        console.error('Resend contacts error:', await resendRes.text())
-      }
-    }
+    // TODO: wire Resend audience when plan supports it
 
     return json({ status: 'confirmed', email: confirmation.email }, 200)
   } catch (err) {
