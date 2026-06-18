@@ -6,8 +6,9 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useSessionStore } from '@/store/session-store'
 import { slideFlash, useMotion } from '@/lib/motion'
 
-// Density score → border color per DESIGN_SYSTEM.md §6 PDF nav strip rules.
-function densityBorderClass(density: number): string {
+function slideBorderClass(zone: 'likely' | 'red' | null | undefined, density: number): string {
+  if (zone === 'red') return 'border-rose-400'
+  if (zone === 'likely') return 'border-violet-400'
   if (density >= 70) return 'border-rose-400'
   if (density >= 30) return 'border-amber-300'
   return 'border-border-default'
@@ -75,6 +76,7 @@ export function SlideNavStrip({ pdfDoc, totalPages, currentPage, onPageSelect }:
   const activeRef = useRef<HTMLButtonElement>(null)
   const jumpToSlide = useSessionStore((s) => s.jumpToSlide)
   const slideDensityMap = useSessionStore((s) => s.slideDensityMap)
+  const slideZoneMap = useSessionStore((s) => s.slideZoneMap)
   const prevSlide = useRef(currentPage)
   const [flashKey, setFlashKey] = useState(0)
   const { reduced } = useMotion()
@@ -109,6 +111,7 @@ export function SlideNavStrip({ pdfDoc, totalPages, currentPage, onPageSelect }:
       {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
         const isActive = pageNum === currentPage
         const density = slideDensityMap[pageNum] ?? 0
+        const zone = slideZoneMap[pageNum]
         return (
           <button
             key={pageNum}
@@ -122,7 +125,7 @@ export function SlideNavStrip({ pdfDoc, totalPages, currentPage, onPageSelect }:
               'border-l-2',
               isActive
                 ? 'border-indigo-500 bg-bg-subtle'
-                : `${densityBorderClass(density)} hover:bg-bg-subtle`,
+                : `${slideBorderClass(zone, density)} hover:bg-bg-subtle`,
             ].join(' ')}
           >
             {isActive ? (

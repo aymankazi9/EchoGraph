@@ -390,9 +390,10 @@ export async function addFilesToExistingSession(
   }
 
   // Update session flags — only set to true, never overwrite an existing true with false
-  const flagUpdate: Record<string, unknown> = { status: 'ingesting' }
+  const flagUpdate: Record<string, unknown> = { status: 'ready' }
   if (files.some((f) => f.type === 'pdf')) flagUpdate.has_slides = true
   if (files.some((f) => f.type === 'audio')) flagUpdate.has_audio = true
   if (files.some((f) => f.type === 'guide')) flagUpdate.has_study_guide = true
   await supabase.from('sessions').update(flagUpdate).eq('id', sessionId)
+  await db.localSessions.update(sessionId, { status: 'ready' })
 }

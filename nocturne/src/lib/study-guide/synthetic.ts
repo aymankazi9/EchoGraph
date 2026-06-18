@@ -102,13 +102,20 @@ export function applyDomainBoost(
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/** Returns top-N keywords as a synthetic study guide. */
+export interface SyntheticKeyword {
+  term: string
+  tfidfScore: number   // normalised 0–1 relative to top term in this run
+  slideIndices: number[]  // 0-based indices into slideTexts where term appears
+  headerBoost: boolean
+}
+
+/** Returns top-N keywords as a synthetic study guide with TF-IDF metadata. */
 export function generateSyntheticGuide(
   slideTexts: string[],
   transcriptWords: string[],
   domain = 'other',
   topN = 80,
-): string[] {
+): SyntheticKeyword[] {
   // Combine slides + transcript as separate "documents"
   const docs = [
     ...slideTexts.filter(Boolean),
@@ -120,9 +127,18 @@ export function generateSyntheticGuide(
   let scores = computeTFIDF(docs)
   scores = applyDomainBoost(scores, domain)
 
-  // Sort descending by score, take top N
-  return [...scores.entries()]
+  const sorted = [...scores.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, topN)
-    .map(([term]) => term)
+
+  const maxScore = sorted[0]?.[1] ?? 1
+
+  return sorted.map(([term, score]) => ({
+    term,
+    tfidfScore: maxScore > 0 ? score / maxScore : 0,
+    slideIndices: slideTexts
+      .map((text, i) => (text.toLowerCase().includes(term) ? i : -1))
+      .filter((i): i is number => i !== -1),
+    headerBoost: false,
+  }))
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence } from 'framer-motion'
-import { Plus } from 'lucide-react'
+import { Plus, Layers } from 'lucide-react'
 import { isVaultUnlocked, getMasterKey } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
 import { encryptText } from '@/lib/crypto/encrypt'
@@ -12,8 +12,8 @@ import { startTranscription, type TranscriptionProgress } from '@/lib/transcript
 import { startSync, type SyncProgress } from '@/lib/sync/sync-engine'
 import { scoreKeywords, computeSlideDensity } from '@/lib/scoring/keyword-scorer'
 import { generateFlashcards } from '@/lib/scoring/flashcard-generator'
-import { generateSyntheticGuide } from '@/lib/study-guide/synthetic'
-import { useSessionStore } from '@/store/session-store'
+import { generateSyntheticGuide, type SyntheticKeyword } from '@/lib/study-guide/synthetic'
+import { useSessionStore, getAudioEl } from '@/store/session-store'
 import { useNotificationStore } from '@/store/notification-store'
 import { SessionTitle } from '@/components/session/session-title'
 import { KeyboardShortcutOverlay } from '@/components/session/keyboard-shortcut-overlay'
@@ -60,6 +60,7 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
   const [isLoadingTranscript, setIsLoadingTranscript] = useState(false)
   const [isScoring, setIsScoring] = useState(false)
+  const [localGuideType, setLocalGuideType] = useState<string | null>(session.guide_type)
   const cancelRef = useRef<(() => void) | null>(null)
   const syncCancelRef = useRef<(() => void) | null>(null)
   const supabase = createClient()
@@ -76,6 +77,7 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
   const loadKeywords = useSessionStore((s) => s.loadKeywords)
   const loadFlashcards = useSessionStore((s) => s.loadFlashcards)
   const loadSlideDensity = useSessionStore((s) => s.loadSlideDensity)
+  const loadSlideZones = useSessionStore((s) => s.loadSlideZones)
   const reset = useSessionStore((s) => s.reset)
   const setSessionTitle = useSessionStore((s) => s.setSessionTitle)
   const sessionTitle = useSessionStore((s) => s.sessionTitle)
@@ -108,7 +110,7 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
 
   // ── Load transcript + sync map + keywords from DB on mount ──────────────
   useEffect(() => {
-    const canLoad = ['transcribed', 'synced', 'syncing'].includes(session.status)
+    const canLoad = ['ready', 'transcribed', 'synced', 'syncing'].includes(session.status)
     if (!canLoad) return
 
     const mk = getMasterKey()
@@ -180,6 +182,27 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
         )
         loadKeywords(loaded)
       }
+
+      // Load persisted slide density scores and zone flags
+      const { data: densityRows } = await supabase
+        .from('slides')
+        .select('page_number, density_score, is_likely_zone, is_red_zone')
+        .eq('session_id', session.id)
+      if (densityRows) {
+        const rec: Record<number, number> = {}
+        const zones: Record<number, 'likely' | 'red' | null> = {}
+        densityRows.forEach((r) => {
+          const pn = r.page_number as number
+          if (r.density_score != null) rec[pn] = r.density_score as number
+          zones[pn] = (r.is_likely_zone as boolean | null)
+            ? 'likely'
+            : (r.is_red_zone as boolean | null)
+              ? 'red'
+              : null
+        })
+        if (Object.keys(rec).length > 0) loadSlideDensity(rec)
+        if (Object.keys(zones).length > 0) loadSlideZones(zones)
+      }
     }
 
     loadData()
@@ -215,9 +238,10 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
         case ' ':
         case 'Spacebar': {
           e.preventDefault()
-          if (!store._audioEl) return
-          if (store.isPlaying) store._audioEl.pause()
-          else store._audioEl.play().catch(() => {})
+          const el = getAudioEl()
+          if (!el) return
+          if (store.isPlaying) el.pause()
+          else el.play().catch(() => {})
           break
         }
         case 'ArrowLeft': {
@@ -397,15 +421,125 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
         const transcriptText = currentWords.map((w) => w.word).join(' ')
 
         // If no terms provided, generate synthetic guide from slide text + transcript
-        let terms = inputTerms
+        let terms: string[] = inputTerms
+        let syntheticKeywords: SyntheticKeyword[] | null = null
         if (terms.length === 0) {
-          terms = generateSyntheticGuide(
+          syntheticKeywords = generateSyntheticGuide(
             slides.map((s) => s.text),
             currentWords.map((w) => w.word),
+            initialUserField ?? 'other',
           )
+          terms = syntheticKeywords.map((kw) => kw.term)
           source = 'synthetic'
         }
 
+        // ── Synthetic path: insert before confidence-threshold filter ────────
+        if (source === 'synthetic' && syntheticKeywords !== null) {
+          if (syntheticKeywords.length === 0) {
+            console.log('[synthetic] No keywords generated — slides may have no extractable text')
+            return
+          }
+
+          const { data: userData } = await supabase.auth.getUser()
+          const userId = userData.user?.id
+          if (!userId) {
+            console.error('[synthetic] No userId — skipping insert')
+            return
+          }
+
+          // Idempotent: clear any existing synthetic keywords before re-inserting
+          await supabase.from('keywords').delete().eq('session_id', session.id).eq('source', 'synthetic')
+
+          const rows = await Promise.all(
+            syntheticKeywords.map(async (kw) => ({
+              session_id: session.id,
+              user_id: userId,
+              term_encrypted: await encryptText(mk, kw.term),
+              source: 'synthetic' as const,
+              zone: 'likely' as const,
+              confidence_score: kw.tfidfScore,
+              mention_count: kw.slideIndices.length,
+              dwell_time_ms: 0,
+            })),
+          )
+
+          const { data: inserted, error: kwError } = await supabase
+            .from('keywords')
+            .insert(rows)
+            .select('id')
+
+          if (kwError) {
+            console.error('[synthetic] Insert failed:', kwError)
+          } else if (inserted) {
+            console.log('[synthetic] Inserted:', inserted.length, 'keywords')
+            loadKeywords(
+              syntheticKeywords.map((kw, i) => ({
+                id: inserted[i].id as string,
+                term: kw.term,
+                source: 'synthetic' as StoredKeyword['source'],
+                zone: 'likely' as StoredKeyword['zone'],
+                confidenceScore: kw.tfidfScore,
+                mentionCount: kw.slideIndices.length,
+                dwellTimeMs: 0,
+                emphasisScore: 0,
+                lectureConfidence: 0,
+                slideIndices: kw.slideIndices,
+              })),
+            )
+          }
+
+          // Update session metadata
+          if (!session.id) {
+            console.error('[synthetic] No sessionId — skipping session update')
+          } else {
+            const { error: sessionError } = await supabase
+              .from('sessions')
+              .update({ has_study_guide: true, guide_type: 'synthetic' })
+              .eq('id', session.id)
+              .eq('user_id', userId)
+            console.log('[synthetic] Session update:', sessionError ?? 'success', 'sessionId:', session.id)
+            if (!sessionError) setLocalGuideType('synthetic')
+          }
+
+          // Density scoring using SyntheticKeyword.slideIndices (0-based → pageNumber is 1-based)
+          if (slides.length > 0 && syntheticKeywords.length > 0) {
+            const densityMap: Record<number, number> = {}
+            const densityUpdates: { pageNumber: number; densityScore: number; isLikely: boolean }[] = []
+
+            for (const slide of slides) {
+              const slideIdx0 = slide.pageNumber - 1
+              const matchCount = syntheticKeywords.filter((kw) => kw.slideIndices.includes(slideIdx0)).length
+              const densityScore = Math.round((matchCount / syntheticKeywords.length) * 100)
+              /* TODO: revisit threshold after validating with real sessions.
+                 Lowered from 20 to 15 for slides-only TF-IDF scoring. */
+              const isLikely = densityScore >= 15
+              densityMap[slide.pageNumber] = densityScore
+              densityUpdates.push({ pageNumber: slide.pageNumber, densityScore, isLikely })
+            }
+
+            loadSlideDensity(densityMap)
+
+            const zoneMap: Record<number, 'likely' | 'red' | null> = {}
+            densityUpdates.forEach(({ pageNumber, isLikely }) => {
+              zoneMap[pageNumber] = isLikely ? 'likely' : null
+            })
+            loadSlideZones(zoneMap)
+
+            await Promise.all(
+              densityUpdates.map(({ pageNumber, densityScore, isLikely }) =>
+                supabase.from('slides')
+                  .update({ density_score: densityScore, is_likely_zone: isLikely })
+                  .eq('session_id', session.id)
+                  .eq('page_number', pageNumber),
+              ),
+            )
+          }
+
+          useNotificationStore.getState().notify({ type: 'success', message: 'Slide keywords scored', duration: 3000 })
+          return  // ← skip the scored-based path for synthetic
+        }
+
+        // ── Real guide / anki path (unchanged) ──────────────────────────────
         const inputKws: InputKeyword[] = terms.map((t) => ({ term: t, source }))
 
         const currentSyncMap = useSessionStore.getState().syncMap
@@ -416,6 +550,22 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
         const densityRecord: Record<number, number> = {}
         density.forEach((v, k) => { densityRecord[k] = v })
         loadSlideDensity(densityRecord)
+
+        // Persist density scores and red-zone flag to slides table
+        if (density.size > 0) {
+          const redZoneMap: Record<number, 'likely' | 'red' | null> = {}
+          await Promise.all(
+            Array.from(density.entries()).map(([pageNumber, score]) => {
+              const isRed = score >= 30
+              redZoneMap[pageNumber] = isRed ? 'red' : null
+              return supabase.from('slides')
+                .update({ density_score: score, is_red_zone: isRed })
+                .eq('session_id', session.id)
+                .eq('page_number', pageNumber)
+            }),
+          )
+          loadSlideZones(redZoneMap)
+        }
 
         // Generate flashcards
         const cards = generateFlashcards(scored, currentWords)
@@ -448,7 +598,14 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
               .insert(rows)
               .select('id, term_encrypted, source, zone, confidence_score, mention_count, dwell_time_ms, emphasis_score, lecture_confidence, slide_indices')
 
-            if (!error && inserted) {
+            if (error) {
+              console.error(
+                '[keywords] Real guide insert failed:',
+                JSON.stringify(error, null, 2),
+                'code:', error?.code,
+                'message:', error?.message,
+              )
+            } else if (inserted) {
               const loaded: StoredKeyword[] = await Promise.all(
                 inserted.map(async (k) => ({
                   id: k.id as string,
@@ -468,14 +625,21 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
           }
         }
 
-        useNotificationStore.getState().notify({ type: 'success', message: 'Red Zone keywords identified', duration: 3000 })
+        // Banner hides immediately when a real guide run completes, regardless of keyword count
+        if (source !== 'synthetic') setLocalGuideType(source)
 
-        // Update session has_study_guide flag if real/anki source
-        if (source !== 'synthetic') {
-          await supabase
-            .from('sessions')
-            .update({ has_study_guide: true })
-            .eq('id', session.id)
+        if (scored.length > 0) {
+          useNotificationStore.getState().notify({
+            type: 'success',
+            message: source === 'synthetic' ? 'Slide keywords scored' : 'Red Zone keywords identified',
+            duration: 3000,
+          })
+          if (source !== 'synthetic') {
+            await supabase.from('sessions').update({ has_study_guide: true, guide_type: source }).eq('id', session.id)
+          } else if (!session.has_study_guide) {
+            await supabase.from('sessions').update({ guide_type: 'synthetic' }).eq('id', session.id)
+            setLocalGuideType('synthetic')
+          }
         }
       } catch (e) {
         console.error('[SessionClient] scoring error:', e)
@@ -483,7 +647,7 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
         setIsScoring(false)
       }
     },
-    [isScoring, session.id, supabase, loadKeywords, loadFlashcards, loadSlideDensity],
+    [isScoring, session.id, supabase, loadKeywords, loadFlashcards, loadSlideDensity, loadSlideZones, initialUserField],
   )
 
   // ── Guide upload callback ────────────────────────────────────────────────
@@ -495,6 +659,15 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
     },
     [handleScore],
   )
+
+  // ── Callback from PdfViewer after fresh slide extraction ────────────────
+  const handleSlidesExtracted = useCallback(() => {
+    if (session.has_study_guide && session.guide_type !== 'synthetic' && session.guide_type !== null) return
+    const hasKws = useSessionStore.getState().keywords.length > 0
+    if (!hasKws && !isScoring) {
+      handleScore([], 'synthetic')
+    }
+  }, [isScoring, handleScore, session.has_study_guide, session.guide_type])
 
   // ── YouTube flashcard callback — merges caption cards into store + DB ────
   const handleYouTubeFlashcards = useCallback(
@@ -530,17 +703,24 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
     [session.id, supabase, loadFlashcards],
   )
 
-  // ── Auto-score: run synthetic guide when no keywords yet and synced ──────
+  // ── Auto-score: run synthetic guide on ready/synced sessions with no keywords ──
   useEffect(() => {
-    const hasKeywords = useSessionStore.getState().keywords.length > 0
-    const isSynced = session.status === 'synced'
-    if (!hasKeywords && isSynced && !isScoring) {
+    if (!session.has_slides) return
+    // Don't overwrite a real guide — its keywords are already in DB and load via loadData
+    if (session.has_study_guide && session.guide_type !== 'synthetic' && session.guide_type !== null) return
+    const hasKws = useSessionStore.getState().keywords.length > 0
+    if (!hasKws && ['ready', 'synced'].includes(session.status) && !isScoring) {
       handleScore([], 'synthetic')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.status])
+  }, [session.status, session.has_slides])
 
   // ── Layout ───────────────────────────────────────────────────────────────
+
+  const isRealGuideSession =
+    session.has_study_guide &&
+    session.guide_type !== 'synthetic' &&
+    session.guide_type !== null
 
   const inputBadges = [
     session.has_slides && 'Slides',
@@ -645,6 +825,7 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
             <PdfViewer
               storagePath={pdfFile.storage_path}
               sessionId={session.id}
+              onSlidesExtracted={handleSlidesExtracted}
             />
           ) : (
             <GuidedEmptyState variant="pdf" />
@@ -665,6 +846,25 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
         </div>
       </div>
 
+      {/* ── No-keywords bar — slides present but scoring not yet run ────────── */}
+      {!hasKeywords && session.has_slides && (
+        <div className="shrink-0 flex items-center justify-between px-4 py-2 border-t border-border-default">
+          <span className="text-body-sm text-text-tertiary">
+            {isScoring ? 'Analyzing slide content…' : 'No keywords yet'}
+          </span>
+          {!isScoring && !isRealGuideSession && (
+            <button
+              type="button"
+              onClick={() => handleScore([], 'synthetic')}
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-btn text-caption text-text-tertiary hover:text-text-secondary hover:bg-bg-subtle transition-colors"
+            >
+              <Layers size={11} strokeWidth={1.5} />
+              Generate from slides
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Bottom bar ────────────────────────────────────────────────────── */}
       {hasKeywords && (
         <div className="shrink-0 flex flex-col border-t border-border-default">
@@ -673,18 +873,29 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
             initialField={initialUserField}
             initialDismissed={domainPromptDismissed}
           />
+          {localGuideType === 'synthetic' && (
+            <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-border-default">
+              <Layers size={11} strokeWidth={1.5} className="text-violet-400 shrink-0" />
+              <span className="text-caption text-text-tertiary">Keywords from slide analysis · Upload a study guide for better results</span>
+            </div>
+          )}
           <KeywordChipRow />
 
           {/* Score button + flashcard toggle */}
           <div className="flex items-center justify-between px-4 py-1.5 border-t border-border-default">
-            <button
-              type="button"
-              disabled={isScoring}
-              onClick={() => handleScore([], 'synthetic')}
-              className="text-label text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-40"
-            >
-              {isScoring ? 'Scoring…' : 'Re-score'}
-            </button>
+            {!isRealGuideSession && (
+              <button
+                type="button"
+                disabled={isScoring}
+                onClick={() => handleScore([], 'synthetic')}
+                className="text-label text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-40"
+              >
+                {isScoring ? 'Scoring…' : 'Re-score'}
+              </button>
+            )}
+            {isRealGuideSession && isScoring && (
+              <span className="text-label text-text-tertiary opacity-60">Scoring…</span>
+            )}
             <button
               type="button"
               onClick={toggleFlashcardPanel}

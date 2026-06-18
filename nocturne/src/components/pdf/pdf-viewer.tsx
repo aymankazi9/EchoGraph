@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { getMasterKey } from '@/lib/crypto/vault'
 import { fetchAndDecryptFile } from '@/lib/crypto/decrypt'
 import { extractSlideText } from '@/lib/pdf/extractor'
@@ -26,13 +26,6 @@ async function loadPdfjs() {
 
 // ─── Framer Motion variants ───────────────────────────────────────────────────
 
-// Slide transition: enter from right, exit to left — DESIGN_SYSTEM.md §7 slideJump.
-const slideJump = {
-  enter: { opacity: 0, x: 12 },
-  center: { opacity: 1, x: 0, transition: { type: 'spring' as const, stiffness: 600, damping: 35 } },
-  exit: { opacity: 0, x: -8, transition: { duration: 0.15 } },
-}
-
 const fadeUp = {
   hidden: { opacity: 0, y: 8 },
   visible: {
@@ -47,9 +40,10 @@ const fadeUp = {
 interface Props {
   storagePath: string
   sessionId: string
+  onSlidesExtracted?: () => void
 }
 
-export function PdfViewer({ storagePath, sessionId }: Props) {
+export function PdfViewer({ storagePath, sessionId, onSlidesExtracted }: Props) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadLabel, setLoadLabel] = useState('Fetching slides…')
   const [loadPct, setLoadPct] = useState(0)
@@ -65,8 +59,12 @@ export function PdfViewer({ storagePath, sessionId }: Props) {
   const objectUrlRef = useRef<string | null>(null)
   const renderTaskRef = useRef<{ cancel(): void } | null>(null)
   const pageJumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const currentPageRef = useRef(0)
 
   const supabase = createClient()
+
+  const onSlidesExtractedRef = useRef(onSlidesExtracted)
+  useEffect(() => { onSlidesExtractedRef.current = onSlidesExtracted }, [onSlidesExtracted])
 
   // Subscribe to store activeSlideIndex for audio-driven page jumps.
   const activeSlideIndex = useSessionStore((s) => s.activeSlideIndex)
@@ -140,12 +138,22 @@ export function PdfViewer({ storagePath, sessionId }: Props) {
   // ── Render page ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (status !== 'ready') return
+    // Skip if this page was already rendered (guards against re-mount without page change)
+    if (currentPage === currentPageRef.current && currentPageRef.current !== 0) return
+    currentPageRef.current = currentPage
+
     const pdf = pdfRef.current
     const canvas = canvasRef.current
     const textLayerDiv = textLayerRef.current
     const canvasWrap = canvasWrapRef.current
     const canvasArea = canvasAreaRef.current
     if (!pdf || !canvas || !textLayerDiv || !canvasWrap || !canvasArea) return
+
+    // Cancel any in-progress render task before starting a new one
+    if (renderTaskRef.current) {
+      try { renderTaskRef.current.cancel() } catch { /* ignore */ }
+      renderTaskRef.current = null
+    }
 
     let cancelled = false
 
@@ -165,12 +173,12 @@ export function PdfViewer({ storagePath, sessionId }: Props) {
       canvasWrap!.style.width = `${viewport.width}px`
       canvasWrap!.style.height = `${viewport.height}px`
 
-      renderTaskRef.current?.cancel()
       const renderTask = page.render({ canvas: canvas!, viewport })
       renderTaskRef.current = renderTask
 
       try {
         await renderTask.promise
+        renderTaskRef.current = null
       } catch (e) {
         if ((e as Error).name === 'RenderingCancelledException') return
         throw e
@@ -213,6 +221,7 @@ export function PdfViewer({ storagePath, sessionId }: Props) {
 
       if ((count ?? 0) > 0) return
       await extractSlideText(pdfRef.current!, sessionId, mk!, supabase)
+      onSlidesExtractedRef.current?.()
     }
 
     maybeExtract().catch((e) => console.error('[pdf-viewer] extraction error:', e))
@@ -254,23 +263,12 @@ export function PdfViewer({ storagePath, sessionId }: Props) {
           animate="visible"
           className="flex flex-1 min-h-0 overflow-hidden"
         >
-          {/* Scrollable canvas area — AnimatePresence key=currentPage fires slideJump on page change */}
+          {/* Scrollable canvas area — canvas is persistent; rendered to imperatively */}
           <div ref={canvasAreaRef} className="flex-1 min-w-0 overflow-auto p-2">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentPage}
-                variants={slideJump}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                className="inline-block"
-              >
-                <div ref={canvasWrapRef} className="relative inline-block">
-                  <canvas ref={canvasRef} className="block" />
-                  <div ref={textLayerRef} className="textLayer absolute inset-0" />
-                </div>
-              </motion.div>
-            </AnimatePresence>
+            <div ref={canvasWrapRef} className="relative inline-block">
+              <canvas ref={canvasRef} className="block" />
+              <div ref={textLayerRef} className="textLayer absolute inset-0" />
+            </div>
           </div>
 
           <SlideNavStrip

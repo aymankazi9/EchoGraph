@@ -1,12 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence } from 'framer-motion'
-import { Plus } from 'lucide-react'
+import { Plus, RefreshCw } from 'lucide-react'
 import { getMasterKey, isVaultUnlocked } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
+import { encryptText } from '@/lib/crypto/encrypt'
+import { createClient } from '@/lib/supabase'
 import { useDashboardStore, type SessionRow } from '@/store/dashboard-store'
 import { SessionCard } from './session-card'
 import { SessionCardSkeleton } from './session-card-skeleton'
@@ -55,6 +57,10 @@ export function VaultDashboardClient({
 }: Props) {
   const router = useRouter()
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Stable supabase client — used for realtime + manual refresh
+  const supabase = useMemo(() => createClient(), [])
 
   const setSessions = useDashboardStore((s) => s.setSessions)
   const setTitleMap = useDashboardStore((s) => s.setTitleMap)
@@ -115,6 +121,59 @@ export function VaultDashboardClient({
     }
   }, [clearFilters])
 
+  // ── Realtime: update session status/guide in store when DB row changes ─────
+  // NOTE: requires REPLICA IDENTITY FULL on sessions table in Supabase.
+  // Enable in Supabase SQL Editor: ALTER TABLE public.sessions REPLICA IDENTITY FULL;
+  // Enable replication: Database → Replication → sessions table → toggle on.
+  useEffect(() => {
+    const channel = supabase
+      .channel('sessions-status')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'sessions',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          useDashboardStore.getState().updateSession(payload.new.id as string, {
+            status: payload.new.status as string,
+            has_study_guide: payload.new.has_study_guide as boolean,
+            guide_type: payload.new.guide_type as string | null,
+            has_slides: payload.new.has_slides as boolean,
+            has_audio: payload.new.has_audio as boolean,
+          })
+        },
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [userId, supabase])
+
+  // ── Manual refresh: re-fetch sessions from Supabase ────────────────────────
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    try {
+      const { data } = await supabase
+        .from('sessions')
+        .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, created_at')
+        .order('created_at', { ascending: false })
+      if (data) {
+        const existing = useDashboardStore.getState().sessions
+        const existingMap = Object.fromEntries(existing.map((s) => [s.id, s]))
+        const rows: SessionRow[] = data.map((s) => ({
+          ...s,
+          red_zone_count: existingMap[s.id]?.red_zone_count ?? 0,
+          storage_used_bytes: existingMap[s.id]?.storage_used_bytes ?? 0,
+        }))
+        useDashboardStore.getState().setSessions(rows)
+      }
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [supabase])
+
   // ── Cmd/Ctrl+K global shortcut ─────────────────────────────────────────────
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -135,22 +194,34 @@ export function VaultDashboardClient({
     useDashboardStore.getState().setSessions(currentSessions.filter((s) => s.id !== id))
   }
 
+  // ── Rename handler — encrypt + PATCH + update titleMap ────────────────────
+  async function handleRename(id: string, newTitle: string) {
+    const mk = getMasterKey()
+    if (!mk) throw new Error('Vault locked')
+    const titleEncrypted = await encryptText(mk, newTitle)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('sessions')
+      .update({ title_encrypted: titleEncrypted })
+      .eq('id', id)
+    if (error) throw error
+    useDashboardStore.getState().updateTitle(id, newTitle)
+  }
+
   // ── Derive per-card title from store's titleMap ───────────────────────────
   const titleMap = useDashboardStore((s) => s.titleMap)
 
   if (sessions.length === 0) {
     return (
       <div className="flex flex-col">
-        <div className="px-6 pt-8">
-          <GettingStarted
-            userId={userId}
-            sessions={sessions}
-            redZoneCounts={redZoneCounts}
-            initialChecklistDismissed={checklistDismissed}
-            initialChecklistCompleted={checklistCompleted}
-            initialChecklistExported={checklistExported}
-          />
-        </div>
+        <GettingStarted
+          userId={userId}
+          sessions={sessions}
+          redZoneCounts={redZoneCounts}
+          initialChecklistDismissed={checklistDismissed}
+          initialChecklistCompleted={checklistCompleted}
+          initialChecklistExported={checklistExported}
+        />
         <EmptyState />
       </div>
     )
@@ -159,7 +230,7 @@ export function VaultDashboardClient({
   const showResultCount = isFiltered
 
   return (
-    <div className="px-6 py-8">
+    <div>
       {/* Getting started checklist */}
       <GettingStarted
         userId={userId}
@@ -173,13 +244,25 @@ export function VaultDashboardClient({
       {/* Page header */}
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-heading font-medium text-text-primary">Your vault</h1>
-        <Link
-          href="/session/new"
-          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-btn text-body font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
-        >
-          <Plus size={14} strokeWidth={1.5} />
-          New session
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Refresh sessions"
+            aria-label="Refresh sessions"
+            className="w-9 h-9 flex items-center justify-center rounded-btn text-text-tertiary hover:text-text-secondary hover:bg-bg-subtle transition-colors disabled:opacity-40"
+          >
+            <RefreshCw size={16} strokeWidth={1.5} className={isRefreshing ? 'animate-spin' : ''} />
+          </button>
+          <Link
+            href="/session/new"
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-btn text-body font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
+          >
+            <Plus size={14} strokeWidth={1.5} />
+            New session
+          </Link>
+        </div>
       </div>
       <p className="text-body-sm text-text-secondary mb-5">
         {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'} · {storageMB.toFixed(1)} MB used
@@ -216,7 +299,7 @@ export function VaultDashboardClient({
               <SessionCard
                 key={s.id}
                 id={s.id}
-                title={titleMap.get(s.id) ?? null}
+                title={titleMap[s.id] ?? null}
                 status={s.status}
                 hasSlides={s.has_slides}
                 hasAudio={s.has_audio}
@@ -227,6 +310,7 @@ export function VaultDashboardClient({
                 slideCount={slideCounts[s.id] ?? 0}
                 sizeMB={0}
                 onDelete={handleDelete}
+                onRename={handleRename}
                 highlightQuery={searchQuery}
               />
             ))}

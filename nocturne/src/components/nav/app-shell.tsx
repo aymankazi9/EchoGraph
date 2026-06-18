@@ -31,7 +31,7 @@ export function AppShell({ email, usedBytes, children }: Props) {
   return (
     <div className="h-screen flex overflow-hidden bg-bg-base">
       <SideNav email={email} usedBytes={usedBytes} />
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <main className="flex-1 min-w-0 overflow-y-auto p-8">{children}</main>
     </div>
   )
 }

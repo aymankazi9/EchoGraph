@@ -118,7 +118,7 @@ export function NewSessionClient({ userId }: Props) {
   const busy = phase === 'processing'
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="max-w-5xl mx-auto flex flex-col gap-8">
       {/* Header + privacy status */}
       <div className="flex items-start justify-between gap-4">
         <motion.div variants={fadeUp} initial="hidden" animate="visible" className="flex flex-col gap-1.5">
@@ -139,7 +139,7 @@ export function NewSessionClient({ userId }: Props) {
           </span>
           <button
             type="button"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/vault')}
             className="text-label text-amber-200 hover:text-amber-100 transition-colors shrink-0"
           >
             View in dashboard →
@@ -210,7 +210,7 @@ export function NewSessionClient({ userId }: Props) {
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
           <button
             type="button"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/vault')}
             className="h-9 px-4 rounded-btn text-body font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
           >
             Go to dashboard →

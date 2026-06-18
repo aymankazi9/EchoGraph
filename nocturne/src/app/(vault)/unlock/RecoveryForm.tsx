@@ -32,7 +32,7 @@ export function RecoveryForm({ recoverySalt, onBack }: Props) {
     try {
       setBusy(true)
       await vaultUnlockWithRecovery(payload, recoverySalt)
-      router.push('/dashboard')
+      router.push('/vault')
     } catch (err) {
       setBusy(false)
       const msg = err instanceof Error ? err.message : ''

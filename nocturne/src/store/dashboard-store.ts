@@ -34,9 +34,9 @@ export type SortOrder =
 
 // ─── Filtering helpers ────────────────────────────────────────────────────────
 
-function matchesStatus(row: SessionRow, filter: StatusFilter, hasKeywords: boolean): boolean {
+function matchesStatus(row: SessionRow, filter: StatusFilter): boolean {
   if (filter === 'all') return true
-  if (filter === 'ready') return row.status === 'synced' && hasKeywords
+  if (filter === 'ready') return row.status === 'ready' || row.status === 'synced'
   if (filter === 'processing') return ['ingesting', 'processing'].includes(row.status)
   if (filter === 'transcribing') return ['transcribing', 'syncing'].includes(row.status)
   if (filter === 'synced') return row.status === 'synced'
@@ -56,7 +56,7 @@ function matchesInputFilters(row: SessionRow, filters: InputFilter[]): boolean {
 function applySort(
   rows: SessionRow[],
   order: SortOrder,
-  titleMap: Map<string, string>,
+  titleMap: Record<string, string>,
 ): SessionRow[] {
   const sorted = [...rows]
   switch (order) {
@@ -68,8 +68,8 @@ function applySort(
       return sorted.sort((a, b) => b.red_zone_count - a.red_zone_count)
     case 'alphabetical': {
       return sorted.sort((a, b) => {
-        const ta = titleMap.get(a.id) ?? ''
-        const tb = titleMap.get(b.id) ?? ''
+        const ta = titleMap[a.id] ?? ''
+        const tb = titleMap[b.id] ?? ''
         return ta.localeCompare(tb, undefined, { sensitivity: 'base' })
       })
     }
@@ -86,20 +86,16 @@ function computeFiltered(
   statusFilter: StatusFilter,
   inputFilters: InputFilter[],
   sortOrder: SortOrder,
-  titleMap: Map<string, string>,
+  titleMap: Record<string, string>,
 ): SessionRow[] {
   const q = searchQuery.trim().toLowerCase()
 
   const filtered = sessions.filter((row) => {
-    // 1. Search match
     if (q) {
-      const title = (titleMap.get(row.id) ?? '').toLowerCase()
+      const title = (titleMap[row.id] ?? '').toLowerCase()
       if (!title.includes(q)) return false
     }
-    // 2. Status filter
-    const hasKeywords = row.red_zone_count > 0
-    if (!matchesStatus(row, statusFilter, hasKeywords)) return false
-    // 3. Input filters (AND)
+    if (!matchesStatus(row, statusFilter)) return false
     if (!matchesInputFilters(row, inputFilters)) return false
     return true
   })
@@ -118,12 +114,14 @@ interface State {
   sortOrder: SortOrder
   filteredSessions: SessionRow[]
   /** Decrypted titles keyed by session id — populated once on mount. */
-  titleMap: Map<string, string>
+  titleMap: Record<string, string>
 }
 
 interface Actions {
   setSessions(sessions: SessionRow[]): void
   setTitleMap(map: Map<string, string>): void
+  updateTitle(id: string, plainTitle: string): void
+  updateSession(id: string, updates: Partial<SessionRow>): void
   setSearchQuery(q: string): void
   setStatusFilter(f: StatusFilter): void
   toggleInputFilter(f: InputFilter): void
@@ -139,18 +137,7 @@ const initialState: State = {
   inputFilters: [],
   sortOrder: 'newest',
   filteredSessions: [],
-  titleMap: new Map(),
-}
-
-function recompute(s: State): SessionRow[] {
-  return computeFiltered(
-    s.sessions,
-    s.searchQuery,
-    s.statusFilter,
-    s.inputFilters,
-    s.sortOrder,
-    s.titleMap,
-  )
+  titleMap: {},
 }
 
 export const useDashboardStore = create<State & Actions>()(
@@ -161,25 +148,40 @@ export const useDashboardStore = create<State & Actions>()(
       set((s) => {
         s.sessions = sessions
         s.isLoading = false
-        s.filteredSessions = recompute({ ...s, sessions })
+        s.filteredSessions = computeFiltered(sessions, s.searchQuery, s.statusFilter, s.inputFilters, s.sortOrder, s.titleMap)
       }),
 
     setTitleMap: (map) =>
       set((s) => {
-        s.titleMap = map
-        s.filteredSessions = recompute({ ...s, titleMap: map })
+        const record = Object.fromEntries(map)
+        s.titleMap = record
+        s.filteredSessions = computeFiltered(s.sessions, s.searchQuery, s.statusFilter, s.inputFilters, s.sortOrder, record)
+      }),
+
+    updateTitle: (id, plainTitle) =>
+      set((s) => {
+        s.titleMap[id] = plainTitle
+        s.filteredSessions = computeFiltered(s.sessions, s.searchQuery, s.statusFilter, s.inputFilters, s.sortOrder, s.titleMap)
+      }),
+
+    updateSession: (id, updates) =>
+      set((s) => {
+        const idx = s.sessions.findIndex((sess) => sess.id === id)
+        if (idx === -1) return
+        Object.assign(s.sessions[idx], updates)
+        s.filteredSessions = computeFiltered(s.sessions, s.searchQuery, s.statusFilter, s.inputFilters, s.sortOrder, s.titleMap)
       }),
 
     setSearchQuery: (q) =>
       set((s) => {
         s.searchQuery = q
-        s.filteredSessions = recompute({ ...s, searchQuery: q })
+        s.filteredSessions = computeFiltered(s.sessions, q, s.statusFilter, s.inputFilters, s.sortOrder, s.titleMap)
       }),
 
     setStatusFilter: (f) =>
       set((s) => {
         s.statusFilter = f
-        s.filteredSessions = recompute({ ...s, statusFilter: f })
+        s.filteredSessions = computeFiltered(s.sessions, s.searchQuery, f, s.inputFilters, s.sortOrder, s.titleMap)
       }),
 
     toggleInputFilter: (f) =>
@@ -189,13 +191,13 @@ export const useDashboardStore = create<State & Actions>()(
           ? [...s.inputFilters, f]
           : s.inputFilters.filter((x) => x !== f)
         s.inputFilters = next
-        s.filteredSessions = recompute({ ...s, inputFilters: next })
+        s.filteredSessions = computeFiltered(s.sessions, s.searchQuery, s.statusFilter, next, s.sortOrder, s.titleMap)
       }),
 
     setSortOrder: (o) =>
       set((s) => {
         s.sortOrder = o
-        s.filteredSessions = recompute({ ...s, sortOrder: o })
+        s.filteredSessions = computeFiltered(s.sessions, s.searchQuery, s.statusFilter, s.inputFilters, o, s.titleMap)
       }),
 
     clearFilters: () =>
@@ -203,12 +205,7 @@ export const useDashboardStore = create<State & Actions>()(
         s.statusFilter = 'all'
         s.inputFilters = []
         s.sortOrder = 'newest'
-        s.filteredSessions = recompute({
-          ...s,
-          statusFilter: 'all',
-          inputFilters: [],
-          sortOrder: 'newest',
-        })
+        s.filteredSessions = computeFiltered(s.sessions, s.searchQuery, 'all', [], 'newest', s.titleMap)
       }),
   })),
 )

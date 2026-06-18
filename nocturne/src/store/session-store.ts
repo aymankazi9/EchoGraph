@@ -57,8 +57,6 @@ interface State {
   activeSlideIndex: number
   /** id of the word whose [startMs, endMs] window contains currentTimeMs. */
   activeWordId: string | null
-  /** Internal — set by AudioPlayer on mount; used by seekTo and setSpeed. */
-  _audioEl: HTMLAudioElement | null
   /** Scored and zoned keywords for this session. */
   keywords: StoredKeyword[]
   /** Currently focused keyword id (side panel open). */
@@ -67,6 +65,8 @@ interface State {
   flashcards: Flashcard[]
   /** Slide density scores: pageNumber → 0-100. */
   slideDensityMap: Record<number, number>
+  /** Zone classification per slide: 'likely' (synthetic), 'red' (real guide), or null. */
+  slideZoneMap: Record<number, 'likely' | 'red' | null>
   /** Consent granted for this session only (never persisted). */
   youtubeConsentGranted: boolean
   /** YouTube search results for the active keyword query. */
@@ -117,6 +117,7 @@ interface Actions {
   setActiveKeyword(id: string | null): void
   loadFlashcards(cards: Flashcard[]): void
   loadSlideDensity(map: Record<number, number>): void
+  loadSlideZones(map: Record<number, 'likely' | 'red' | null>): void
   /** Sets YouTube per-session consent (never persisted — clears on refresh). */
   grantYoutubeConsent(): void
   setYoutubeResults(results: VideoResult[]): void
@@ -155,11 +156,11 @@ const initialState: State = {
   playbackSpeed: 1,
   activeSlideIndex: 0,
   activeWordId: null,
-  _audioEl: null,
   keywords: [],
   activeKeywordId: null,
   flashcards: [],
   slideDensityMap: {},
+  slideZoneMap: {},
   youtubeConsentGranted: false,
   youtubeResults: [],
   youtubePanelOpen: false,
@@ -175,15 +176,23 @@ const initialState: State = {
   isUploadPanelOpen: false,
 }
 
+// ─── Audio element (module-level — Immer cannot proxy DOM objects) ────────────
+
+let _audioEl: HTMLAudioElement | null = null
+
+export function getAudioEl(): HTMLAudioElement | null {
+  return _audioEl
+}
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useSessionStore = create<State & Actions>()(
   immer((set, get) => ({
     ...initialState,
 
-    registerAudio: (el) => set((s) => { s._audioEl = el as unknown as null }),
+    registerAudio: (el) => { _audioEl = el },
 
-    unregisterAudio: () => set((s) => { s._audioEl = null }),
+    unregisterAudio: () => { _audioEl = null },
 
     onTimeUpdate: (ms) => set((s) => {
       s.currentTimeMs = ms
@@ -196,8 +205,8 @@ export const useSessionStore = create<State & Actions>()(
     onPlayStateChange: (playing) => set((s) => { s.isPlaying = playing }),
 
     seekTo: (ms) => {
-      const { _audioEl, syncMap, transcriptWords } = get()
       if (_audioEl) _audioEl.currentTime = ms / 1000
+      const { syncMap, transcriptWords } = get()
       set((s) => {
         s.currentTimeMs = ms
         s.activeSlideIndex = getActiveSlideIndex(ms, syncMap)
@@ -206,7 +215,6 @@ export const useSessionStore = create<State & Actions>()(
     },
 
     setSpeed: (speed) => {
-      const { _audioEl } = get()
       if (_audioEl) _audioEl.playbackRate = speed
       set((s) => { s.playbackSpeed = speed })
     },
@@ -258,6 +266,8 @@ export const useSessionStore = create<State & Actions>()(
     loadFlashcards: (cards) => set((s) => { s.flashcards = cards }),
 
     loadSlideDensity: (map) => set((s) => { s.slideDensityMap = map }),
+
+    loadSlideZones: (map) => set((s) => { s.slideZoneMap = map }),
 
     grantYoutubeConsent: () => set((s) => { s.youtubeConsentGranted = true }),
 

@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { Shield } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Props {
   collapsed: boolean
@@ -18,13 +19,20 @@ const localPulse = {
 export function PrivacyBadge({ collapsed }: Props) {
   if (collapsed) {
     return (
-      <div className="flex items-center justify-center w-8 h-8">
-        <motion.span
-          variants={localPulse}
-          animate="animate"
-          className="inline-block w-2 h-2 rounded-full bg-indigo-500"
-        />
-      </div>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center justify-center w-7 h-7 cursor-default">
+              <motion.span
+                variants={localPulse}
+                animate="animate"
+                className="inline-block w-2 h-2 rounded-full bg-indigo-500"
+              />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right">Local Mode — processing on your device</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     )
   }
 

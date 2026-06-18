@@ -86,10 +86,10 @@ export async function GET(
       .eq('id', user.id)
       .single()
 
-  const destination = 
-    profile?.pbkdf2_salt 
-      ? '/vault/unlock' 
-      : '/vault/setup'
+  const destination =
+    profile?.pbkdf2_salt
+      ? '/unlock'
+      : '/setup'
 
   return NextResponse.redirect(
     new URL(destination, origin)
