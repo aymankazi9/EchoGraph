@@ -17,7 +17,7 @@ export default async function SessionPage({
 
   const { data: session } = await supabase
     .from('sessions')
-    .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status')
+    .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, course_tag')
     .eq('id', sessionId)
     .eq('user_id', user.id)
     .single()

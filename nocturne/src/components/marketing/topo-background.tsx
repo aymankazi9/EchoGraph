@@ -1,258 +1,265 @@
-/*
- * TOPO BACKGROUND TUNING
- *
- * To make pulses more frequent:   decrease GAP_LENGTH (try 40)
- * To make pulses less frequent:   increase GAP_LENGTH (try 80)
- * To make pulses longer/fatter:   increase PULSE_LENGTH (try 12)
- * To make pulses shorter/sharper: decrease PULSE_LENGTH (try 5)
- * To speed up the flow:           decrease BASE_DURATION (try 7)
- * To slow down the flow:          increase BASE_DURATION (try 14)
- * To increase line density:       increase NUM_CONTOUR_LEVELS in noise-field.ts (try 22)
- * To make terrain more complex:   decrease NOISE_SCALE in noise-field.ts (try 0.012)
- * To increase glow intensity:     increase stdDeviation in pulse-glow filter (try 0.6 / 1.0)
- * To make base lines more visible: increase base stroke opacity from 0.10 to 0.15
- *
- * Note: SVG filter IDs (pulse-glow, pulse-glow-strong, topo-fade, topo-mask) must be
- * unique per page. TopoBackground is rendered once — this assumption holds as long as
- * it is not used in multiple simultaneous instances.
- */
-
 'use client'
 
-import { useEffect, useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
-import { generateSingleTerrain } from '@/lib/topo/noise-field'
+import { useEffect, useRef } from 'react'
+import { useReducedMotion } from 'framer-motion'
 
-// Animation constants — adjust via the tuning guide above
-const PULSE_LENGTH = 20
-const GAP_LENGTH = 900
-const BASE_DURATION = 72 // seconds per pulse cycle
-const PULSES_PER_PATH = 2
+// --- Perlin noise (classic implementation) ---
 
-const GRID_WIDTH = 140
-const GRID_HEIGHT = 90
-
-// Mid-elevation band (topographic peaks): brighter glow
-const MID_LOW = 0.35
-const MID_HIGH = 0.70
-
-interface GlowLayerProps {
-  reduced: boolean | null
+function buildPerm(): Uint8Array {
+  const p = new Uint8Array(512)
+  const src = Array.from({ length: 256 }, (_, i) => i)
+  for (let i = 255; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0
+    const t = src[i]; src[i] = src[j]; src[j] = t
+  }
+  for (let i = 0; i < 512; i++) p[i] = src[i & 255]
+  return p
 }
 
-function GlowLayer({ reduced }: GlowLayerProps) {
-  return (
-    <>
-      {/* Primary focal glow — indigo, left-center */}
-      <motion.div
-        animate={
-          reduced
-            ? undefined
-            : { opacity: [0.6, 1, 0.6], x: [0, 15, 0], y: [0, -10, 0] }
-        }
-        transition={
-          reduced
-            ? undefined
-            : { duration: 14, repeat: Infinity, ease: 'easeInOut' }
-        }
-        style={{
-          position: 'absolute',
-          top: '15%',
-          left: '25%',
-          width: 500,
-          height: 350,
-          background:
-            'radial-gradient(ellipse at center, rgba(99,102,241,0.07) 0%, rgba(99,102,241,0.02) 45%, transparent 70%)',
-          filter: 'blur(40px)',
-          pointerEvents: 'none',
-        }}
-      />
-      {/* Secondary focal glow — violet, right-center */}
-      <motion.div
-        animate={
-          reduced
-            ? undefined
-            : { opacity: [0.4, 0.8, 0.4], x: [0, -20, 0], y: [0, 12, 0] }
-        }
-        transition={
-          reduced
-            ? undefined
-            : { duration: 20, repeat: Infinity, ease: 'easeInOut' }
-        }
-        style={{
-          position: 'absolute',
-          top: '35%',
-          left: '58%',
-          width: 400,
-          height: 280,
-          background:
-            'radial-gradient(ellipse at center, rgba(139,92,246,0.05) 0%, rgba(139,92,246,0.015) 40%, transparent 70%)',
-          filter: 'blur(50px)',
-          pointerEvents: 'none',
-        }}
-      />
-    </>
+function fade(t: number) { return t * t * t * (t * (t * 6 - 15) + 10) }
+function lerpN(a: number, b: number, t: number) { return a + t * (b - a) }
+function grad(h: number, x: number, y: number, z: number) {
+  h &= 15
+  const u = h < 8 ? x : y
+  const v = h < 4 ? y : h === 12 || h === 14 ? x : z
+  return ((h & 1) ? -u : u) + ((h & 2) ? -v : v)
+}
+function perlin(perm: Uint8Array, x: number, y: number, z: number): number {
+  const fl = Math.floor
+  let X = fl(x) & 255, Y = fl(y) & 255, Z = fl(z) & 255
+  x -= fl(x); y -= fl(y); z -= fl(z)
+  const u = fade(x), v = fade(y), w = fade(z)
+  const A = perm[X] + Y, AA = perm[A] + Z, AB = perm[A + 1] + Z
+  const B = perm[X + 1] + Y, BA = perm[B] + Z, BB = perm[B + 1] + Z
+  return lerpN(
+    lerpN(
+      lerpN(grad(perm[AA], x, y, z),         grad(perm[BA], x - 1, y, z), u),
+      lerpN(grad(perm[AB], x, y - 1, z),     grad(perm[BB], x - 1, y - 1, z), u),
+      v,
+    ),
+    lerpN(
+      lerpN(grad(perm[AA + 1], x, y, z - 1),     grad(perm[BA + 1], x - 1, y, z - 1), u),
+      lerpN(grad(perm[AB + 1], x, y - 1, z - 1), grad(perm[BB + 1], x - 1, y - 1, z - 1), u),
+      v,
+    ),
+    w,
   )
 }
 
-export function TopoBackground() {
-  const [paths, setPaths] = useState<string[]>([])
-  const reduced = useReducedMotion()
+// --- Marching squares draw ---
 
-  // generateSingleTerrain() is CPU-bound — deferred 100ms so first paint completes first.
-  // Cancellation flag prevents setState after unmount.
-  useEffect(() => {
-    let cancelled = false
-    const id = setTimeout(() => {
-      generateSingleTerrain()
-        .then((result) => { if (!cancelled) setPaths(result) })
-        .catch(() => {})
-    }, 100)
-    return () => {
-      cancelled = true
-      clearTimeout(id)
+type S = {
+  w: number; h: number; dpr: number
+  cols: number; rows: number; cw: number; ch: number
+  mx: number; my: number; tmx: number; tmy: number
+}
+
+function drawFrame(
+  ctx: CanvasRenderingContext2D,
+  s: S,
+  noise: (x: number, y: number, z: number) => number,
+  vals: Float32Array,
+  LEVELS: number,
+  t: number,
+  animate: boolean,
+) {
+  const { cols, rows, cw, ch } = s
+  const hasMouse = s.mx > -50000
+
+  for (let gy = 0; gy < rows; gy++) {
+    for (let gx = 0; gx < cols; gx++) {
+      let v = noise(gx * 0.085, gy * 0.085, t * 0.10) * 0.5 + 0.5
+      if (hasMouse) {
+        const dx = gx * cw - s.mx, dy = gy * ch - s.my
+        const d2 = dx * dx + dy * dy
+        if (d2 < 60000) v += 0.34 * Math.exp(-d2 / 16000)
+      }
+      vals[gx + gy * cols] = v
     }
-  }, [])
+  }
 
-  // Scroll parallax — rAF-throttled so CSS property updates sync with paint at 60fps max
-  useEffect(() => {
-    if (reduced) return
-    let rafId: number
-    let lastScrollY = 0
-    let ticking = false
+  ctx.clearRect(0, 0, s.w, s.h)
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  const breath = animate ? (0.62 + 0.38 * Math.sin(t * 1.5)) : 1
 
-    const handleScroll = () => {
-      lastScrollY = window.scrollY
-      if (!ticking) {
-        rafId = requestAnimationFrame(() => {
-          const offset = Math.min(lastScrollY / (window.innerHeight * 0.8), 1) * 20
-          document.documentElement.style.setProperty('--topo-scroll-offset', `${offset}px`)
-          ticking = false
-        })
-        ticking = true
+  const seg = (ax: number, ay: number, bx: number, by: number) => {
+    ctx.moveTo(ax, ay); ctx.lineTo(bx, by)
+  }
+
+  for (let li = 0; li < LEVELS; li++) {
+    const f = li / (LEVELS - 1)
+    const thr = 0.16 + f * 0.70
+    let color: string, alpha: number, lw: number, glow: number
+
+    if (f > 0.84)      { color = '244,63,94';   alpha = 0.6 * breath; lw = 1.6; glow = 12 }
+    else if (f > 0.66) { color = '167,139,250'; alpha = 0.5;           lw = 1.25; glow = 6 }
+    else               { color = '99,102,241';  alpha = 0.09 + 0.20 * f; lw = 1; glow = 0 }
+
+    ctx.beginPath()
+    for (let gy = 0; gy < rows - 1; gy++) {
+      for (let gx = 0; gx < cols - 1; gx++) {
+        const i = gx + gy * cols
+        const tl = vals[i], tr = vals[i + 1], bl = vals[i + cols], br = vals[i + cols + 1]
+        let idx = 0
+        if (tl > thr) idx |= 8; if (tr > thr) idx |= 4
+        if (br > thr) idx |= 2; if (bl > thr) idx |= 1
+        if (idx === 0 || idx === 15) continue
+        const x0 = gx * cw, y0 = gy * ch, x1 = x0 + cw, y1 = y0 + ch
+        const tpx = x0 + (thr - tl) / (tr - tl) * cw
+        const rpy = y0 + (thr - tr) / (br - tr) * ch
+        const bpx = x0 + (thr - bl) / (br - bl) * cw
+        const lpy = y0 + (thr - tl) / (bl - tl) * ch
+        switch (idx) {
+          case 1:  seg(x0, lpy, bpx, y1); break
+          case 2:  seg(bpx, y1, x1, rpy); break
+          case 3:  seg(x0, lpy, x1, rpy); break
+          case 4:  seg(tpx, y0, x1, rpy); break
+          case 5:  seg(tpx, y0, x1, rpy); seg(x0, lpy, bpx, y1); break
+          case 6:  seg(tpx, y0, bpx, y1); break
+          case 7:  seg(tpx, y0, x0, lpy); break
+          case 8:  seg(tpx, y0, x0, lpy); break
+          case 9:  seg(tpx, y0, bpx, y1); break
+          case 10: seg(tpx, y0, x0, lpy); seg(bpx, y1, x1, rpy); break
+          case 11: seg(tpx, y0, x1, rpy); break
+          case 12: seg(x0, lpy, x1, rpy); break
+          case 13: seg(bpx, y1, x1, rpy); break
+          case 14: seg(x0, lpy, bpx, y1); break
+        }
       }
     }
 
-    window.addEventListener('scroll', handleScroll, { passive: true })
+    ctx.strokeStyle = `rgba(${color},${alpha})`
+    ctx.lineWidth = lw
+    if (glow > 0) { ctx.shadowBlur = glow; ctx.shadowColor = `rgba(${color},0.85)` }
+    else ctx.shadowBlur = 0
+    ctx.stroke()
+  }
+  ctx.shadowBlur = 0
+}
+
+// --- Component ---
+
+export function TopoBackground() {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const glowRef = useRef<HTMLDivElement>(null)
+  const reduced = useReducedMotion()
+
+  useEffect(() => {
+    const wrap = wrapRef.current
+    const canvas = canvasRef.current
+    const glow = glowRef.current
+    if (!canvas || !wrap) return
+
+    const ctx = canvas.getContext('2d')!
+    const perm = buildPerm()
+    const LEVELS = 13
+
+    const s: S = { w: 0, h: 0, dpr: 1, cols: 0, rows: 0, cw: 0, ch: 0, mx: -99999, my: -99999, tmx: -99999, tmy: -99999 }
+    let vals = new Float32Array(0)
+    let rafId = 0
+
+    const resize = () => {
+      const r = wrap.getBoundingClientRect()
+      s.w = r.width; s.h = r.height
+      s.dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+      canvas.width = Math.round(s.w * s.dpr)
+      canvas.height = Math.round(s.h * s.dpr)
+      ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0)
+      s.cols = Math.max(26, Math.round(s.w / 24))
+      s.rows = Math.max(18, Math.round(s.h / 24))
+      s.cw = s.w / (s.cols - 1)
+      s.ch = s.h / (s.rows - 1)
+      vals = new Float32Array(s.cols * s.rows)
+    }
+    window.addEventListener('resize', resize, { passive: true })
+    resize()
+
+    // Track cursor via window — pointermove on a pointer-events:none wrapper won't fire.
+    // Bounds check restricts the effect to the hero area only.
+    const onMove = (e: PointerEvent) => {
+      const r = canvas.getBoundingClientRect()
+      const x = e.clientX - r.left, y = e.clientY - r.top
+      if (x >= 0 && x <= r.width && y >= 0 && y <= r.height) {
+        s.tmx = x; s.tmy = y
+      } else {
+        s.tmx = -99999; s.tmy = -99999
+      }
+    }
+    window.addEventListener('pointermove', onMove)
+
+    const noise = (x: number, y: number, z: number) => perlin(perm, x, y, z)
+
+    if (reduced) {
+      drawFrame(ctx, s, noise, vals, LEVELS, 0, false)
+    } else {
+      const start = performance.now()
+      const loop = (now: number) => {
+        const t = (now - start) / 1000
+        if (s.tmx < -50000) {
+          s.mx += (-99999 - s.mx) * 0.08
+          s.my += (-99999 - s.my) * 0.08
+        } else {
+          s.mx += (s.tmx - s.mx) * 0.12
+          s.my += (s.tmy - s.my) * 0.12
+        }
+        if (glow) {
+          if (s.tmx > -50000) {
+            glow.style.opacity = '1'
+            glow.style.transform = `translate(${s.mx}px,${s.my}px)`
+          } else {
+            glow.style.opacity = '0'
+          }
+        }
+        drawFrame(ctx, s, noise, vals, LEVELS, t, true)
+        rafId = requestAnimationFrame(loop)
+      }
+      rafId = requestAnimationFrame(loop)
+    }
+
     return () => {
-      window.removeEventListener('scroll', handleScroll)
       cancelAnimationFrame(rafId)
-      document.documentElement.style.removeProperty('--topo-scroll-offset')
+      window.removeEventListener('resize', resize)
+      window.removeEventListener('pointermove', onMove)
     }
   }, [reduced])
 
   return (
     <div
+      ref={wrapRef}
       className="absolute inset-0 overflow-hidden pointer-events-none"
-      style={{
-        zIndex: 0,
-        contain: 'strict',
-        willChange: 'transform',
-        transform: 'translateZ(0)',
-        maskImage: 'linear-gradient(to bottom, black 0%, black 60%, transparent 85%)',
-        WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 60%, transparent 85%)',
-      }}
+      style={{ zIndex: 0, contain: 'strict' }}
       aria-hidden="true"
     >
-      <GlowLayer reduced={reduced} />
-
-      <svg
-        viewBox={`0 0 ${GRID_WIDTH} ${GRID_HEIGHT}`}
-        preserveAspectRatio="xMidYMid slice"
+      {/* Static ambient glow */}
+      <div style={{
+        position: 'absolute', top: '8%', left: '50%',
+        transform: 'translateX(-50%)',
+        width: 760, maxWidth: '90vw', height: 380,
+        background: 'radial-gradient(ellipse at center, rgba(99,102,241,0.10) 0%, rgba(139,92,246,0.05) 40%, transparent 72%)',
+        filter: 'blur(50px)', pointerEvents: 'none',
+      }} />
+      {/* Cursor-following rose glow */}
+      <div
+        ref={glowRef}
         style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
+          position: 'absolute', top: 0, left: 0,
+          width: 340, height: 340,
+          margin: '-170px 0 0 -170px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle at center, rgba(244,63,94,0.14) 0%, rgba(139,92,246,0.06) 45%, transparent 70%)',
+          filter: 'blur(14px)',
+          opacity: 0,
+          transition: 'opacity .4s',
           pointerEvents: 'none',
           willChange: 'transform',
-          transform: reduced
-            ? undefined
-            : 'translateY(calc(var(--topo-scroll-offset, 0px) * -0.15))',
         }}
-      >
-        <defs>
-          {/* Radial vignette — fades contours toward edges */}
-          <radialGradient id="topo-fade" cx="50%" cy="40%" r="55%">
-            <stop offset="0%" stopColor="white" stopOpacity="1" />
-            <stop offset="65%" stopColor="white" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="white" stopOpacity="0" />
-          </radialGradient>
-          <mask id="topo-mask">
-            <rect width="100%" height="100%" fill="url(#topo-fade)" />
-          </mask>
-
-        </defs>
-
-        <g mask="url(#topo-mask)">
-          {/* Base paths — static, very dim, no filter */}
-          {paths.map((d, i) => (
-            <path
-              key={i}
-              d={d}
-              fill="none"
-              stroke="rgba(99,102,241,0.10)"
-              strokeWidth={0.18}
-            />
-          ))}
-
-          {/* Standard elevation pulses — one CSS blur on the group, not per-path */}
-          {!reduced && (
-            <g style={{ filter: 'blur(0.6px)', willChange: 'filter' }}>
-              {paths.flatMap((d, i) => {
-                const fraction = i / (paths.length - 1 || 1)
-                if (fraction >= MID_LOW && fraction <= MID_HIGH) return []
-                const delay = i * 0.4
-                return Array.from({ length: PULSES_PER_PATH }, (_, pulseIndex) => {
-                  const pulseDelay = delay + (pulseIndex * (BASE_DURATION / PULSES_PER_PATH))
-                  return (
-                    <path
-                      key={`${i}-${pulseIndex}`}
-                      d={d}
-                      fill="none"
-                      stroke="rgba(167,139,250,0.6)"
-                      strokeWidth={0.22}
-                      strokeDasharray={`${PULSE_LENGTH} ${GAP_LENGTH}`}
-                      strokeDashoffset={0}
-                      style={{
-                        animation: 'topo-pulse ' + BASE_DURATION + 's linear -' + pulseDelay + 's infinite',
-                      }}
-                    />
-                  )
-                })
-              })}
-            </g>
-          )}
-
-          {/* Mid-elevation pulses — stronger blur for topographic peaks */}
-          {!reduced && (
-            <g style={{ filter: 'blur(1.0px)', willChange: 'filter' }}>
-              {paths.flatMap((d, i) => {
-                const fraction = i / (paths.length - 1 || 1)
-                if (!(fraction >= MID_LOW && fraction <= MID_HIGH)) return []
-                const delay = i * 0.4
-                return Array.from({ length: PULSES_PER_PATH }, (_, pulseIndex) => {
-                  const pulseDelay = delay + (pulseIndex * (BASE_DURATION / PULSES_PER_PATH))
-                  return (
-                    <path
-                      key={`${i}-${pulseIndex}`}
-                      d={d}
-                      fill="none"
-                      stroke="rgba(167,139,250,0.8)"
-                      strokeWidth={0.3}
-                      strokeDasharray={`${PULSE_LENGTH} ${GAP_LENGTH}`}
-                      strokeDashoffset={0}
-                      style={{
-                        animation: 'topo-pulse ' + BASE_DURATION + 's linear -' + pulseDelay + 's infinite',
-                      }}
-                    />
-                  )
-                })
-              })}
-            </g>
-          )}
-        </g>
-      </svg>
+      />
+      <canvas
+        ref={canvasRef}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      />
     </div>
   )
 }

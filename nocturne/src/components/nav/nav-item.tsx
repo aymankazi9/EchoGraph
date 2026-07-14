@@ -19,13 +19,12 @@ export function NavItem({ href, icon: Icon, label, collapsed }: Props) {
   const inner = (
     <Link
       href={href}
+      data-navitem
+      style={isActive ? { background: 'rgba(99,102,241,0.13)', color: '#C7CEF5' } : undefined}
       className={[
-        'flex items-center gap-3 rounded-btn transition-colors',
-        collapsed ? 'w-8 h-8 justify-center' : 'h-9 px-3',
-        isActive
-          ? 'bg-bg-subtle text-text-primary border-l-2 border-indigo-500 pl-[10px]'
-          : 'text-text-secondary hover:bg-bg-subtle hover:text-text-primary border-l-2 border-transparent',
-        !isActive && !collapsed ? 'pl-[10px]' : '',
+        'flex items-center gap-3 rounded-md transition-colors',
+        collapsed ? 'w-10 h-[38px] justify-center' : 'h-[38px] px-3',
+        isActive ? '' : 'text-text-secondary hover:bg-bg-subtle hover:text-text-primary',
       ].join(' ')}
     >
       <Icon size={16} strokeWidth={1.5} className="shrink-0" />

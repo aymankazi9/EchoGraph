@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; }
+  body { background:#09090F; color:#E2E8F0; font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  ::selection { background:rgba(99,102,241,0.28); color:#E2E8F0; }
+  a { color:inherit; text-decoration:none; }
+  @keyframes noct-dial-stall { 0%{ transform:rotate(0deg); } 12%{ transform:rotate(34deg); } 16%{ transform:rotate(30deg); } 70%{ transform:rotate(214deg); } 76%{ transform:rotate(210deg); } 100%{ transform:rotate(360deg); } }
+  @keyframes noct-pulse { 0%,100%{ opacity:0.55; } 50%{ opacity:1; } }
+  @keyframes noct-flicker { 0%,100%{ opacity:0.85; } 45%{ opacity:0.85; } 50%{ opacity:0.3; } 55%{ opacity:0.85; } }
+</style>
+</helmet>
+
+<div style="position:relative; min-height:100vh; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:96px 24px 48px; box-sizing:border-box;">
+
+  <!-- ambient glows -->
+  <div style="position:absolute; top:-260px; left:50%; transform:translateX(-50%); width:900px; height:620px; background:radial-gradient(ellipse at center, rgba(99,102,241,0.16), rgba(99,102,241,0) 62%); pointer-events:none;"></div>
+  <div style="position:absolute; bottom:-200px; left:50%; transform:translateX(-50%); width:760px; height:420px; background:radial-gradient(ellipse at center, rgba(251,113,133,0.07), rgba(251,113,133,0) 65%); pointer-events:none;"></div>
+
+  <!-- wordmark -->
+  <a href="Vault Dashboard.dc.html" style="position:absolute; top:28px; left:32px; display:inline-flex; align-items:center; gap:9px; font-size:16px; font-weight:600; letter-spacing:-0.01em; color:#E2E8F0;">
+    <span style="width:25px; height:25px; border-radius:7px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:13px;">N</span>
+    Nocturne
+  </a>
+
+  <!-- content -->
+  <div style="position:relative; z-index:1; width:100%; max-width:560px; text-align:center;">
+
+    <!-- 5 0 0 with stalled vault-dial zero -->
+    <div style="display:flex; align-items:center; justify-content:center; gap:8px; font-size:clamp(108px,18vw,170px); font-weight:600; line-height:1; letter-spacing:-0.05em; color:#E6E9F2;">
+      <span>5</span>
+      <span style="position:relative; display:inline-flex; width:0.92em; height:0.92em; align-items:center; justify-content:center;">
+        <svg viewBox="0 0 100 100" style="width:100%; height:100%; display:block;">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#17161F" stroke-width="3"></circle>
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#23222F" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round"></circle>
+          <circle cx="50" cy="50" r="33" fill="none" stroke="#FB7185" stroke-width="2.5" stroke-dasharray="118 90" opacity="0.8" style="animation:noct-flicker 2.4s ease-in-out infinite;"></circle>
+          <circle cx="50" cy="50" r="6.5" fill="#FDA4AF"></circle>
+          <g style="transform-origin:50px 50px; animation:noct-dial-stall 5.5s cubic-bezier(.5,0,.5,1) infinite;">
+            <circle cx="50" cy="12" r="4.2" fill="#FDA4AF"></circle>
+          </g>
+        </svg>
+      </span>
+      <span>0</span>
+    </div>
+
+    <h1 style="font-size:23px; font-weight:600; letter-spacing:-0.02em; color:#E2E8F0; margin:30px 0 0;">Something jammed on our end</h1>
+    <p style="font-size:14.5px; line-height:1.65; color:#94A3B8; margin:13px auto 0; max-width:440px;">A server hit a fault while reaching for your vault. Nothing was lost and nothing was decrypted — give it a moment and try again.</p>
+
+    <!-- error chip -->
+    <div style="display:inline-flex; align-items:center; gap:8px; margin-top:22px; padding:7px 13px; border-radius:9px; border:1px solid #1A1A26; background:#0D0D14;">
+      <span style="width:6px; height:6px; border-radius:50%; background:#FB7185; animation:noct-pulse 2s ease-in-out infinite;"></span>
+      <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#7C8398; letter-spacing:0.01em; white-space:nowrap;">ERR_500 · VAULT_UNREACHABLE</span>
+    </div>
+
+    <!-- actions -->
+    <div style="display:flex; align-items:center; justify-content:center; gap:11px; flex-wrap:wrap; margin-top:30px;">
+      <a href="500.dc.html" style="height:46px; padding:0 22px; display:inline-flex; align-items:center; gap:9px; border-radius:10px; background:#6366F1; color:#09090F; font-size:14.5px; font-weight:500; box-shadow:0 8px 26px rgba(99,102,241,0.32); transition:background .2s, transform .25s cubic-bezier(.34,1.4,.42,1);" style-hover="background:#4F46E5; transform:translateY(-1px);">
+        <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4 v4 h-4"></path><path d="M14.5 8 A6 6 0 1 0 13 13.5"></path></svg>
+        Try again
+      </a>
+      <a href="Help Center.dc.html" style="height:46px; padding:0 20px; display:inline-flex; align-items:center; gap:8px; border-radius:10px; background:transparent; border:1px solid #2D2B45; color:#E2E8F0; font-size:14.5px; font-weight:500; transition:background .2s, border-color .2s;" style-hover="background:#13121C; border-color:#3a3856;">
+        Visit Help Center
+      </a>
+    </div>
+
+    <p style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#3F485C; margin:34px 0 0;">nocturne · encrypted study vault</p>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

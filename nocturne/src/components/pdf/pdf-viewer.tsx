@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { motion } from 'framer-motion'
 import { getMasterKey } from '@/lib/crypto/vault'
@@ -8,8 +8,6 @@ import { fetchAndDecryptFile } from '@/lib/crypto/decrypt'
 import { extractSlideText } from '@/lib/pdf/extractor'
 import { createClient } from '@/lib/supabase'
 import { useSessionStore } from '@/store/session-store'
-import { PageControls } from './page-controls'
-import { SlideNavStrip } from './slide-nav-strip'
 
 // ─── PDF.js lazy loader ───────────────────────────────────────────────────────
 
@@ -35,15 +33,26 @@ const fadeUp = {
   },
 }
 
+// ─── Public handle ────────────────────────────────────────────────────────────
+
+export interface PdfViewerHandle {
+  goToPage: (page: number) => void
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
   storagePath: string
   sessionId: string
   onSlidesExtracted?: () => void
+  onPdfDocReady?: (doc: PDFDocumentProxy, totalPages: number) => void
+  onPageChange?: (page: number) => void
 }
 
-export function PdfViewer({ storagePath, sessionId, onSlidesExtracted }: Props) {
+export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
+  { storagePath, sessionId, onSlidesExtracted, onPdfDocReady, onPageChange },
+  ref,
+) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadLabel, setLoadLabel] = useState('Fetching slides…')
   const [loadPct, setLoadPct] = useState(0)
@@ -66,8 +75,29 @@ export function PdfViewer({ storagePath, sessionId, onSlidesExtracted }: Props) 
   const onSlidesExtractedRef = useRef(onSlidesExtracted)
   useEffect(() => { onSlidesExtractedRef.current = onSlidesExtracted }, [onSlidesExtracted])
 
+  const onPdfDocReadyRef = useRef(onPdfDocReady)
+  useEffect(() => { onPdfDocReadyRef.current = onPdfDocReady }, [onPdfDocReady])
+
+  const onPageChangeRef = useRef(onPageChange)
+  useEffect(() => { onPageChangeRef.current = onPageChange }, [onPageChange])
+
   // Subscribe to store activeSlideIndex for audio-driven page jumps.
   const activeSlideIndex = useSessionStore((s) => s.activeSlideIndex)
+
+  // ── Expose goToPage imperatively ─────────────────────────────────────────
+  const goToPage = useCallback(
+    (page: number) => {
+      if (page >= 1 && page <= totalPages) setCurrentPage(page)
+    },
+    [totalPages],
+  )
+
+  useImperativeHandle(ref, () => ({ goToPage }), [goToPage])
+
+  // ── Notify parent when page changes ─────────────────────────────────────
+  useEffect(() => {
+    onPageChangeRef.current?.(currentPage)
+  }, [currentPage])
 
   // ── Load PDF on mount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -102,6 +132,7 @@ export function PdfViewer({ storagePath, sessionId, onSlidesExtracted }: Props) 
         pdfRef.current = pdf
         setTotalPages(pdf.numPages)
         setStatus('ready')
+        onPdfDocReadyRef.current?.(pdf, pdf.numPages)
       } catch (e) {
         if (!cancelled) {
           setStatus('error')
@@ -138,7 +169,6 @@ export function PdfViewer({ storagePath, sessionId, onSlidesExtracted }: Props) 
   // ── Render page ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (status !== 'ready') return
-    // Skip if this page was already rendered (guards against re-mount without page change)
     if (currentPage === currentPageRef.current && currentPageRef.current !== 0) return
     currentPageRef.current = currentPage
 
@@ -149,7 +179,6 @@ export function PdfViewer({ storagePath, sessionId, onSlidesExtracted }: Props) 
     const canvasArea = canvasAreaRef.current
     if (!pdf || !canvas || !textLayerDiv || !canvasWrap || !canvasArea) return
 
-    // Cancel any in-progress render task before starting a new one
     if (renderTaskRef.current) {
       try { renderTaskRef.current.cancel() } catch { /* ignore */ }
       renderTaskRef.current = null
@@ -227,13 +256,6 @@ export function PdfViewer({ storagePath, sessionId, onSlidesExtracted }: Props) 
     maybeExtract().catch((e) => console.error('[pdf-viewer] extraction error:', e))
   }, [status, sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const goToPage = useCallback(
-    (page: number) => {
-      if (page >= 1 && page <= totalPages) setCurrentPage(page)
-    },
-    [totalPages],
-  )
-
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -263,30 +285,14 @@ export function PdfViewer({ storagePath, sessionId, onSlidesExtracted }: Props) 
           animate="visible"
           className="flex flex-1 min-h-0 overflow-hidden"
         >
-          {/* Scrollable canvas area — canvas is persistent; rendered to imperatively */}
           <div ref={canvasAreaRef} className="flex-1 min-w-0 overflow-auto p-2">
             <div ref={canvasWrapRef} className="relative inline-block">
               <canvas ref={canvasRef} className="block" />
               <div ref={textLayerRef} className="textLayer absolute inset-0" />
             </div>
           </div>
-
-          <SlideNavStrip
-            pdfDoc={pdfRef.current!}
-            totalPages={totalPages}
-            currentPage={currentPage}
-            onPageSelect={goToPage}
-          />
         </motion.div>
-      )}
-
-      {status === 'ready' && (
-        <PageControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={goToPage}
-        />
       )}
     </div>
   )
-}
+})

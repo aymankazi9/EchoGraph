@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AppleMeta } from '@/components/pwa/apple-meta'
+import { ScrollManager } from '@/components/scroll-manager'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AppleMeta />
       </head>
       <body className="min-h-full">
+        <ScrollManager />
         <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
       </body>
     </html>

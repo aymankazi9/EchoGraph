@@ -6,14 +6,6 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useSessionStore } from '@/store/session-store'
 import { slideFlash, useMotion } from '@/lib/motion'
 
-function slideBorderClass(zone: 'likely' | 'red' | null | undefined, density: number): string {
-  if (zone === 'red') return 'border-rose-400'
-  if (zone === 'likely') return 'border-violet-400'
-  if (density >= 70) return 'border-rose-400'
-  if (density >= 30) return 'border-amber-300'
-  return 'border-border-default'
-}
-
 // ─── Thumbnail canvas ─────────────────────────────────────────────────────────
 
 function ThumbnailCanvas({ pdfDoc, pageNum }: { pdfDoc: PDFDocumentProxy; pageNum: number }) {
@@ -35,7 +27,7 @@ function ThumbnailCanvas({ pdfDoc, pageNum }: { pdfDoc: PDFDocumentProxy; pageNu
         if (cancelled || !canvasRef.current) { page.cleanup(); return }
 
         const viewport1 = page.getViewport({ scale: 1.0 })
-        const scale = 80 / viewport1.width
+        const scale = 106 / viewport1.width
         const viewport = page.getViewport({ scale })
 
         const c = canvasRef.current
@@ -74,19 +66,15 @@ interface Props {
 
 export function SlideNavStrip({ pdfDoc, totalPages, currentPage, onPageSelect }: Props) {
   const activeRef = useRef<HTMLButtonElement>(null)
-  const jumpToSlide = useSessionStore((s) => s.jumpToSlide)
-  const slideDensityMap = useSessionStore((s) => s.slideDensityMap)
   const slideZoneMap = useSessionStore((s) => s.slideZoneMap)
   const prevSlide = useRef(currentPage)
   const [flashKey, setFlashKey] = useState(0)
   const { reduced } = useMotion()
 
-  // Scroll the active thumbnail into view when currentPage changes.
   useEffect(() => {
     activeRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [currentPage])
 
-  // Trigger flash when active slide changes
   useEffect(() => {
     if (prevSlide.current !== currentPage) {
       if (!reduced) setFlashKey((k) => k + 1)
@@ -95,23 +83,21 @@ export function SlideNavStrip({ pdfDoc, totalPages, currentPage, onPageSelect }:
   }, [currentPage, reduced])
 
   const handleClick = useCallback(
-    (pageNum: number) => {
-      onPageSelect(pageNum)      // update PDF viewer page immediately
-      jumpToSlide(pageNum)       // seek audio to that slide's timestamp (if syncMap loaded)
-    },
-    [onPageSelect, jumpToSlide],
+    (pageNum: number) => { onPageSelect(pageNum) },
+    [onPageSelect],
   )
 
   return (
     <div
-      className="w-[100px] shrink-0 border-l border-border-default overflow-y-auto flex flex-col gap-0"
+      style={{ flex: 1, overflowY: 'auto', padding: '2px 12px 12px', display: 'flex', flexDirection: 'column', gap: 9 }}
       role="listbox"
       aria-label="Slide navigation"
     >
       {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
         const isActive = pageNum === currentPage
-        const density = slideDensityMap[pageNum] ?? 0
         const zone = slideZoneMap[pageNum]
+        const dotColor = zone === 'red' ? '#FB7185' : zone === 'likely' ? '#FBBF24' : null
+
         return (
           <button
             key={pageNum}
@@ -120,36 +106,48 @@ export function SlideNavStrip({ pdfDoc, totalPages, currentPage, onPageSelect }:
             role="option"
             aria-selected={isActive}
             onClick={() => handleClick(pageNum)}
-            className={[
-              'flex flex-col items-center gap-1 py-2 px-2 shrink-0 transition-colors text-left w-full',
-              'border-l-2',
-              isActive
-                ? 'border-indigo-500 bg-bg-subtle'
-                : `${slideBorderClass(zone, density)} hover:bg-bg-subtle`,
-            ].join(' ')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 5,
+              padding: '6px 6px 5px',
+              borderRadius: 8,
+              border: `1px solid ${isActive ? '#2D2B45' : 'transparent'}`,
+              background: isActive ? '#111119' : 'transparent',
+              cursor: 'pointer',
+              textAlign: 'left',
+              width: '100%',
+            }}
           >
-            {isActive ? (
-              <motion.div
-                key={flashKey}
-                variants={slideFlash}
-                animate={flashKey > 0 ? 'flash' : false}
-                className="w-[80px] flex items-center justify-center bg-bg-overlay overflow-hidden"
-              >
+            {/* Thumbnail */}
+            <div style={{ position: 'relative', width: '100%', background: '#0D0D14', borderRadius: 5, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 66 }}>
+              {isActive ? (
+                <motion.div
+                  key={flashKey}
+                  variants={slideFlash}
+                  animate={flashKey > 0 ? 'flash' : false}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <ThumbnailCanvas pdfDoc={pdfDoc} pageNum={pageNum} />
+                </motion.div>
+              ) : (
                 <ThumbnailCanvas pdfDoc={pdfDoc} pageNum={pageNum} />
-              </motion.div>
-            ) : (
-              <div className="w-[80px] flex items-center justify-center bg-bg-overlay overflow-hidden">
-                <ThumbnailCanvas pdfDoc={pdfDoc} pageNum={pageNum} />
-              </div>
-            )}
-            <span
-              className={[
-                'text-caption',
-                isActive ? 'text-indigo-400' : 'text-text-tertiary',
-              ].join(' ')}
-            >
-              {pageNum}
-            </span>
+              )}
+              {/* Slide number — bottom-left */}
+              <span style={{
+                position: 'absolute', bottom: 4, left: 6,
+                fontFamily: 'var(--font-mono), monospace', fontSize: 9, color: '#94A3B8',
+              }}>
+                {String(pageNum).padStart(2, '0')}
+              </span>
+              {/* Zone dot — top-right */}
+              {dotColor && (
+                <span style={{
+                  position: 'absolute', top: 5, right: 5,
+                  width: 7, height: 7, borderRadius: '50%', background: dotColor,
+                }} />
+              )}
+            </div>
           </button>
         )
       })}

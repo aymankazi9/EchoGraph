@@ -18,6 +18,7 @@ import { FilterChips } from './filter-chips'
 import { SortControl } from './sort-control'
 import { EmptyFilteredState } from './empty-filtered-state'
 import { GettingStarted } from './getting-started'
+import { MomentumRibbon } from './momentum-ribbon'
 
 interface RawSession {
   id: string
@@ -243,7 +244,7 @@ export function VaultDashboardClient({
 
       {/* Page header */}
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-heading font-medium text-text-primary">Your vault</h1>
+        <h1 style={{ fontSize: 27, fontWeight: 600, letterSpacing: '-0.025em', color: '#E2E8F0', margin: 0 }}>Your vault</h1>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -264,9 +265,12 @@ export function VaultDashboardClient({
           </Link>
         </div>
       </div>
-      <p className="text-body-sm text-text-secondary mb-5">
+      <p className="text-body-sm text-text-secondary mb-3">
         {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'} · {storageMB.toFixed(1)} MB used
       </p>
+
+      {/* Ambient momentum ribbon */}
+      <MomentumRibbon />
 
       {/* Search bar */}
       <div className="mb-3">
