@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html { scroll-behavior: smooth; }
+  body { margin:0; background:#09090F; color:#E2E8F0; font-family:'Inter',system-ui,sans-serif; font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  *::-webkit-scrollbar { width:8px; height:8px; }
+  *::-webkit-scrollbar-track { background:transparent; }
+  *::-webkit-scrollbar-thumb { background:#1E1E2E; border-radius:9999px; }
+  *::-webkit-scrollbar-thumb:hover { background:#2D2B45; }
+  ::selection { background:rgba(99,102,241,0.28); color:#E2E8F0; }
+  [data-reveal] { transition:opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); }
+  [data-reveal].is-in { opacity:1; transform:none; }
+  @media (prefers-reduced-motion: reduce) { [data-reveal] { opacity:1 !important; transform:none !important; transition:none !important; } }
+  header a { white-space:nowrap; }
+  @media (max-width: 880px) { [data-desktop="nav"] { display:none !important; } [data-desktop="signin"] { display:none !important; } }
+  @media (max-width: 760px) {
+    [data-cards-3] { grid-template-columns:1fr !important; }
+    [data-privacy-grid] { grid-template-columns:1fr !important; gap:36px !important; }
+    [data-demo-grid] { grid-template-columns:1fr !important; }
+    [data-demo-left] { border-right:none !important; border-bottom:1px solid #1E1E2E !important; }
+    [data-footer-grid] { grid-template-columns:repeat(2,1fr) !important; }
+  }
+  @keyframes noct-livedot { 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:0.35; transform:scale(0.7);} }
+  @keyframes noct-sweep { from{ transform:translateX(-130%);} to{ transform:translateX(560%);} }
+  @keyframes noct-float { 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-7px);} }
+  @keyframes noct-ringpulse { 0%{ transform:scale(0.6); opacity:0.55;} 80%,100%{ transform:scale(2.4); opacity:0;} }
+  a { color:inherit; text-decoration:none; }
+  button { font-family:inherit; }
+  @keyframes noct-marquee { from { transform:translateX(0); } to { transform:translateX(-50%); } }
+  @keyframes noct-barpulse { 0%,100%{ box-shadow:0 0 9px rgba(244,63,94,0.4);} 50%{ box-shadow:0 0 20px rgba(244,63,94,0.85);} }
+  @keyframes noct-scanfield { 0%{ left:-13%;} 100%{ left:100%;} }
+  /* nav links: underline wipe from left on hover */
+  [data-navlink] { position:relative; transition:color .25s; }
+  [data-navlink]::after { content:""; position:absolute; left:12px; right:12px; bottom:6px; height:1.5px; background:#818CF8; border-radius:2px; transform:scaleX(0); transform-origin:right; transition:transform .35s cubic-bezier(.22,1,.36,1); }
+  [data-navlink]:hover { color:#E2E8F0; }
+  [data-navlink]:hover::after { transform:scaleX(1); transform-origin:left; }
+  /* snappy buttons */
+  [data-btn] { transition:transform .3s cubic-bezier(.34,1.4,.42,1), background .3s, border-color .3s, box-shadow .3s; }
+  [data-btn]:hover { transform:translateY(-2px); }
+  [data-arrow] { display:inline-block; transition:transform .3s cubic-bezier(.34,1.4,.42,1); }
+  [data-btn]:hover [data-arrow] { transform:translateX(4px); }
+  [data-shine] { position:relative; overflow:hidden; }
+  [data-shine]::before { content:""; position:absolute; top:0; left:-85%; width:55%; height:100%; background:linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent); transform:skewX(-20deg); transition:left .6s cubic-bezier(.22,1,.36,1); pointer-events:none; }
+  [data-shine]:hover::before { left:150%; }
+  /* marquee pause on hover */
+  [data-marquee]:hover [data-marquee-track] { animation-play-state:paused; }
+  /* feature cards: cursor glow + icon lift */
+  [data-feat]::before { content:""; position:absolute; inset:0; background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%), rgba(99,102,241,0.09), transparent 62%); opacity:0; transition:opacity .4s; pointer-events:none; }
+  [data-feat]:hover::before { opacity:1; }
+  [data-feat]:hover { background:#16151F !important; }
+  [data-feat-glyph] { transition:transform .4s cubic-bezier(.34,1.4,.42,1), border-color .4s, color .4s; }
+  [data-feat]:hover [data-feat-glyph] { transform:translateY(-3px) rotate(-5deg); border-color:#6366F1; }
+  [data-feat-red]:hover::before { background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%), rgba(244,63,94,0.09), transparent 62%); }
+  [data-feat-red]:hover [data-feat-glyph] { border-color:#F43F5E; }
+  /* keychain animated diagram */
+  [data-kc="arrow"] { position:relative; }
+  [data-kc="arrow"]::before { content:""; position:absolute; left:19px; top:-3px; width:1.5px; height:calc(100% + 6px); background:linear-gradient(#818CF8, rgba(129,140,248,0.3)); }
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="position:relative; background:#09090F;">
+
+  <header style="{{ navStyle }}">
+    <div style="max-width:1160px; margin:0 auto; padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between;">
+      <a href="#top" style="display:flex; align-items:center; gap:9px;">
+        <span style="width:24px; height:24px; border-radius:7px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:13px; box-shadow:0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.35);">N</span>
+        <span style="font-size:16px; font-weight:600; letter-spacing:-0.01em; color:#E2E8F0;">Nocturne</span>
+      </a>
+      <nav style="display:flex; align-items:center; gap:8px;" data-desktop="nav">
+        <a href="#how" data-navlink style="height:34px; padding:0 12px; display:inline-flex; align-items:center; font-size:14px; color:#94A3B8;">How it works</a>
+        <a href="#features" data-navlink style="height:34px; padding:0 12px; display:inline-flex; align-items:center; font-size:14px; color:#94A3B8;">Features</a>
+        <a href="#privacy" data-navlink style="height:34px; padding:0 12px; display:inline-flex; align-items:center; font-size:14px; color:#94A3B8;">Security</a>
+        <a href="#pricing" data-navlink style="height:34px; padding:0 12px; display:inline-flex; align-items:center; font-size:14px; color:#94A3B8;">Pricing</a>
+      </nav>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <a href="#top" data-btn style="height:34px; padding:0 14px; display:inline-flex; align-items:center; border-radius:6px; font-size:14px; color:#94A3B8;" style-hover="color:#E2E8F0; background:#1C1B28;" data-desktop="signin">Sign in</a>
+        <a href="#top" data-btn data-shine style="height:34px; padding:0 16px; display:inline-flex; align-items:center; border-radius:6px; font-size:14px; font-weight:500; background:#6366F1; color:#09090F;" style-hover="background:#4F46E5;">Get started</a>
+      </div>
+    </div>
+  </header>
+
+  <span id="top"></span>
+  <section ref="{{ heroRef }}" style="position:relative; min-height:92vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:96px 24px 80px; overflow:hidden;">
+    <canvas ref="{{ canvasRef }}" style="position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none;"></canvas>
+    <div style="position:absolute; top:8%; left:50%; transform:translateX(-50%); width:760px; max-width:90vw; height:380px; background:radial-gradient(ellipse at center, rgba(99,102,241,0.10) 0%, rgba(139,92,246,0.05) 40%, transparent 72%); filter:blur(50px); z-index:0; pointer-events:none;"></div>
+    <div ref="{{ glowRef }}" style="position:absolute; top:0; left:0; width:340px; height:340px; margin:-170px 0 0 -170px; border-radius:50%; background:radial-gradient(circle at center, rgba(244,63,94,0.14) 0%, rgba(139,92,246,0.06) 45%, transparent 70%); filter:blur(14px); opacity:0; transition:opacity .4s; z-index:0; pointer-events:none; will-change:transform;"></div>
+
+    <div style="position:relative; z-index:2; width:100%; max-width:840px; display:flex; flex-direction:column; align-items:center;">
+      <div data-reveal data-delay="0" style="display:inline-flex; align-items:center; gap:9px; padding:5px 13px 5px 11px; border-radius:9999px; border:1px solid #2D2B45; background:rgba(28,27,40,0.6); backdrop-filter:blur(8px); margin-bottom:28px;">
+        <span style="position:relative; width:7px; height:7px;"><span style="position:absolute; inset:0; border-radius:50%; background:#F43F5E; animation:noct-livedot 1.8s ease-in-out infinite;"></span></span>
+        <span style="font-size:12px; letter-spacing:0.04em; color:#94A3B8;">Measuring professor emphasis, live</span>
+      </div>
+
+      <h1 data-reveal data-delay="60" style="font-size:clamp(40px,7vw,72px); line-height:1.04; letter-spacing:-0.025em; font-weight:600; margin:0; color:#E2E8F0;">
+        Stop studying everything.<br>
+        <span ref="{{ taglineRef }}" style="background:linear-gradient(100deg,#A5B4FC 0%,#A78BFA 45%,#FB7185 100%); -webkit-background-clip:text; background-clip:text; color:transparent;">Study what gets tested.</span>
+      </h1>
+
+      <p data-reveal data-delay="140" style="font-size:clamp(16px,2vw,18px); line-height:1.6; color:#94A3B8; max-width:560px; margin:26px 0 0;">
+        Nocturne links your lecture audio, slides, and study guide — then surfaces the <span style="color:#FB7185; font-weight:500;">Red Zone</span>: the handful of keywords your professor actually emphasized, ranked by how likely they are to appear on the exam.
+      </p>
+
+      <div data-reveal data-delay="220" style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-top:36px;">
+        <a href="#top" data-btn data-shine style="height:46px; padding:0 26px; display:inline-flex; align-items:center; gap:9px; border-radius:8px; font-size:15px; font-weight:500; background:#6366F1; color:#09090F; box-shadow:0 8px 28px rgba(99,102,241,0.35);" style-hover="background:#4F46E5; box-shadow:0 10px 34px rgba(99,102,241,0.5);">Start for free <span data-arrow style="color:#09090F;">→</span></a>
+        <a href="#how" data-btn style="height:46px; padding:0 24px; display:inline-flex; align-items:center; gap:8px; border-radius:8px; font-size:15px; color:#E2E8F0; border:1px solid #2D2B45; background:rgba(17,17,24,0.5);" style-hover="background:#1C1B28; border-color:#3a3856;">See how it works <span data-arrow style="color:#5B6478;">→</span></a>
+      </div>
+
+      <p data-reveal data-delay="300" style="font-size:13px; color:#5B6478; margin-top:26px; letter-spacing:0.01em;">
+        Zero-knowledge encrypted&nbsp;&nbsp;·&nbsp;&nbsp;Runs in your browser&nbsp;&nbsp;·&nbsp;&nbsp;No credit card required
+      </p>
+    </div>
+
+    <div style="position:absolute; bottom:0; left:0; right:0; height:160px; background:linear-gradient(to bottom, transparent, #09090F); z-index:1; pointer-events:none;"></div>
+  </section>
+
+  <section style="border-top:1px solid #191827; border-bottom:1px solid #191827; padding:22px 0; background:rgba(17,17,24,0.4); overflow:hidden;">
+    <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; margin:0 0 16px; text-align:center;">Built for high-stakes fields</p>
+    <div data-marquee style="position:relative; overflow:hidden;">
+      <div style="position:absolute; top:0; bottom:0; left:0; width:120px; z-index:2; pointer-events:none; background:linear-gradient(90deg, #0C0C13, transparent);"></div>
+      <div style="position:absolute; top:0; bottom:0; right:0; width:120px; z-index:2; pointer-events:none; background:linear-gradient(-90deg, #0C0C13, transparent);"></div>
+      <div data-marquee-track style="display:flex; width:max-content; animation:noct-marquee 44s linear infinite;">
+        <div style="display:flex; gap:10px; padding-right:10px;">
+          <sc-for list="{{ fields }}" as="f" hint-placeholder-count="12">
+            <span style="display:inline-flex; align-items:center; padding:6px 16px; border-radius:9999px; border:1px solid #1E1E2E; font-size:14px; color:#94A3B8; white-space:nowrap; transition:color .3s, border-color .3s;" style-hover="color:#E2E8F0; border-color:#2D2B45;">{{ f }}</span>
+          </sc-for>
+        </div>
+        <div style="display:flex; gap:10px; padding-right:10px;" aria-hidden="true">
+          <sc-for list="{{ fields }}" as="f" hint-placeholder-count="12">
+            <span style="display:inline-flex; align-items:center; padding:6px 16px; border-radius:9999px; border:1px solid #1E1E2E; font-size:14px; color:#94A3B8; white-space:nowrap; transition:color .3s, border-color .3s;" style-hover="color:#E2E8F0; border-color:#2D2B45;">{{ f }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="problem" style="scroll-margin-top:80px; padding:clamp(72px,9vw,120px) 24px; border-top:1px solid #191827;">
+    <div style="max-width:1000px; margin:0 auto;">
+      <div data-reveal style="text-align:center; margin-bottom:48px;">
+        <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#FB7185; margin:0 0 14px;">The problem</p>
+        <h2 style="font-size:clamp(28px,4vw,40px); font-weight:600; letter-spacing:-0.02em; margin:0; color:#E2E8F0;">A lecture is mostly noise.</h2>
+        <p style="font-size:clamp(16px,2vw,18px); line-height:1.7; color:#94A3B8; max-width:600px; margin:20px auto 0;">
+          Fifty minutes of talking. Three slides that actually matter. Somewhere in the transcript are the <span style="color:#FB7185; font-weight:500;">four phrases that carry the exam</span> &mdash; and you&rsquo;re meant to find them by re-reading everything.
+        </p>
+      </div>
+
+      <div data-reveal data-delay="120" style="position:relative; border:1px solid #1E1E2E; border-radius:14px; background:#111118; padding:30px 30px 26px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.4);">
+        <div style="position:absolute; inset:0; background:radial-gradient(620px circle at 70% -25%, rgba(244,63,94,0.06), transparent 60%); pointer-events:none;"></div>
+
+        <div style="position:relative; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:22px;">
+          <p style="font-family:'JetBrains Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:#5B6478; margin:0;">Professor emphasis &middot; one lecture</p>
+          <div style="display:flex; align-items:center; gap:18px;">
+            <span style="display:inline-flex; align-items:center; gap:7px; font-size:12px; color:#5B6478;"><span style="width:8px; height:8px; border-radius:2px; background:#23222F;"></span>Talking</span>
+            <span style="display:inline-flex; align-items:center; gap:7px; font-size:12px; color:#94A3B8;"><span style="width:8px; height:8px; border-radius:2px; background:linear-gradient(#FB7185,#F43F5E); box-shadow:0 0 8px rgba(244,63,94,0.6);"></span>Tested</span>
+          </div>
+        </div>
+
+        <div style="position:relative; height:160px;">
+          <div style="display:flex; align-items:flex-end; gap:3px; height:100%;">
+            <sc-for list="{{ noiseBars }}" as="b" hint-placeholder-count="80">
+              <div style="{{ b.style }}"></div>
+            </sc-for>
+          </div>
+          <div style="position:absolute; top:0; bottom:0; left:-13%; width:90px; background:linear-gradient(90deg, transparent, rgba(129,140,248,0.12), transparent); animation:noct-scanfield 5.5s linear infinite; pointer-events:none;"></div>
+        </div>
+
+        <div style="position:relative; display:flex; align-items:center; justify-content:space-between; margin-top:12px; font-family:'JetBrains Mono',monospace; font-size:11px; color:#3F485C;">
+          <span>00:00</span>
+          <span>50:00</span>
+        </div>
+
+        <div style="position:relative; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px; margin-top:22px; padding-top:22px; border-top:1px solid #1E1E2E;">
+          <div style="display:flex; align-items:baseline; gap:12px;">
+            <span style="font-size:32px; font-weight:600; letter-spacing:-0.02em; color:#FB7185;">4</span>
+            <span style="font-size:14px; color:#E2E8F0;">phrases decide the grade</span>
+          </div>
+          <span style="font-size:13px; color:#5B6478;">&asymp; 8,400 words spoken &middot; the rest is noise</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" style="scroll-margin-top:80px; padding:clamp(72px,9vw,120px) 24px; border-top:1px solid #191827;">
+    <div style="max-width:1100px; margin:0 auto;">
+      <div data-reveal style="text-align:center; margin-bottom:52px;">
+        <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; margin:0 0 14px;">How it works</p>
+        <h2 style="font-size:clamp(28px,4vw,40px); font-weight:600; letter-spacing:-0.02em; margin:0; color:#E2E8F0;">Works with whatever you have.</h2>
+      </div>
+      <div data-reveal style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px;" data-cards-3>
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+          <div style="{{ s.cardStyle }}" style-hover="transform:translateY(-6px); border-color:#2D2B45; box-shadow:0 24px 50px -24px rgba(0,0,0,0.75);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+              <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:{{ s.accent }};">{{ s.step }}</span>
+              <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.09em; color:#5B6478;">{{ s.label }}</span>
+            </div>
+            <h3 style="font-size:18px; font-weight:600; margin:0 0 10px; color:#E2E8F0;">{{ s.title }}</h3>
+            <p style="font-size:14px; line-height:1.65; color:#94A3B8; margin:0 0 18px;">{{ s.body }}</p>
+            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:auto;">
+              <sc-for list="{{ s.chips }}" as="c" hint-placeholder-count="3">
+                <span style="{{ s.chipStyle }}">{{ c }}</span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section id="demo" style="scroll-margin-top:80px; padding:clamp(72px,9vw,120px) 24px; position:relative; border-top:1px solid #191827;">
+    <div style="max-width:1100px; margin:0 auto;">
+      <div data-reveal style="text-align:center; margin-bottom:48px;">
+        <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#818CF8; margin:0 0 14px;">The Red Zone, live</p>
+        <h2 style="font-size:clamp(28px,4vw,40px); font-weight:600; letter-spacing:-0.02em; margin:0; color:#E2E8F0;">Watch it surface what matters.</h2>
+        <p style="font-size:16px; color:#94A3B8; max-width:520px; margin:16px auto 0;">Add what you have, and Nocturne sharpens its read. Step through a real lecture moment below.</p>
+      </div>
+
+      <div data-reveal style="border:1px solid #1E1E2E; border-radius:14px; background:#111118; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.45);">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:16px 20px; border-bottom:1px solid #1E1E2E; background:rgba(22,21,31,0.6);">
+          <div style="position:relative;">
+            <button type="button" onClick="{{ toggleSubjectMenu }}" style="display:flex; align-items:center; gap:9px; padding:7px 11px; border-radius:7px; border:1px solid #1E1E2E; background:#09090F; font-family:'JetBrains Mono',monospace; font-size:12px; color:#94A3B8; cursor:pointer; transition:border-color .2s, color .2s;" style-hover="border-color:#2D2B45; color:#E2E8F0;">
+              <span style="width:8px; height:8px; border-radius:50%; background:#F43F5E; box-shadow:0 0 10px rgba(244,63,94,0.7); flex-shrink:0;"></span>
+              {{ currentCourse }}
+              <span style="color:#5B6478; font-size:9px; margin-left:1px;">▼</span>
+            </button>
+            <sc-if value="{{ subjectOpen }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ toggleSubjectMenu }}" style="position:fixed; inset:0; z-index:29;"></div>
+              <div style="position:absolute; top:calc(100% + 6px); left:0; z-index:30; min-width:248px; border:1px solid #2D2B45; border-radius:9px; background:#16151F; box-shadow:0 14px 36px rgba(0,0,0,0.55); overflow:hidden; padding:4px;">
+                <sc-for list="{{ subjectMenu }}" as="sm" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ sm.onClick }}" style="{{ sm.style }}">{{ sm.label }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+          <div style="display:inline-flex; padding:3px; gap:3px; border-radius:9px; background:#09090F; border:1px solid #1E1E2E;">
+            <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="3">
+              <button type="button" onClick="{{ tab.onClick }}" style="{{ tab.style }}">{{ tab.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1.45fr 1fr; gap:0;" data-demo-grid>
+          <div style="position:relative; padding:26px 26px 24px; border-right:1px solid #1E1E2E; overflow:hidden;" data-demo-left>
+            <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; margin:0 0 16px;">Lecture transcript</p>
+            <p style="font-size:17px; line-height:1.85; margin:0; color:#94A3B8;">
+              <sc-for list="{{ tokens }}" as="tk" hint-placeholder-count="11"><span style="{{ tk.style }}">{{ tk.text }}</span></sc-for>
+            </p>
+            <sc-if value="{{ scanning }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute; top:0; bottom:0; left:0; width:90px; background:linear-gradient(90deg, transparent, rgba(129,140,248,0.16), rgba(167,139,250,0.05), transparent); animation:noct-sweep 0.72s cubic-bezier(.4,0,.2,1); pointer-events:none;"></div>
+            </sc-if>
+          </div>
+
+          <div style="padding:26px 24px 24px; display:flex; flex-direction:column;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px;">
+              <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; margin:0;">Surfaced keywords</p>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#94A3B8;">{{ summary }}</span>
+            </div>
+            <p style="font-size:12.5px; color:#5B6478; margin:0 0 18px; min-height:32px;">{{ modeCaption }}</p>
+
+            <div style="display:flex; flex-direction:column; gap:14px;">
+              <sc-for list="{{ detected }}" as="d" hint-placeholder-count="4">
+                <div>
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;">
+                    <span style="display:inline-flex; align-items:center; gap:8px; font-size:13.5px; color:#E2E8F0;">
+                      <span style="{{ d.dotStyle }}"></span>{{ d.name }}
+                    </span>
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:{{ d.color }};">{{ d.confText }}</span>
+                  </div>
+                  <div style="height:5px; border-radius:9999px; background:#1C1B28; overflow:hidden;">
+                    <div style="{{ d.barStyle }}"></div>
+                  </div>
+                  <span style="{{ d.zoneStyle }}">{{ d.zoneLabel }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ exportVisible }}" hint-placeholder-val="{{ false }}">
+              <a href="#top" data-btn style="margin-top:22px; height:38px; display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:7px; font-size:13.5px; font-weight:500; background:rgba(244,63,94,0.12); color:#FB7185; border:1px solid rgba(244,63,94,0.32);" style-hover="background:rgba(244,63,94,0.2); border-color:rgba(244,63,94,0.5);">Export 3 Red Zone flashcards → .apkg</a>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" style="scroll-margin-top:80px; padding:clamp(72px,9vw,120px) 24px; border-top:1px solid #191827;">
+    <div style="max-width:1100px; margin:0 auto;">
+      <div data-reveal style="text-align:center; margin-bottom:52px;">
+        <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; margin:0 0 14px;">What's inside</p>
+        <h2 style="font-size:clamp(28px,4vw,40px); font-weight:600; letter-spacing:-0.02em; margin:0; color:#E2E8F0;">Everything the serious student needs.</h2>
+      </div>
+      <div data-reveal style="display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#1E1E2E; border:1px solid #1E1E2E; border-radius:12px; overflow:hidden;" data-cards-3>
+        <sc-for list="{{ features }}" as="ft" hint-placeholder-count="6">
+          <div data-feat style="position:relative; display:flex; flex-direction:column; gap:14px; padding:32px 28px; background:#111118; transition:background .4s;">
+            <span data-feat-glyph style="{{ ft.glyphStyle }}">{{ ft.icon }}</span>
+            <h3 style="font-size:17px; font-weight:600; margin:0; color:#E2E8F0;">{{ ft.title }}</h3>
+            <p style="font-size:14px; line-height:1.65; color:#94A3B8; margin:0;">{{ ft.body }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding:clamp(72px,9vw,120px) 24px; border-top:1px solid #191827;">
+    <div style="max-width:880px; margin:0 auto;">
+      <div data-reveal style="text-align:center; margin-bottom:44px;">
+        <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; margin:0 0 14px;">Why it's different</p>
+        <h2 style="font-size:clamp(28px,4vw,40px); font-weight:600; letter-spacing:-0.02em; margin:0; color:#E2E8F0;">A note-taker records. Nocturne ranks.</h2>
+        <p style="font-size:16px; color:#94A3B8; max-width:560px; margin:16px auto 0;">Otter, Notion, and Turbo hand you notes and flashcards to grind through. Nocturne tells you which terms matter — ranked by how likely each one is to be on the exam.</p>
+      </div>
+      <div data-reveal style="border:1px solid #1E1E2E; border-radius:14px; overflow:hidden; background:#111118;">
+        <div style="overflow-x:auto;">
+          <div style="min-width:680px;">
+            <div style="display:grid; grid-template-columns:1.9fr 1fr 1fr 1fr 1fr;">
+              <div style="padding:16px 22px; border-bottom:1px solid #1E1E2E;"></div>
+              <div style="padding:16px 10px; border-bottom:1px solid #1E1E2E; border-left:1px solid #1E1E2E; text-align:center; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#64708A;">Otter.ai</div>
+              <div style="padding:16px 10px; border-bottom:1px solid #1E1E2E; border-left:1px solid #1E1E2E; text-align:center; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#64708A;">Notion AI</div>
+              <div style="padding:16px 10px; border-bottom:1px solid #1E1E2E; border-left:1px solid #1E1E2E; text-align:center; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#64708A;">Turbo AI</div>
+              <div style="padding:16px 10px; border-bottom:1px solid #1E1E2E; border-left:1px solid rgba(99,102,241,0.35); text-align:center; background:rgba(99,102,241,0.07); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#A5B4FC; font-weight:600;">Nocturne</div>
+            </div>
+            <sc-for list="{{ compareRows }}" as="r" hint-placeholder-count="9">
+              <div style="{{ r.rowStyle }}">
+                <div style="padding:15px 22px; font-size:14px; color:#E2E8F0;">{{ r.label }}</div>
+                <div style="padding:15px 10px; border-left:1px solid #1E1E2E; display:flex; align-items:center; justify-content:center;"><span style="{{ r.otterStyle }}">{{ r.otterMark }}</span></div>
+                <div style="padding:15px 10px; border-left:1px solid #1E1E2E; display:flex; align-items:center; justify-content:center;"><span style="{{ r.notionStyle }}">{{ r.notionMark }}</span></div>
+                <div style="padding:15px 10px; border-left:1px solid #1E1E2E; display:flex; align-items:center; justify-content:center;"><span style="{{ r.turboStyle }}">{{ r.turboMark }}</span></div>
+                <div style="padding:15px 10px; border-left:1px solid rgba(99,102,241,0.35); background:rgba(99,102,241,0.05); display:flex; align-items:center; justify-content:center;"><span style="{{ r.nocturneStyle }}">✓</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy" style="scroll-margin-top:80px; padding:clamp(72px,9vw,120px) 24px; border-top:1px solid #191827;">
+    <div style="max-width:1100px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:64px; align-items:start;" data-privacy-grid>
+      <div data-reveal>
+        <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#818CF8; margin:0 0 16px;">Zero-knowledge architecture</p>
+        <h2 style="font-size:clamp(26px,3.4vw,34px); font-weight:600; letter-spacing:-0.02em; margin:0 0 16px; line-height:1.2; color:#E2E8F0;">The server stores data it cannot read.</h2>
+        <p style="font-size:15px; line-height:1.7; color:#94A3B8; margin:0 0 26px;">Nocturne's encryption isn't a marketing claim — it's a structural constraint. Your vault passphrase derives the key that wraps your Master Key, and that passphrase never leaves your browser.</p>
+        <ul style="list-style:none; margin:0; padding:0;">
+          <sc-for list="{{ guarantees }}" as="g" hint-placeholder-count="6">
+            <li style="{{ g.rowStyle }}">
+              <span style="{{ g.checkStyle }}"></span>
+              <span style="{{ g.textStyle }}">{{ g.text }}</span>
+            </li>
+          </sc-for>
+        </ul>
+      </div>
+
+      <div data-reveal style="position:relative; border:1px solid #1E1E2E; border-radius:14px; background:#111118; padding:30px; overflow:hidden;">
+        <div style="position:absolute; inset:0; background:radial-gradient(500px circle at 80% -10%, rgba(99,102,241,0.08), transparent 60%); pointer-events:none;"></div>
+        <p style="position:relative; font-family:'JetBrains Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.14em; color:#5B6478; margin:0 0 24px;">3-Tier key hierarchy</p>
+
+        <div data-reveal data-delay="0" data-kc="tier" style="position:relative; border:1px solid #2D2B45; border-radius:10px; padding:14px 18px; background:#09090F;">
+          <div style="font-size:14px; font-weight:500; color:#E2E8F0;">Passphrase</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#5B6478; margin-top:3px;">your memory only</div>
+        </div>
+        <div data-kc="arrow" style="min-height:36px; display:flex; align-items:center; padding:7px 0 7px 42px; line-height:1.45; font-family:'JetBrains Mono',monospace; font-size:11px; color:#5B6478;"><span data-reveal data-delay="100">PBKDF2 · 310,000 iterations · SHA-256</span></div>
+
+        <div data-reveal data-delay="160" data-kc="tier" style="position:relative; border:1px solid #2D2B45; border-radius:10px; padding:14px 18px; background:#09090F;">
+          <div style="font-size:14px; font-weight:500; color:#E2E8F0;">KEK</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#5B6478; margin-top:3px;">memory only, discarded after unwrap</div>
+        </div>
+        <div data-kc="arrow" style="min-height:36px; display:flex; align-items:center; padding:7px 0 7px 42px; line-height:1.45; font-family:'JetBrains Mono',monospace; font-size:11px; color:#5B6478;"><span data-reveal data-delay="260">AES-KW unwrap</span></div>
+
+        <div data-reveal data-delay="320" data-kc="tier" style="position:relative; border:1px solid #2D2B45; border-radius:10px; padding:14px 18px; background:#09090F;">
+          <div style="font-size:14px; font-weight:500; color:#E2E8F0;">Master Key</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#5B6478; margin-top:3px;">non-extractable CryptoKey</div>
+        </div>
+        <div data-kc="arrow" style="min-height:36px; display:flex; align-items:center; padding:7px 0 7px 42px; line-height:1.45; font-family:'JetBrains Mono',monospace; font-size:11px; color:#5B6478;"><span data-reveal data-delay="420">AES-GCM 256 · unique IV per file</span></div>
+
+        <div data-reveal data-delay="480" data-kc="tier" style="position:relative; border:1px solid rgba(99,102,241,0.45); border-radius:10px; padding:14px 18px; background:#09090F;">
+          <div style="font-size:14px; font-weight:500; color:#818CF8;">Encrypted .bin blob</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#5B6478; margin-top:3px;">stored in Supabase — opaque to the server</div>
+        </div>
+
+        <div data-reveal data-delay="600" style="position:relative; margin-top:22px; border:1px solid rgba(244,63,94,0.3); background:rgba(244,63,94,0.1); border-radius:10px; padding:13px 18px; font-family:'JetBrains Mono',monospace; font-size:12.5px; color:#FB7185;">No password reset exists. There is no backdoor.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SOCIAL PROOF — PLACEHOLDER: replace stats, quotes, and school names with real data before launch ===== -->
+  <section id="loved" style="scroll-margin-top:80px; padding:clamp(72px,9vw,120px) 24px; border-top:1px solid #191827;">
+    <div style="max-width:1100px; margin:0 auto;">
+      <div data-reveal style="text-align:center; margin-bottom:52px;">
+        <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#818CF8; margin:0 0 14px;">Loved by students</p>
+        <h2 style="font-size:clamp(28px,4vw,40px); font-weight:600; letter-spacing:-0.02em; margin:0; color:#E2E8F0;">Built in the library, tested before exams.</h2>
+        <p style="font-size:16px; color:#94A3B8; max-width:480px; margin:16px auto 0;">From the beta cohort using Nocturne to walk into midterms already knowing what to study.</p>
+      </div>
+
+      <div data-reveal style="display:flex; flex-wrap:wrap; justify-content:center; gap:1px; background:#1E1E2E; border:1px solid #1E1E2E; border-radius:14px; overflow:hidden; margin-bottom:42px;">
+        <div style="flex:1 1 180px; min-width:150px; text-align:center; padding:30px 18px; background:#111118;">
+          <div style="font-size:clamp(28px,3.4vw,38px); font-weight:600; letter-spacing:-0.02em; color:#E2E8F0;">14,200<span style="color:#5B6478;">+</span></div>
+          <div style="font-size:13px; color:#5B6478; margin-top:6px;">Lectures processed</div>
+        </div>
+        <div style="flex:1 1 180px; min-width:150px; text-align:center; padding:30px 18px; background:#111118;">
+          <div style="font-size:clamp(28px,3.4vw,38px); font-weight:600; letter-spacing:-0.02em; color:#E2E8F0;">3,800<span style="color:#5B6478;">+</span></div>
+          <div style="font-size:13px; color:#5B6478; margin-top:6px;">Students in the beta</div>
+        </div>
+        <div style="flex:1 1 180px; min-width:150px; text-align:center; padding:30px 18px; background:#111118;">
+          <div style="font-size:clamp(28px,3.4vw,38px); font-weight:600; letter-spacing:-0.02em; color:#E2E8F0;">4.8<span style="font-size:18px; color:#5B6478;">/5</span></div>
+          <div style="font-size:13px; color:#5B6478; margin-top:6px;">Average beta rating</div>
+        </div>
+        <div style="flex:1 1 180px; min-width:150px; text-align:center; padding:30px 18px; background:#111118;">
+          <div style="font-size:clamp(28px,3.4vw,38px); font-weight:600; letter-spacing:-0.02em; color:#818CF8;">92<span style="font-size:18px;">%</span></div>
+          <div style="font-size:13px; color:#5B6478; margin-top:6px;">Felt more exam-ready</div>
+        </div>
+      </div>
+
+      <div data-reveal style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px;" data-cards-3>
+        <div style="display:flex; flex-direction:column; gap:16px; padding:26px 24px; border-radius:12px; background:#111118; border:1px solid #1E1E2E;">
+          <div style="display:flex; gap:3px; color:#818CF8; font-size:13px; letter-spacing:1px;">★★★★★</div>
+          <p style="font-size:15px; line-height:1.6; color:#CBD5E1; margin:0; flex:1;">“Nocturne flagged three terms my professor kept circling back to — all three were on the midterm. I stopped re-reading everything.”</p>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:38px; height:38px; border-radius:50%; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; color:#A5B4FC; flex-shrink:0;">MR</div>
+            <div>
+              <div style="font-size:13.5px; font-weight:500; color:#E2E8F0;">Maya R.</div>
+              <div style="font-size:12px; color:#5B6478;">Biochemistry · UC San Diego</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:16px; padding:26px 24px; border-radius:12px; background:#111118; border:1px solid #1E1E2E;">
+          <div style="display:flex; gap:3px; color:#818CF8; font-size:13px; letter-spacing:1px;">★★★★★</div>
+          <p style="font-size:15px; line-height:1.6; color:#CBD5E1; margin:0; flex:1;">“I used to transcribe lectures and never look back. The Red Zone ranking is the part Otter never gave me — it tells me where to actually spend my time.”</p>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:38px; height:38px; border-radius:50%; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; color:#A5B4FC; flex-shrink:0;">DK</div>
+            <div>
+              <div style="font-size:13.5px; font-weight:500; color:#E2E8F0;">Devin K.</div>
+              <div style="font-size:12px; color:#5B6478;">Mechanical Engineering · Cal Poly SLO</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:16px; padding:26px 24px; border-radius:12px; background:#111118; border:1px solid #1E1E2E;">
+          <div style="display:flex; gap:3px; color:#818CF8; font-size:13px; letter-spacing:1px;">★★★★★</div>
+          <p style="font-size:15px; line-height:1.6; color:#CBD5E1; margin:0; flex:1;">“The fact that my audio never leaves my laptop is what sold me. The exam-likelihood scores are what kept me through finals.”</p>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:38px; height:38px; border-radius:50%; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; color:#A5B4FC; flex-shrink:0;">PS</div>
+            <div>
+              <div style="font-size:13.5px; font-weight:500; color:#E2E8F0;">Priya S.</div>
+              <div style="font-size:12px; color:#5B6478;">Pre-Med · UCLA</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-reveal style="margin-top:52px;">
+        <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; margin:0 0 22px; text-align:center;">Used by students across the UC, CSU &amp; California private systems</p>
+        <div data-marquee style="position:relative; overflow:hidden;">
+          <div style="position:absolute; top:0; bottom:0; left:0; width:90px; z-index:2; pointer-events:none; background:linear-gradient(90deg, #0C0C13, transparent);"></div>
+          <div style="position:absolute; top:0; bottom:0; right:0; width:90px; z-index:2; pointer-events:none; background:linear-gradient(-90deg, #0C0C13, transparent);"></div>
+          <div data-marquee-track style="display:flex; width:max-content; animation:noct-marquee 52s linear infinite;">
+            <div style="display:flex; gap:12px; padding-right:12px;">
+              <sc-for list="{{ schools }}" as="s" hint-placeholder-count="12">
+                <span style="display:inline-flex; align-items:center; gap:11px; padding:8px 18px 8px 9px; border-radius:9999px; border:1px solid #1E1E2E; background:#0F0F17; white-space:nowrap; transition:border-color .3s;" style-hover="border-color:#2D2B45;">
+                  <span style="{{ s.logoStyle }}">{{ s.abbr }}</span>
+                  <span style="font-size:14px; color:#94A3B8;">{{ s.name }}</span>
+                </span>
+              </sc-for>
+            </div>
+            <div style="display:flex; gap:12px; padding-right:12px;" aria-hidden="true">
+              <sc-for list="{{ schools }}" as="s" hint-placeholder-count="12">
+                <span style="display:inline-flex; align-items:center; gap:11px; padding:8px 18px 8px 9px; border-radius:9999px; border:1px solid #1E1E2E; background:#0F0F17; white-space:nowrap; transition:border-color .3s;" style-hover="border-color:#2D2B45;">
+                  <span style="{{ s.logoStyle }}">{{ s.abbr }}</span>
+                  <span style="font-size:14px; color:#94A3B8;">{{ s.name }}</span>
+                </span>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing" style="scroll-margin-top:80px; padding:clamp(72px,9vw,120px) 24px; border-top:1px solid #191827;">
+    <div style="max-width:1100px; margin:0 auto;">
+      <div data-reveal style="text-align:center; margin-bottom:52px;">
+        <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; margin:0 0 14px;">Pricing</p>
+        <h2 style="font-size:clamp(28px,4vw,40px); font-weight:600; letter-spacing:-0.02em; margin:0; color:#E2E8F0;">The free tier is the full product.</h2>
+        <p style="font-size:16px; color:#94A3B8; max-width:460px; margin:16px auto 0;">The complete core pipeline is free. Paid tiers add sharper ASR and more storage — never access to the basics.</p>
+      </div>
+      <div data-reveal style="display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom:38px;">
+        <div style="display:inline-flex; align-items:center; gap:4px; padding:4px; border-radius:9999px; background:#111118; border:1px solid #1E1E2E;">
+          <button type="button" onClick="{{ setMonthly }}" style="{{ monthlyBtnStyle }}">Monthly</button>
+          <button type="button" onClick="{{ setYearly }}" style="{{ yearlyBtnStyle }}">Yearly <span style="{{ saveBadgeStyle }}">Save 25%</span></button>
+        </div>
+        <p style="font-size:12.5px; color:#5B6478; margin:0; letter-spacing:0.01em;">{{ billingHint }}</p>
+      </div>
+      <div data-reveal style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px; align-items:start;" data-cards-3>
+        <sc-for list="{{ plans }}" as="p" hint-placeholder-count="3">
+          <div style="{{ p.cardStyle }}" style-hover="transform:translateY(-6px); box-shadow:0 26px 60px -28px rgba(0,0,0,0.8);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+              <span style="font-size:17px; font-weight:600; color:#E2E8F0;">{{ p.name }}</span>
+              <span style="{{ p.badgeStyle }}">{{ p.badge }}</span>
+            </div>
+            <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:5px;">
+              <sc-if value="{{ p.showStrike }}" hint-placeholder-val="{{ true }}">
+                <span style="font-size:18px; font-weight:500; color:#5B6478; text-decoration:line-through; text-decoration-color:#6366F1;">{{ p.strike }}</span>
+              </sc-if>
+              <span style="font-size:34px; font-weight:600; letter-spacing:-0.02em; color:#E2E8F0;">{{ p.price }}</span>
+              <span style="font-size:13px; color:#5B6478;">{{ p.period }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; min-height:21px; margin-bottom:16px;">
+              <span style="font-size:12px; color:#5B6478;">{{ p.subMain }}</span>
+              <sc-if value="{{ p.showSave }}" hint-placeholder-val="{{ true }}">
+                <span style="font-size:10.5px; font-weight:600; letter-spacing:0.03em; padding:2px 7px; border-radius:9999px; background:rgba(99,102,241,0.16); color:#A5B4FC; border:1px solid rgba(99,102,241,0.3);">{{ p.saveChip }}</span>
+              </sc-if>
+            </div>
+            <p style="font-size:13.5px; color:#94A3B8; margin:0 0 20px;">{{ p.tagline }}</p>
+            <a href="{{ p.ctaHref }}" data-btn data-shine style="{{ p.ctaStyle }}">{{ p.cta }}</a>
+            <ul style="list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:11px;">
+              <sc-for list="{{ p.features }}" as="f" hint-placeholder-count="8">
+                <li style="display:flex; align-items:flex-start; gap:10px; font-size:13.5px; line-height:1.5; color:#94A3B8;">
+                  <span style="margin-top:2px; flex-shrink:0; color:{{ p.checkColor }}; font-size:12px;">✓</span>{{ f }}
+                </li>
+              </sc-for>
+            </ul>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding:clamp(72px,9vw,120px) 24px; border-top:1px solid #191827;">
+    <div style="max-width:760px; margin:0 auto;">
+      <div data-reveal style="margin-bottom:44px;">
+        <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; margin:0 0 14px;">Questions</p>
+        <h2 style="font-size:clamp(28px,4vw,40px); font-weight:600; letter-spacing:-0.02em; margin:0; color:#E2E8F0;">Good to know.</h2>
+      </div>
+      <div data-reveal style="display:flex; flex-direction:column; gap:10px;">
+        <sc-for list="{{ faqs }}" as="q" hint-placeholder-count="6">
+          <div style="border:1px solid #1E1E2E; border-radius:10px; background:#111118; overflow:hidden;">
+            <button type="button" onClick="{{ q.onClick }}" style="width:100%; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 20px; background:transparent; border:none; cursor:pointer; text-align:left;">
+              <span style="font-size:15px; font-weight:500; color:#E2E8F0;">{{ q.question }}</span>
+              <span style="{{ q.iconStyle }}">+</span>
+            </button>
+            <div style="{{ q.bodyWrapStyle }}">
+              <p style="margin:0; padding:0 20px 18px; font-size:14px; line-height:1.7; color:#94A3B8;">{{ q.answer }}</p>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section style="position:relative; padding:clamp(80px,10vw,140px) 24px; border-top:1px solid #191827; overflow:hidden; text-align:center;">
+    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:820px; max-width:120vw; height:420px; background:radial-gradient(ellipse at center, rgba(99,102,241,0.12) 0%, rgba(244,63,94,0.05) 45%, transparent 72%); filter:blur(60px); pointer-events:none;"></div>
+    <div data-reveal style="position:relative; max-width:680px; margin:0 auto;">
+      <h2 style="font-size:clamp(32px,5vw,56px); font-weight:600; letter-spacing:-0.025em; line-height:1.08; margin:0; color:#E2E8F0;">Walk into the exam<br>knowing what's on it.</h2>
+      <p style="font-size:17px; color:#94A3B8; margin:22px auto 0; max-width:480px;">No credit card, no trial limits — just the core pipeline, free forever, running entirely in your browser.</p>
+      <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-top:36px;">
+        <a href="#top" data-btn data-shine style="height:48px; padding:0 28px; display:inline-flex; align-items:center; gap:9px; border-radius:8px; font-size:15px; font-weight:500; background:#6366F1; color:#09090F; box-shadow:0 10px 32px rgba(99,102,241,0.4);" style-hover="background:#4F46E5;">Start for free <span data-arrow style="color:#09090F;">→</span></a>
+        <a href="#pricing" data-btn style="height:48px; padding:0 24px; display:inline-flex; align-items:center; border-radius:8px; font-size:15px; color:#E2E8F0; border:1px solid #2D2B45;" style-hover="background:#1C1B28;">Compare plans</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="newsletter" style="scroll-margin-top:80px; padding:clamp(56px,7vw,88px) 24px; border-top:1px solid #1E1E2E; background:#111118;">
+    <div data-reveal style="max-width:540px; margin:0 auto; text-align:center;">
+      <p style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:#818CF8; margin:0 0 12px;">Stay in the loop</p>
+      <h2 style="font-size:clamp(24px,3vw,30px); font-weight:600; letter-spacing:-0.02em; margin:0 0 10px; color:#E2E8F0;">Be first to know.</h2>
+      <p style="font-size:14px; color:#94A3B8; margin:0 0 24px;">Beta updates, feature releases, and study tips for STEM students. No spam. Unsubscribe anytime.</p>
+      <sc-if value="{{ subscribed }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; align-items:center; justify-content:center; gap:10px; padding:14px; border-radius:9px; border:1px solid rgba(99,102,241,0.35); background:rgba(99,102,241,0.08);">
+          <span style="color:#818CF8;">✓</span><span style="font-size:14px; color:#E2E8F0;">Check your inbox to confirm your subscription.</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ notSubscribed }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex; gap:8px; max-width:440px; margin:0 auto;">
+          <input ref="{{ emailRef }}" type="email" placeholder="your@university.edu" style="flex:1; height:44px; padding:0 14px; border-radius:7px; background:#13121C; border:1px solid #1E1E2E; color:#E2E8F0; font-size:14px; outline:none;" style-focus="border-color:#6366F1;">
+          <button type="button" onClick="{{ onSubscribe }}" data-btn data-shine style="height:44px; padding:0 22px; border-radius:7px; background:#6366F1; color:#09090F; font-size:14px; font-weight:500; border:none; cursor:pointer; flex-shrink:0;" style-hover="background:#4F46E5;">Subscribe</button>
+        </div>
+        <p style="font-size:12px; color:#5B6478; margin:14px 0 0;">We never share your email. View our Privacy Policy.</p>
+      </sc-if>
+    </div>
+  </section>
+
+  <footer style="border-top:1px solid #191827; padding:56px 24px 40px;">
+    <div style="max-width:1100px; margin:0 auto;">
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:32px; margin-bottom:48px;" data-footer-grid>
+        <sc-for list="{{ footerCols }}" as="col" hint-placeholder-count="4">
+          <div>
+            <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; margin:0 0 16px;">{{ col.heading }}</p>
+            <ul style="list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:11px;">
+              <sc-for list="{{ col.links }}" as="lnk" hint-placeholder-count="4">
+                <li><a href="#top" style="font-size:14px; color:#94A3B8;" style-hover="color:#E2E8F0;">{{ lnk }}</a></li>
+              </sc-for>
+            </ul>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding-top:28px; border-top:1px solid #191827; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px;">
+        <div style="display:flex; align-items:center; gap:11px;">
+          <span style="width:28px; height:28px; border-radius:8px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:14px;">N</span>
+          <div>
+            <p style="font-size:12px; color:#5B6478; margin:0;">© 2026 Nocturne</p>
+            <p style="font-size:12px; color:#5B6478; margin:0;">Not a note-taker. A study intelligence system.</p>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:18px;">
+          <a href="#top" style="font-size:12px; color:#5B6478;" style-hover="color:#94A3B8;">GitHub</a>
+          <a href="#top" style="font-size:12px; color:#5B6478;" style-hover="color:#94A3B8;">X / Twitter</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1200,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { mode: 2, scanning: false, faqOpen: 0, navScrolled: false, subscribed: false, subject: 0, subjectOpen: false, billing: 'yearly' }
+
+  constructor(props){
+    super(props)
+    this.rootRef = React.createRef()
+    this.heroRef = React.createRef()
+    this.canvasRef = React.createRef()
+    this.glowRef = React.createRef()
+    this.emailRef = React.createRef()
+    this.taglineRef = React.createRef()
+  }
+
+  componentDidMount(){
+    this.reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    this.setupNav()
+    this.setupReveal()
+    this.setupCanvas()
+    this.setupFeatureGlow()
+    if(!this.reduced){
+      const go = () => setTimeout(() => this.runDecrypt(), 160)
+      if(document.fonts && document.fonts.ready){ document.fonts.ready.then(go) } else { go() }
+    }
+  }
+
+  runDecrypt(){
+    const el = this.taglineRef.current; if(!el || this._decDone) return
+    this._decDone = true
+    const finalText = 'Study what gets tested.'
+    // moderate-width glyphs only (no W/M/m/w) so churn never overflows a cell
+    const glyphs = '0123456789<>[]{}/\\=+*#%$&?abcdefghijknopqrstuvxyz'
+    const n = finalText.length
+
+    // per-cell color sampled along the CSS gradient (indigo -> violet -> rose)
+    const stops = [[165,180,252,0],[167,139,250,0.45],[251,113,133,1]]
+    const lerp = (a,b,t) => Math.round(a + (b - a) * t)
+    const colorAt = (p) => {
+      let i = 0; while(i < stops.length - 2 && p > stops[i+1][3]) i++
+      const a = stops[i], b = stops[i+1], sp = (b[3] - a[3]) || 1
+      const t = Math.max(0, Math.min(1, (p - a[3]) / sp))
+      return 'rgb(' + lerp(a[0],b[0],t) + ',' + lerp(a[1],b[1],t) + ',' + lerp(a[2],b[2],t) + ')'
+    }
+
+    // lay every char in its own fixed-width cell so the line never changes width. Neutralise the
+    // inherited letter-spacing and re-apply it as a fixed margin, so the cell layout matches native
+    // kerning exactly — the cells stay in place at the end, so there is zero collapse/snap.
+    const cs = getComputedStyle(el)
+    const tracking = parseFloat(cs.letterSpacing) || 0
+    const mctx = document.createElement('canvas').getContext('2d')
+    mctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily
+    el.style.letterSpacing = '0'
+
+    el.textContent = ''
+    const cells = []
+    for(let i=0;i<n;i++){
+      const ch = finalText[i]
+      const cell = document.createElement('span')
+      cell.style.display = 'inline-block'
+      cell.style.width = mctx.measureText(ch === ' ' ? ' ' : ch).width + 'px'
+      cell.style.textAlign = 'center'
+      cell.style.marginRight = tracking + 'px'
+      if(ch === ' '){ cell.style.color = 'transparent'; cell.textContent = '\u00A0'; cells.push(null) }
+      else { cell.style.color = colorAt(i / (n - 1)); cell.textContent = ch; cells.push(cell) }
+      el.appendChild(cell)
+    }
+
+    const D = 3200
+    const settle = []
+    for(let i=0;i<n;i++) settle[i] = finalText[i]===' ' ? 0 : 480 + (i/(n-1))*2350 + Math.random()*300
+    const start = performance.now()
+    let lastChurn = 0
+    el.style.textShadow = '0 0 18px rgba(167,139,250,0.5)'
+    const tick = (now) => {
+      const t = now - start
+      const churn = (now - lastChurn) > 60
+      if(churn) lastChurn = now
+      let done = true
+      for(let i=0;i<n;i++){
+        const cell = cells[i]; if(!cell) continue
+        if(t >= settle[i]){ if(cell.textContent !== finalText[i]) cell.textContent = finalText[i] }
+        else { done = false; if(churn) cell.textContent = glyphs[(Math.random()*glyphs.length)|0] }
+      }
+      const p = Math.min(1, t / D)
+      el.style.textShadow = '0 0 ' + (18*(1-p)).toFixed(1) + 'px rgba(167,139,250,' + (0.5*(1-p)).toFixed(2) + ')'
+      if(!done && t < D + 250){ this._decRaf = requestAnimationFrame(tick) }
+      else {
+        // leave the fixed-width cells exactly where they are — no collapse, so no end-snap
+        el.style.textShadow = ''
+      }
+    }
+    this._decRaf = requestAnimationFrame(tick)
+  }
+
+  setupFeatureGlow(){
+    const root = this.rootRef.current; if(!root) return
+    root.querySelectorAll('[data-feat]').forEach(card => {
+      card.addEventListener('pointermove', (e) => {
+        const r = card.getBoundingClientRect()
+        card.style.setProperty('--mx', (e.clientX - r.left) + 'px')
+        card.style.setProperty('--my', (e.clientY - r.top) + 'px')
+      })
+    })
+  }
+  componentWillUnmount(){
+    cancelAnimationFrame(this._raf)
+    cancelAnimationFrame(this._decRaf)
+    clearTimeout(this._scanT)
+    window.removeEventListener('resize', this._onResize)
+    window.removeEventListener('scroll', this._onScroll)
+    if(this._hero){ this._hero.removeEventListener('pointermove', this._onMove); this._hero.removeEventListener('pointerleave', this._onLeave) }
+    if(this._io) this._io.disconnect()
+  }
+
+  setupNav(){
+    this._onScroll = () => { const s = window.scrollY > 12; if(s !== this.state.navScrolled) this.setState({ navScrolled: s }) }
+    window.addEventListener('scroll', this._onScroll, { passive:true })
+  }
+
+  setupReveal(){
+    const root = this.rootRef.current; if(!root) return
+    const els = Array.from(root.querySelectorAll('[data-reveal]'))
+    if(this.reduced){ els.forEach(el => el.classList.add('is-in')); return }
+    this._io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if(e.isIntersecting){
+          const el = e.target
+          const d = parseInt(el.getAttribute('data-delay')||'0', 10)
+          el.style.transitionDelay = d + 'ms'
+          el.classList.add('is-in')
+          this._io.unobserve(el)
+        }
+      })
+    }, { threshold: 0.12, rootMargin: '0px 0px -7% 0px' })
+    els.forEach(el => this._io.observe(el))
+  }
+
+  // ---- Perlin noise ----
+  _buildPerm(){
+    const p = new Uint8Array(512); const src = []
+    for(let i=0;i<256;i++) src[i]=i
+    for(let i=255;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=src[i]; src[i]=src[j]; src[j]=t }
+    for(let i=0;i<512;i++) p[i]=src[i&255]
+    return p
+  }
+  _fade(t){ return t*t*t*(t*(t*6-15)+10) }
+  _lerp(a,b,t){ return a+t*(b-a) }
+  _grad(h,x,y,z){ h&=15; const u=h<8?x:y; const v=h<4?y:(h===12||h===14?x:z); return ((h&1)?-u:u)+((h&2)?-v:v) }
+  _perlin(perm,x,y,z){
+    const fl=Math.floor
+    let X=fl(x)&255, Y=fl(y)&255, Z=fl(z)&255
+    x-=fl(x); y-=fl(y); z-=fl(z)
+    const u=this._fade(x), v=this._fade(y), w=this._fade(z)
+    const A=perm[X]+Y, AA=perm[A]+Z, AB=perm[A+1]+Z
+    const B=perm[X+1]+Y, BA=perm[B]+Z, BB=perm[B+1]+Z
+    const g=this._grad.bind(this), L=this._lerp
+    return L(
+      L(L(g(perm[AA],x,y,z), g(perm[BA],x-1,y,z), u), L(g(perm[AB],x,y-1,z), g(perm[BB],x-1,y-1,z), u), v),
+      L(L(g(perm[AA+1],x,y,z-1), g(perm[BA+1],x-1,y,z-1), u), L(g(perm[AB+1],x,y-1,z-1), g(perm[BB+1],x-1,y-1,z-1), u), v),
+      w)
+  }
+
+  setupCanvas(){
+    const canvas = this.canvasRef.current, hero = this.heroRef.current
+    if(!canvas || !hero) return
+    this._hero = hero
+    const ctx = canvas.getContext('2d')
+    const perm = this._buildPerm()
+    const s = { w:0,h:0,dpr:1,cols:0,rows:0,cw:0,ch:0,mx:-99999,my:-99999,tmx:-99999,tmy:-99999 }
+    this._cs = s
+
+    const resize = () => {
+      const r = hero.getBoundingClientRect()
+      s.w = r.width; s.h = r.height
+      s.dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+      canvas.width = Math.round(s.w*s.dpr); canvas.height = Math.round(s.h*s.dpr)
+      ctx.setTransform(s.dpr,0,0,s.dpr,0,0)
+      s.cols = Math.max(26, Math.round(s.w/24))
+      s.rows = Math.max(18, Math.round(s.h/24))
+      s.cw = s.w/(s.cols-1); s.ch = s.h/(s.rows-1)
+      this._vals = new Float32Array(s.cols*s.rows)
+    }
+    this._onResize = resize
+    window.addEventListener('resize', resize, { passive:true })
+    resize()
+
+    this._onMove = (e) => { const r=hero.getBoundingClientRect(); s.tmx=e.clientX-r.left; s.tmy=e.clientY-r.top }
+    this._onLeave = () => { s.tmx=-99999; s.tmy=-99999 }
+    hero.addEventListener('pointermove', this._onMove)
+    hero.addEventListener('pointerleave', this._onLeave)
+
+    const LEVELS = 13
+    const noise = (x,y,z) => this._perlin(perm,x,y,z)
+
+    if(this.reduced){ this._draw(ctx,s,noise,LEVELS,0,0); return }
+
+    const start = performance.now()
+    const loop = (now) => {
+      const t = (now-start)/1000
+      if(s.tmx < -50000){ s.mx += (-99999-s.mx)*0.08; s.my += (-99999-s.my)*0.08 }
+      else { s.mx += (s.tmx-s.mx)*0.12; s.my += (s.tmy-s.my)*0.12 }
+      const g = this.glowRef.current
+      if(g){ if(s.tmx > -50000){ g.style.opacity='1'; g.style.transform='translate('+s.mx+'px,'+s.my+'px)' } else { g.style.opacity='0' } }
+      this._draw(ctx,s,noise,LEVELS,t,1)
+      this._raf = requestAnimationFrame(loop)
+    }
+    this._raf = requestAnimationFrame(loop)
+  }
+
+  _draw(ctx,s,noise,LEVELS,t,breathe){
+    const cols=s.cols, rows=s.rows, cw=s.cw, ch=s.ch, vals=this._vals
+    const ns=0.085, zt=t*0.10
+    const hasMouse = s.mx > -50000
+    for(let gy=0; gy<rows; gy++){
+      for(let gx=0; gx<cols; gx++){
+        let v = noise(gx*ns, gy*ns, zt)*0.5 + 0.5
+        if(hasMouse){
+          const dx=gx*cw - s.mx, dy=gy*ch - s.my, d2=dx*dx+dy*dy
+          if(d2 < 60000) v += 0.34*Math.exp(-d2/16000)
+        }
+        vals[gx+gy*cols] = v
+      }
+    }
+    ctx.clearRect(0,0,s.w,s.h)
+    ctx.lineJoin='round'; ctx.lineCap='round'
+    const breath = breathe ? (0.62 + 0.38*Math.sin(t*1.5)) : 1
+    const seg=(ax,ay,bx,by)=>{ ctx.moveTo(ax,ay); ctx.lineTo(bx,by) }
+    for(let li=0; li<LEVELS; li++){
+      const f = li/(LEVELS-1)
+      const thr = 0.16 + f*0.70
+      let color, alpha, lw, glow
+      if(f > 0.84){ color='244,63,94'; alpha=0.6*breath; lw=1.6; glow=12 }
+      else if(f > 0.66){ color='167,139,250'; alpha=0.5; lw=1.25; glow=6 }
+      else { color='99,102,241'; alpha=0.09 + 0.20*f; lw=1; glow=0 }
+      ctx.beginPath()
+      for(let gy=0; gy<rows-1; gy++){
+        for(let gx=0; gx<cols-1; gx++){
+          const i=gx+gy*cols
+          const tl=vals[i], tr=vals[i+1], bl=vals[i+cols], br=vals[i+cols+1]
+          let idx=0
+          if(tl>thr) idx|=8; if(tr>thr) idx|=4; if(br>thr) idx|=2; if(bl>thr) idx|=1
+          if(idx===0 || idx===15) continue
+          const x0=gx*cw, y0=gy*ch, x1=x0+cw, y1=y0+ch
+          const tpx=x0+(thr-tl)/(tr-tl)*cw
+          const rpy=y0+(thr-tr)/(br-tr)*ch
+          const bpx=x0+(thr-bl)/(br-bl)*cw
+          const lpy=y0+(thr-tl)/(bl-tl)*ch
+          switch(idx){
+            case 1: seg(x0,lpy,bpx,y1); break
+            case 2: seg(bpx,y1,x1,rpy); break
+            case 3: seg(x0,lpy,x1,rpy); break
+            case 4: seg(tpx,y0,x1,rpy); break
+            case 5: seg(tpx,y0,x1,rpy); seg(x0,lpy,bpx,y1); break
+            case 6: seg(tpx,y0,bpx,y1); break
+            case 7: seg(tpx,y0,x0,lpy); break
+            case 8: seg(tpx,y0,x0,lpy); break
+            case 9: seg(tpx,y0,bpx,y1); break
+            case 10: seg(tpx,y0,x0,lpy); seg(bpx,y1,x1,rpy); break
+            case 11: seg(tpx,y0,x1,rpy); break
+            case 12: seg(x0,lpy,x1,rpy); break
+            case 13: seg(bpx,y1,x1,rpy); break
+            case 14: seg(x0,lpy,bpx,y1); break
+          }
+        }
+      }
+      ctx.strokeStyle='rgba('+color+','+alpha+')'
+      ctx.lineWidth=lw
+      if(glow>0){ ctx.shadowBlur=glow; ctx.shadowColor='rgba('+color+',0.85)' } else { ctx.shadowBlur=0 }
+      ctx.stroke()
+    }
+    ctx.shadowBlur=0
+  }
+
+  setMode(i){
+    if(i === this.state.mode) return
+    this.setState({ mode:i, scanning:true })
+    clearTimeout(this._scanT)
+    this._scanT = setTimeout(() => this.setState({ scanning:false }), 740)
+  }
+  toggleSubjectMenu(){ this.setState(s => ({ subjectOpen: !s.subjectOpen })) }
+  setSubject(i){
+    this.setState({ subject:i, subjectOpen:false, scanning:true })
+    clearTimeout(this._scanT)
+    this._scanT = setTimeout(() => this.setState({ scanning:false }), 740)
+  }
+  toggleFaq(i){ this.setState(s => ({ faqOpen: s.faqOpen===i ? -1 : i })) }
+  setBilling(b){ if(b !== this.state.billing) this.setState({ billing:b }) }
+  subscribe(){ const v=this.emailRef.current; if(v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.value.trim())) this.setState({ subscribed:true }) }
+
+  renderVals(){
+    const mode = this.state.mode
+
+    // ---- nav ----
+    const navStyle = {
+      position:'fixed', top:0, left:0, right:0, zIndex:50, width:'100%',
+      backgroundColor: this.state.navScrolled ? 'rgba(9,9,15,0.82)' : 'rgba(9,9,15,0)',
+      backdropFilter: this.state.navScrolled ? 'blur(12px)' : 'none',
+      WebkitBackdropFilter: this.state.navScrolled ? 'blur(12px)' : 'none',
+      borderBottom: '1px solid ' + (this.state.navScrolled ? '#191827' : 'transparent'),
+      transition:'background-color .25s, border-color .25s'
+    }
+
+    // ---- demo data ----
+    const Z = {
+      red:    { text:'#FB7185', bar:'#F43F5E', rgb:'244,63,94',  label:'Red Zone' },
+      likely: { text:'#A78BFA', bar:'#8B5CF6', rgb:'139,92,246', label:'Likely Zone' },
+    }
+    const SUBJECTS = [
+      {
+        code:'BIOL 201', topic:'Cellular Respiration', time:'00:42:18',
+        KW:[
+          { name:'electron transport chain',        m:[{z:'likely',c:52},{z:'likely',c:69},{z:'red',c:94}] },
+          { name:'net ATP yield',                   m:[{z:'likely',c:46},{z:'likely',c:60},{z:'red',c:83}] },
+          { name:'substrate-level phosphorylation', m:[{z:'none',c:0}, {z:'likely',c:61},{z:'red',c:88}] },
+          { name:'glycolysis',                      m:[{z:'likely',c:50},{z:'likely',c:64},{z:'likely',c:72}] },
+          { name:'pyruvate',                        m:[{z:'none',c:0}, {z:'none',c:0}, {z:'likely',c:60}] },
+        ],
+        src:[
+          { t:'\u201CThis is absolutely fair game for the midterm. The ' },
+          { k:'electron transport chain' },
+          { t:' is where most of your ' },
+          { k:'net ATP yield' },
+          { t:' actually comes from \u2014 not ' },
+          { k:'glycolysis' },
+          { t:'. Know ' },
+          { k:'substrate-level phosphorylation' },
+          { t:' cold, and remember ' },
+          { k:'pyruvate' },
+          { t:' is the hand-off into the Krebs cycle.\u201D' },
+        ],
+      },
+      {
+        code:'ORGO 250', topic:'Reaction Mechanisms', time:'00:28:54',
+        KW:[
+          { name:'SN2 mechanism',         m:[{z:'likely',c:55},{z:'likely',c:71},{z:'red',c:93}] },
+          { name:'carbocation stability', m:[{z:'likely',c:47},{z:'likely',c:62},{z:'red',c:86}] },
+          { name:'Markovnikov addition',  m:[{z:'none',c:0}, {z:'likely',c:58},{z:'red',c:80}] },
+          { name:'stereochemistry',       m:[{z:'likely',c:51},{z:'likely',c:65},{z:'likely',c:73}] },
+          { name:'leaving group',         m:[{z:'none',c:0}, {z:'none',c:0}, {z:'likely',c:57}] },
+        ],
+        src:[
+          { t:'\u201CThis shows up on every exam, I promise you. The ' },
+          { k:'SN2 mechanism' },
+          { t:' is backside attack with a good ' },
+          { k:'leaving group' },
+          { t:' \u2014 don\u2019t confuse it with ' },
+          { k:'carbocation stability' },
+          { t:', which is what drives ' },
+          { k:'Markovnikov addition' },
+          { t:'. And watch your ' },
+          { k:'stereochemistry' },
+          { t:' on the inversion.\u201D' },
+        ],
+      },
+      {
+        code:'PSYC 240', topic:'Memory & Cognition', time:'00:35:07',
+        KW:[
+          { name:'long-term potentiation', m:[{z:'likely',c:53},{z:'likely',c:68},{z:'red',c:91}] },
+          { name:'working memory',         m:[{z:'likely',c:49},{z:'likely',c:63},{z:'red',c:84}] },
+          { name:'the hippocampus',        m:[{z:'none',c:0}, {z:'likely',c:59},{z:'red',c:79}] },
+          { name:'encoding specificity',   m:[{z:'likely',c:50},{z:'likely',c:64},{z:'likely',c:72}] },
+          { name:'retrieval cues',         m:[{z:'none',c:0}, {z:'none',c:0}, {z:'likely',c:58}] },
+        ],
+        src:[
+          { t:'\u201CGuaranteed exam question here. The cellular basis of learning is ' },
+          { k:'long-term potentiation' },
+          { t:', and it lives in ' },
+          { k:'the hippocampus' },
+          { t:'. Don\u2019t confuse ' },
+          { k:'working memory' },
+          { t:' with storage \u2014 and remember ' },
+          { k:'encoding specificity' },
+          { t:': ' },
+          { k:'retrieval cues' },
+          { t:' only work if they match.\u201D' },
+        ],
+      },
+    ]
+    const cur = SUBJECTS[this.state.subject] || SUBJECTS[0]
+    const KW = cur.KW
+    const zoneOf = (name) => { const k = KW.find(k => k.name===name); return k ? k.m[mode] : { z:'none', c:0 } }
+    const currentCourse = cur.code + ' · ' + cur.topic + ' · ' + cur.time
+    const subjectMenu = SUBJECTS.map((sub,i) => ({
+      label: sub.code + ' · ' + sub.topic,
+      onClick: () => this.setSubject(i),
+      style: {
+        display:'block', width:'100%', textAlign:'left', padding:'9px 14px', border:'none', cursor:'pointer', borderRadius:'6px',
+        fontFamily:"'JetBrains Mono',monospace", fontSize:'12px', whiteSpace:'nowrap',
+        background: i===this.state.subject ? '#1C1B28' : 'transparent',
+        color: i===this.state.subject ? '#E2E8F0' : '#94A3B8', transition:'background .15s, color .15s'
+      }
+    }))
+
+    const MODE_LABELS = ['Slides only','+ Recording','Full session']
+    const tabs = MODE_LABELS.map((label,i) => ({
+      label,
+      onClick: () => this.setMode(i),
+      style: {
+        height:'30px', padding:'0 13px', borderRadius:'7px', border:'none', cursor:'pointer',
+        fontSize:'12.5px', fontWeight: i===mode ? 600 : 400,
+        background: i===mode ? '#1C1B28' : 'transparent',
+        color: i===mode ? '#E2E8F0' : '#5B6478',
+        boxShadow: i===mode ? '0 0 0 1px #2D2B45' : 'none',
+        transition:'all .2s'
+      }
+    }))
+
+    // transcript tokens
+    const tokens = cur.src.map(tok => {
+      if(tok.t) return { text: tok.t, style:{ color:'#8B95A7', transition:'color .4s' } }
+      const z = zoneOf(tok.k)
+      if(z.z === 'none') return { text: tok.k, style:{ color:'#C2CAD6', borderBottom:'1px dashed #2D2B45', transition:'all .45s' } }
+      const zc = Z[z.z]
+      return { text: tok.k, style:{ color:zc.text, background:'rgba('+zc.rgb+',0.12)', borderBottom:'1px solid rgba('+zc.rgb+',0.5)', borderRadius:'3px', padding:'1px 4px', transition:'all .45s' } }
+    })
+
+    // detected list
+    const detected = KW
+      .map(k => ({ name:k.name, m:k.m[mode] }))
+      .filter(x => x.m.c > 0)
+      .sort((a,b) => b.m.c - a.m.c)
+      .map(x => {
+        const zc = Z[x.m.z]
+        return {
+          name: x.name,
+          color: zc.text,
+          confText: x.m.c + '%',
+          dotStyle: { width:'7px', height:'7px', borderRadius:'50%', background:zc.bar, flexShrink:0, boxShadow:'0 0 8px rgba('+zc.rgb+',0.6)' },
+          barStyle: { height:'100%', width:x.m.c+'%', borderRadius:'9999px', background:'linear-gradient(90deg,rgba('+zc.rgb+',0.5),'+zc.bar+')', transition:'width .7s cubic-bezier(.16,1,.3,1)' },
+          zoneLabel: zc.label,
+          zoneStyle: { display:'inline-block', marginTop:'5px', fontSize:'10.5px', textTransform:'uppercase', letterSpacing:'0.08em', color:zc.text, opacity:0.8 }
+        }
+      })
+    const redCount = KW.filter(k => k.m[mode].z==='red').length
+    const likelyCount = KW.filter(k => k.m[mode].z==='likely').length
+    const summary = redCount > 0 ? (redCount + ' Red · ' + likelyCount + ' Likely') : (likelyCount + ' Likely')
+    const modeCaption = [
+      'Synthetic guess from your slide text — no recording analyzed yet.',
+      'Emphasis measured from your lecture audio: dwell time + verbal repetition.',
+      'Cross-referenced against your study guide. These are exam-critical.'
+    ][mode]
+
+    // ---- steps ----
+    const stepBase = { display:'flex', flexDirection:'column', padding:'24px', borderRadius:'12px', minHeight:'240px', background:'#111118', transition:'transform .45s cubic-bezier(.22,1,.36,1), border-color .45s, box-shadow .45s' }
+    const steps = [
+      { step:'01', label:'Slides only', title:'Start with your deck', body:'Nocturne extracts text from every slide and generates a Synthetic Study Guide automatically. Likely Zone keywords appear immediately.', chips:['PDF viewer','Synthetic guide','Flashcards'], hi:false },
+      { step:'02', label:'Add a recording', title:'Layer in the lecture', body:'Whisper transcribes your audio in-browser. The silence-gap engine syncs each word to its slide, measuring dwell time per topic.', chips:['Word-level sync','Emphasis detection','Confidence'], hi:false },
+      { step:'03', label:'Full session', title:'Surface the Red Zone', body:'Cross-reference your study guide against what the professor emphasized. Red Zone keywords are scored, hot-linked, and exported.', chips:['Red Zone scoring','Heatmap','Anki export'], hi:true },
+    ].map((s,i) => ({
+      ...s,
+      delay: i*70,
+      accent: s.hi ? '#FB7185' : '#818CF8',
+      cardStyle: { ...stepBase, border: '1px solid ' + (s.hi ? 'rgba(244,63,94,0.35)' : '#1E1E2E'), boxShadow: s.hi ? '0 0 0 1px rgba(244,63,94,0.1), 0 12px 40px rgba(244,63,94,0.08)' : 'none' },
+      chipStyle: { display:'inline-flex', alignItems:'center', padding:'3px 9px', borderRadius:'9999px', fontSize:'11.5px', background: s.hi ? 'rgba(244,63,94,0.12)' : '#1C1B28', color: s.hi ? '#FB7185' : '#5B6478', border:'1px solid ' + (s.hi ? 'rgba(244,63,94,0.25)' : '#191827') }
+    }))
+
+    // ---- features ----
+    const E = React.createElement
+    const svg = (...kids) => E('svg', { width:18, height:18, viewBox:'0 0 18 18', fill:'none', stroke:'currentColor', strokeWidth:1.5, strokeLinecap:'round', strokeLinejoin:'round' }, ...kids)
+    const featIcons = [
+      svg(E('circle',{cx:9,cy:9,r:7}), E('circle',{cx:9,cy:9,r:3.5}), E('circle',{cx:9,cy:9,r:0.9,fill:'currentColor'})),
+      svg(E('path',{d:'M2 13 L6 7 L10 11 L16 3'}), E('path',{d:'M12 3 h4 v4'})),
+      svg(E('path',{d:'M9 2 a7 7 0 1 1 -7 7'}), E('path',{d:'M9 5 v4 l3 2'})),
+      svg(E('rect',{x:2,y:3,width:14,height:10,rx:2}), E('path',{d:'M6 16 h6 M2 7 h14'})),
+      svg(E('rect',{x:4,y:8,width:10,height:7,rx:1.5}), E('path',{d:'M6 8 V6 a3 3 0 0 1 6 0 v2'})),
+      svg(E('circle',{cx:9,cy:9,r:7}), E('path',{d:'M2 9 h14 M9 2 a11 11 0 0 1 0 14 M9 2 a11 11 0 0 0 0 14'})),
+    ]
+    const glyphBase = { width:'38px', height:'38px', borderRadius:'9px', border:'1px solid #2D2B45', display:'flex', alignItems:'center', justifyContent:'center' }
+    const features = [
+      { title:'Red Zone Detection', body:'Cross-references your study guide against slide density and verbal repetition to surface the highest-yield keywords.', red:true },
+      { title:'Emphasis Detection', body:'Measures how long the professor dwells on each slide and how often they repeat each term. Not what was said — what was stressed.' },
+      { title:'Confidence Score', body:'Each Red Zone keyword gets a per-keyword score derived from slide density, verbal mentions, and study-guide alignment.' },
+      { title:'Anki Integration', body:'Import your existing deck to seed the guide. Export Red Zone cards as a valid .apkg, tagged and ready for spaced repetition.' },
+      { title:'Zero-Knowledge Encrypted', body:'Files are AES-GCM encrypted in the browser before upload. The server stores opaque blobs it cannot read.' },
+      { title:'Runs in Your Browser', body:'Whisper and BERT run as WASM Web Workers on your device. No audio leaves your machine on the free tier.' },
+    ].map((f,i) => ({ ...f, icon:featIcons[i], glyphStyle:{ ...glyphBase, color: f.red ? '#FB7185' : '#818CF8' } }))
+
+    // ---- comparison ----
+    const compareRows = [
+      { label:'Transcribes the lecture',                  otter:true,  notion:false, turbo:true  },
+      { label:'Auto-generates notes & summaries',         otter:true,  notion:true,  turbo:true  },
+      { label:'Makes flashcards & practice quizzes',      otter:false, notion:false, turbo:true  },
+      { label:'Measures what the professor emphasized',   otter:false, notion:false, turbo:false },
+      { label:'Ranks every term by exam likelihood',      otter:false, notion:false, turbo:false },
+      { label:'Cross-references your own study guide',     otter:false, notion:false, turbo:false },
+      { label:'Slide-dwell + verbal-repetition heatmap',  otter:false, notion:false, turbo:false },
+      { label:'Audio never leaves your device',           otter:false, notion:false, turbo:false },
+      { label:'Exports a valid, tagged Anki .apkg',        otter:false, notion:false, turbo:false },
+    ].map((r,i) => ({
+      label:r.label,
+      rowStyle:{ display:'grid', gridTemplateColumns:'1.9fr 1fr 1fr 1fr 1fr', borderTop: i===0 ? 'none' : '1px solid #1E1E2E' },
+      otterMark: r.otter ? '\u2713' : '\u2014',
+      otterStyle:{ fontSize:'15px', color: r.otter ? '#64708A' : '#33324a' },
+      notionMark: r.notion ? '\u2713' : '\u2014',
+      notionStyle:{ fontSize:'15px', color: r.notion ? '#64708A' : '#33324a' },
+      turboMark: r.turbo ? '\u2713' : '\u2014',
+      turboStyle:{ fontSize:'15px', color: r.turbo ? '#64708A' : '#33324a' },
+      nocturneStyle:{ fontSize:'15px', color:'#818CF8', fontWeight:600 }
+    }))
+
+    // ---- privacy ----
+    const guaranteeSrc = [
+      'Vault passphrase never leaves your device — not even hashed',
+      'Master Key is non-extractable; created with extractable: false',
+      'Files are AES-GCM 256 encrypted before upload',
+      'PBKDF2 at 310,000 iterations runs in a Web Worker, off the main thread',
+      'Whisper + BERT run locally via WASM — nothing leaves the browser on Free',
+      'No password reset exists. There is no backdoor.',
+    ]
+    const guarantees = guaranteeSrc.map((text,i) => {
+      const last = i === guaranteeSrc.length - 1
+      const c = last ? '#FB7185' : '#818CF8'
+      return {
+        text,
+        rowStyle:{ display:'flex', alignItems:'flex-start', gap:'16px', padding:'13px 0', borderBottom: i===guaranteeSrc.length-1 ? 'none' : '1px solid #1E1E2E' },
+        checkStyle:{ marginTop:'6px', flexShrink:0, width:'11px', height:'6px', borderLeft:'1.5px solid '+c, borderBottom:'1.5px solid '+c, transform:'rotate(-45deg)' },
+        textStyle:{ fontSize:'14.5px', lineHeight:1.6, color: last ? '#E2E8F0' : '#94A3B8' }
+      }
+    })
+
+    // ---- social proof: schools (PLACEHOLDER — swap monograms for real logos) ----
+    const schoolPalette = ['#818CF8','#A78BFA','#F472B6','#38BDF8','#2DD4BF','#FBBF24']
+    const schools = [
+      { name:'UC Berkeley', abbr:'UCB' },
+      { name:'UCLA', abbr:'UCLA' },
+      { name:'Stanford', abbr:'SU' },
+      { name:'USC', abbr:'USC' },
+      { name:'UC San Diego', abbr:'UCSD' },
+      { name:'Caltech', abbr:'CIT' },
+      { name:'UC Davis', abbr:'UCD' },
+      { name:'UC Irvine', abbr:'UCI' },
+      { name:'Cal Poly SLO', abbr:'CP' },
+      { name:'San Diego State', abbr:'SDSU' },
+      { name:'San José State', abbr:'SJSU' },
+      { name:'UC Santa Barbara', abbr:'UCSB' },
+    ].map((s,i) => {
+      const c = schoolPalette[i % schoolPalette.length]
+      return {
+        name:s.name, abbr:s.abbr,
+        logoStyle:{ display:'inline-flex', alignItems:'center', justifyContent:'center', height:'28px', padding:'0 8px', minWidth:'28px', borderRadius:'7px', fontSize:'10.5px', fontWeight:700, letterSpacing:'0.02em', color:c, background:c+'1A', border:'1px solid '+c+'40', flexShrink:0 }
+      }
+    })
+
+    // ---- pricing ----
+    const ctaSolid = { display:'flex', alignItems:'center', justifyContent:'center', width:'100%', height:'40px', borderRadius:'7px', fontSize:'14px', fontWeight:600, background:'#6366F1', color:'#09090F', boxShadow:'0 8px 26px rgba(99,102,241,0.32)' }
+    const ctaOutline = { display:'flex', alignItems:'center', justifyContent:'center', width:'100%', height:'40px', borderRadius:'7px', fontSize:'14px', fontWeight:500, border:'1px solid #2D2B45', color:'#E2E8F0', background:'transparent' }
+    const yearly = this.state.billing === 'yearly'
+    const planSrc = [
+      { name:'Dusk', monthly:0, tagline:'The full core product.', badge:'', hi:false, coming:false, cta:'Start for free', primary:false, href:'#top',
+        features:['PDF viewer + slide extraction','Whisper browser transcription','Synthetic Study Guide','Red Zone scoring','Slide density heatmap','Anki .apkg import + export','500 MB encrypted storage','3 sessions per month'] },
+      { name:'Midnight', monthly:8, tagline:'Sharper transcription. More storage.', badge:'Popular', hi:true, coming:false, cta:'Get Midnight', primary:true, href:'#top',
+        features:['Everything in Dusk','Server-side ASR + diarization','Hotword injection from guide','YouTube Red Zone search','Cross-session convergence','Exam Urgency Mode','5 GB encrypted storage','Unlimited sessions'] },
+      { name:'Eclipse', monthly:20, tagline:'Everything, with AI explanations.', badge:'', hi:false, coming:true, cta:'Join the waitlist', primary:false, href:'#newsletter',
+        features:['Everything in Midnight','AI summarization (opt-in)','Practice quiz mode','Cross-session deck merging','Markdown notes export','20 GB encrypted storage','Priority processing'] },
+    ]
+    const plans = planSrc.map((p,i) => {
+      const free = p.monthly === 0
+      const perMo = yearly ? p.monthly * 0.75 : p.monthly
+      const annual = perMo * 12
+      const saved = (p.monthly - perMo) * 12
+      return {
+        ...p,
+        delay:i*70,
+        price: free ? '$0' : '$' + perMo,
+        period: free ? 'forever' : '/mo',
+        showStrike: yearly && !free,
+        strike: '$' + p.monthly,
+        subMain: free ? 'Free forever — no card needed'
+          : (yearly ? '$' + annual + ' billed yearly' : '$' + annual + '/yr billed monthly'),
+        showSave: yearly && !free,
+        saveChip: 'Save $' + saved + '/yr',
+        checkColor: p.hi ? '#818CF8' : '#6366F1',
+        cardStyle:{ display:'flex', flexDirection:'column', padding:'26px 24px', borderRadius:'12px', background:'#111118', border:'1px solid ' + (p.hi ? 'rgba(99,102,241,0.4)' : '#1E1E2E'), boxShadow: p.hi ? '0 0 0 1px rgba(99,102,241,0.15), 0 16px 50px rgba(99,102,241,0.1)' : 'none', transition:'transform .45s cubic-bezier(.22,1,.36,1), border-color .45s, box-shadow .45s' },
+        badgeStyle: p.badge ? { fontSize:'10.5px', textTransform:'uppercase', letterSpacing:'0.08em', padding:'3px 9px', borderRadius:'9999px', background:'rgba(99,102,241,0.18)', color:'#A5B4FC', border:'1px solid rgba(99,102,241,0.3)' } : { display:'none' },
+        cta: p.cta,
+        ctaHref: p.href,
+        ctaStyle: p.primary ? ctaSolid : ctaOutline,
+      }
+    })
+
+    const segBase = { height:'34px', padding:'0 18px', borderRadius:'9999px', border:'none', cursor:'pointer', fontSize:'13.5px', fontWeight:500, display:'inline-flex', alignItems:'center', gap:'8px', transition:'background .25s, color .25s' }
+    const segActive = { background:'#6366F1', color:'#09090F' }
+    const segIdle = { background:'transparent', color:'#94A3B8' }
+    const monthlyBtnStyle = { ...segBase, ...(yearly ? segIdle : segActive) }
+    const yearlyBtnStyle = { ...segBase, ...(yearly ? segActive : segIdle) }
+    const saveBadgeStyle = { fontSize:'10px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', padding:'2px 7px', borderRadius:'9999px', background: yearly ? 'rgba(9,9,15,0.22)' : 'rgba(99,102,241,0.18)', color: yearly ? '#09090F' : '#A5B4FC' }
+    const billingHint = yearly ? 'Billed annually · three months free vs. paying monthly' : 'Switch to yearly to save 25% — like three months free'
+
+    // ---- faq ----
+    const faqSrc = [
+      { question:'Do I need a study guide to start?', answer:'No. Nocturne generates a Synthetic Study Guide from your slide text alone, so Likely Zone keywords appear before you upload anything else.' },
+      { question:'Does my audio leave my computer?', answer:'On the Free tier, never. Whisper runs as a WASM Web Worker directly in your browser — no audio is uploaded. Server-side ASR is opt-in on paid tiers.' },
+      { question:'What exactly is the Red Zone?', answer:'The handful of keywords your professor most emphasized — measured by slide dwell time and verbal repetition, then cross-referenced against your study guide and ranked by exam likelihood.' },
+      { question:'How is my data encrypted?', answer:'Your passphrase derives a key that wraps a non-extractable Master Key. Files are AES-GCM 256 encrypted in-browser before upload. The server only ever stores opaque blobs.' },
+      { question:'Is the free tier actually usable?', answer:'It is the full core product: transcription, Red Zone scoring, heatmaps, and Anki export — capped at 3 sessions per month and 500 MB of storage.' },
+      { question:'Can I bring my existing Anki deck?', answer:'Yes. Import any .apkg and your card fronts seed the study guide automatically. Export Red Zone cards back out as a valid, tagged .apkg.' },
+    ]
+    const faqs = faqSrc.map((q,i) => {
+      const open = this.state.faqOpen === i
+      return {
+        question:q.question, answer:q.answer,
+        onClick: () => this.toggleFaq(i),
+        iconStyle:{ fontSize:'20px', color: open ? '#818CF8' : '#5B6478', transform: open ? 'rotate(45deg)' : 'none', transition:'transform .3s, color .2s', flexShrink:0, lineHeight:1 },
+        bodyWrapStyle:{ maxHeight: open ? '220px' : '0px', opacity: open ? 1 : 0, overflow:'hidden', transition:'max-height .4s cubic-bezier(.16,1,.3,1), opacity .3s' }
+      }
+    })
+
+    // ---- "mostly noise" emphasis field ----
+    const sigIdx = { 16:96, 33:80, 52:100, 69:86 }
+    const noiseBars = []
+    const totalBars = 80
+    for(let i=0;i<totalBars;i++){
+      const sig = sigIdx[i]
+      if(sig){
+        noiseBars.push({ style:{ flex:'1 1 0', minWidth:'0', height:sig+'%', borderRadius:'3px 3px 0 0', background:'linear-gradient(#FB7185,#F43F5E)', boxShadow:'0 0 14px rgba(244,63,94,0.6)', animation:'noct-barpulse 2.6s ease-in-out infinite', animationDelay:((i%6)*0.18).toFixed(2)+'s', position:'relative', zIndex:1 } })
+      } else {
+        const h = 8 + (Math.sin(i*1.7)*0.5+0.5)*22
+        noiseBars.push({ style:{ flex:'1 1 0', minWidth:'0', height:h.toFixed(1)+'%', borderRadius:'3px 3px 0 0', background:'#23222F' } })
+      }
+    }
+
+    const footerCols = [
+      { heading:'Product', links:['Pricing','Security','Roadmap','Newsletter'] },
+      { heading:'Company', links:['About','Blog','Changelog'] },
+      { heading:'Legal', links:['Privacy','Terms','Cookies'] },
+      { heading:'Support', links:['Help','Contact','Accessibility'] },
+    ]
+
+    return {
+      rootRef:this.rootRef, heroRef:this.heroRef, canvasRef:this.canvasRef, glowRef:this.glowRef, emailRef:this.emailRef, taglineRef:this.taglineRef,
+      navStyle,
+      fields:['Pre-med','Medical school','Nursing','Pharmacology','Engineering','Computer Science','Organic Chemistry','Physics','Biochemistry','Law','Graduate STEM','PhD programs'],
+      tabs, tokens, detected, summary, modeCaption,
+      currentCourse, subjectMenu, subjectOpen:this.state.subjectOpen,
+      toggleSubjectMenu:() => this.toggleSubjectMenu(),
+      scanning:this.state.scanning,
+      exportVisible: mode===2,
+      steps, features, compareRows, guarantees, plans, faqs, footerCols, noiseBars, schools,
+      monthlyBtnStyle, yearlyBtnStyle, saveBadgeStyle, billingHint,
+      setMonthly:() => this.setBilling('monthly'), setYearly:() => this.setBilling('yearly'),
+      subscribed:this.state.subscribed, notSubscribed:!this.state.subscribed,
+      onSubscribe:() => this.subscribe(),
+    }
+  }
+}
+</script>
+</body>
+</html>

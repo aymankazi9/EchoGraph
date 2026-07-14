@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:#09090F; color:#E2E8F0; font-family:'Inter',system-ui,sans-serif; font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  *::-webkit-scrollbar { width:9px; height:9px; }
+  *::-webkit-scrollbar-track { background:transparent; }
+  *::-webkit-scrollbar-thumb { background:#1E1E2E; border-radius:9999px; }
+  *::-webkit-scrollbar-thumb:hover { background:#2D2B45; }
+  ::selection { background:rgba(99,102,241,0.28); color:#E2E8F0; }
+  a { color:inherit; text-decoration:none; }
+  button, input { font-family:inherit; }
+  input::placeholder { color:#3F485C; }
+  @keyframes co-livedot { 0%,100%{ opacity:1;} 50%{ opacity:0.4;} }
+  [data-navitem] { transition:background .18s, color .18s; }
+  [data-room] { transition:transform .2s cubic-bezier(.34,1.4,.42,1), border-color .2s, background .2s; }
+  [data-room]:hover { transform:translateY(-2px); border-color:#34324d !important; }
+  [data-kw] { transition:background .18s; }
+  [data-kw]:hover { background:#0F0E17 !important; }
+  [data-thread] { transition:border-color .2s, background .2s; }
+  [data-thread]:hover { border-color:#2D2B45 !important; background:#0F0E17 !important; }
+  [data-join] { transition:transform .25s cubic-bezier(.34,1.4,.42,1), background .25s, border-color .25s, color .25s; }
+  [data-join]:hover { transform:translateY(-1px); }
+  [data-btn] { transition:transform .25s cubic-bezier(.34,1.4,.42,1), background .25s, border-color .25s; }
+  [data-btn]:hover { transform:translateY(-1px); }
+</style>
+</helmet>
+
+<div style="display:flex; min-height:100vh; background:#09090F;">
+
+  <!-- ===== SIDEBAR ===== -->
+  <nav style="{{ sideStyle }}">
+    <div style="{{ sideHeadStyle }}">
+      <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}">
+        <a href="Vault Dashboard.dc.html" style="font-size:16px; font-weight:600; letter-spacing:-0.01em; color:#E2E8F0; display:inline-flex; align-items:center; gap:9px;">
+          <span style="width:25px; height:25px; border-radius:7px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:13px;">N</span>
+          Nocturne
+        </a>
+      </sc-if>
+      <sc-if value="{{ collapsed }}" hint-placeholder-val="{{ false }}">
+        <span style="width:25px; height:25px; border-radius:7px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:13px;">N</span>
+      </sc-if>
+      <button type="button" onClick="{{ onToggleCollapse }}" aria-label="Toggle navigation" style="{{ collapseBtnStyle }}">
+        <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="{{ chevTransform }}"><path d="M11 4 L6 9 L11 14"></path></svg>
+      </button>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:3px; padding:10px 9px; flex:1;">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="7">
+        <a href="{{ n.href }}" onClick="{{ n.onClick }}" data-navitem title="{{ n.label }}" style="{{ n.style }}">
+          <span style="flex-shrink:0; display:flex;">{{ n.icon }}</span>
+          <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span style="white-space:nowrap;">{{ n.label }}</span></sc-if>
+        </a>
+      </sc-for>
+    </div>
+
+    <div style="{{ sideBottomStyle }}">
+      <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:9px; border:1px solid rgba(99,102,241,0.2); background:rgba(99,102,241,0.06); margin-bottom:14px;">
+            <span style="color:#818CF8; display:flex;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="10" height="7" rx="1.5"></rect><path d="M6 8 V6 a3 3 0 0 1 6 0 v2"></path></svg></span>
+            <span style="font-size:11.5px; color:#A5B4FC; font-weight:500;">Zero-knowledge encrypted</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; border:1px solid #1E1E2E; background:#0D0D14;">
+            <span style="width:30px; height:30px; flex-shrink:0; border-radius:8px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:600; font-size:13px;">M</span>
+            <div style="min-width:0; flex:1;">
+              <div style="font-size:12.5px; color:#E2E8F0; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">maya@ucsd.edu</div>
+              <div style="font-size:11px; color:#5B6478;">Pro plan</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ collapsed }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:14px;">
+          <span style="color:#818CF8; display:flex;" title="Zero-knowledge encrypted"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="10" height="7" rx="1.5"></rect><path d="M6 8 V6 a3 3 0 0 1 6 0 v2"></path></svg></span>
+          <span style="width:30px; height:30px; border-radius:8px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:600; font-size:13px;">M</span>
+        </div>
+      </sc-if>
+    </div>
+  </nav>
+
+  <!-- ===== MAIN ===== -->
+  <main style="flex:1; min-width:0; position:relative; overflow-x:hidden;">
+    <div style="position:absolute; top:0; left:0; right:0; height:300px; background:radial-gradient(720px 300px at 26% -90px, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.04) 44%, transparent 74%); pointer-events:none; z-index:0;"></div>
+
+    <div style="position:relative; z-index:1; max-width:1080px; margin:0 auto; padding:34px 40px 90px;">
+
+      <!-- header -->
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:20px;">
+        <div>
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:7px;">
+            <h1 style="font-size:27px; font-weight:600; letter-spacing:-0.025em; color:#E2E8F0; margin:0;">Community</h1>
+            <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:9999px; border:1px solid rgba(99,102,241,0.3); background:rgba(99,102,241,0.1); font-size:10.5px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:#A5B4FC;">Beta</span>
+          </div>
+          <p style="font-size:14px; color:#94A3B8; margin:0;">Join your course, not a network. Rooms are anonymous, course-scoped, and you can leave any time.</p>
+        </div>
+        <button type="button" style="display:flex; align-items:center; gap:9px; flex-shrink:0; height:38px; padding:0 14px; border-radius:10px; border:1px solid #1E1E2E; background:#0D0D14; color:#CBD5E1; font-size:13px; cursor:pointer;" style-hover="border-color:#2D2B45;">
+          <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="#818CF8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7 L9 3 L15 7 L9 11 Z"></path><path d="M5.5 8.5 V12 c0 1 1.7 2 3.5 2 s3.5 -1 3.5 -2 V8.5"></path></svg>
+          UC San Diego
+          <span style="color:#5B6478; font-size:12px;">· change</span>
+        </button>
+      </div>
+
+      <!-- your rooms -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:26px; margin-bottom:13px;">
+        <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:#5B6478;">Your course rooms</span>
+        <span style="font-size:12px; color:#5B6478;">{{ joinedCount }} joined</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:13px;">
+        <sc-for list="{{ joinedRooms }}" as="r" hint-placeholder-count="3">
+          <button type="button" data-room onClick="{{ r.onSelect }}" style="{{ r.cardStyle }}">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span style="{{ r.codeStyle }}">{{ r.code }}</span>
+              <sc-if value="{{ r.hasNew }}" hint-placeholder-val="{{ false }}">
+                <span style="display:inline-flex; align-items:center; gap:5px; font-size:10.5px; color:#FCD34D;"><span style="width:6px; height:6px; border-radius:50%; background:#FBBF24; box-shadow:0 0 7px rgba(251,191,36,0.7);"></span>New deck</span>
+              </sc-if>
+            </div>
+            <div style="font-size:14px; font-weight:600; color:#E2E8F0; text-align:left; margin-top:11px; line-height:1.3;">{{ r.name }}</div>
+            <div style="display:flex; align-items:center; gap:7px; margin-top:9px;">
+              <span style="color:#5B6478; display:flex;"><svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6" r="2.4"></circle><path d="M2.5 14 c0 -2.5 1.8 -4 4 -4 s4 1.5 4 4"></path><path d="M11.5 4 a2.2 2.2 0 0 1 0 4.2 M12 10.2 c2 0.3 3.5 1.7 3.5 3.8"></path></svg></span>
+              <span style="font-size:12px; color:#94A3B8;">{{ r.members }} in room</span>
+            </div>
+          </button>
+        </sc-for>
+      </div>
+
+      <!-- active room panel -->
+      <div style="margin-top:18px; border:1px solid #1A1A26; border-radius:18px; background:#0B0B11; overflow:hidden;">
+        <!-- room header -->
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 22px; border-bottom:1px solid #16151F; background:linear-gradient(120deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.03) 45%, transparent 100%); flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:14px; min-width:0;">
+            <span style="width:44px; height:44px; flex-shrink:0; border-radius:12px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.28); display:flex; align-items:center; justify-content:center; color:#A5B4FC; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; text-align:center; line-height:1.1;">{{ activeShort }}</span>
+            <div style="min-width:0;">
+              <div style="font-size:17px; font-weight:600; letter-spacing:-0.015em; color:#E2E8F0;">{{ activeName }}</div>
+              <div style="font-size:12.5px; color:#94A3B8; margin-top:2px;">{{ activeCode }} · UC San Diego · <span style="color:#A5B4FC;">{{ activeMembers }} classmates this term</span></div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+            <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:9999px; border:1px solid rgba(45,212,191,0.28); background:rgba(45,212,191,0.08);">
+              <span style="width:6px; height:6px; border-radius:50%; background:#2DD4BF; animation:co-livedot 2s ease-in-out infinite;"></span>
+              <span style="font-size:11px; color:#5EEAD4;">{{ activeOnline }} active now</span>
+            </span>
+            <button type="button" style="height:32px; padding:0 13px; border-radius:8px; border:1px solid #23222F; background:transparent; color:#94A3B8; font-size:12.5px; cursor:pointer;" style-hover="border-color:#FB7185; color:#FB7185;">Leave</button>
+          </div>
+        </div>
+
+        <!-- room body -->
+        <div style="display:grid; grid-template-columns:1.55fr 1fr; gap:0;">
+
+          <!-- left: pooled keywords + threads -->
+          <div style="padding:22px; border-right:1px solid #16151F;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:5px;">
+              <div style="font-size:14.5px; font-weight:600; color:#E2E8F0;">What the class is flagging</div>
+              <span style="font-size:11px; color:#5B6478; font-family:'JetBrains Mono',monospace;">pooled · {{ activePooledFrom }} vaults</span>
+            </div>
+            <p style="font-size:12.5px; color:#5B6478; margin:0 0 16px;">Most-flagged <span style="color:#FB7185;">Red Zone</span> keywords across the room — your transcripts never leave your device, only counts are pooled.</p>
+            <div style="display:flex; flex-direction:column; gap:3px;">
+              <sc-for list="{{ keywords }}" as="k" hint-placeholder-count="6">
+                <div data-kw style="display:flex; align-items:center; gap:14px; padding:10px 11px; border-radius:10px; background:transparent;">
+                  <span style="width:20px; flex-shrink:0; font-family:'JetBrains Mono',monospace; font-size:11px; color:#3F485C; text-align:right;">{{ k.rank }}</span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px;">
+                      <span style="font-size:13px; color:#E2E8F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ k.term }}</span>
+                      <span style="font-size:11px; color:#94A3B8; flex-shrink:0; font-family:'JetBrains Mono',monospace;">{{ k.count }}</span>
+                    </div>
+                    <div style="height:5px; width:100%; border-radius:9999px; background:#16151F; overflow:hidden;">
+                      <div style="{{ k.barStyle }}"></div>
+                    </div>
+                  </div>
+                  <sc-if value="{{ k.inMine }}" hint-placeholder-val="{{ false }}">
+                    <span title="Also in your vault" style="color:#818CF8; display:flex; flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5 L7.5 13 L14 5"></path></svg></span>
+                  </sc-if>
+                  <sc-if value="{{ k.notMine }}" hint-placeholder-val="{{ true }}">
+                    <span title="Not yet in your vault" style="width:14px; height:14px; flex-shrink:0; border-radius:50%; border:1.5px dashed #2D2B45;"></span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="height:1px; background:#16151F; margin:20px 0;"></div>
+
+            <div style="font-size:14.5px; font-weight:600; color:#E2E8F0; margin-bottom:13px;">Study threads</div>
+            <div style="display:flex; flex-direction:column; gap:9px;">
+              <sc-for list="{{ threads }}" as="t" hint-placeholder-count="3">
+                <a href="#" data-thread style="display:flex; align-items:center; gap:13px; padding:12px 14px; border-radius:12px; border:1px solid #16151F; background:#0D0D14;">
+                  <span style="width:32px; height:32px; flex-shrink:0; border-radius:9px; background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.22); display:flex; align-items:center; justify-content:center; color:#818CF8;"><svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4 h12 a1 1 0 0 1 1 1 v6 a1 1 0 0 1 -1 1 H8 l-3.5 3 V12 H3 a1 1 0 0 1 -1 -1 V5 a1 1 0 0 1 1 -1 Z"></path></svg></span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:13px; font-weight:500; color:#E2E8F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ t.title }}</div>
+                    <div style="font-size:11.5px; color:#5B6478;">{{ t.meta }}</div>
+                  </div>
+                  <span style="font-size:11px; color:#5B6478; flex-shrink:0;">{{ t.last }}</span>
+                </a>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- right: shared deck + privacy -->
+          <div style="padding:22px; display:flex; flex-direction:column; gap:16px;">
+            <div style="border:1px solid rgba(244,63,94,0.22); border-radius:14px; background:linear-gradient(180deg, rgba(244,63,94,0.06), #0D0D14 60%); padding:17px 18px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:9px;">
+                <span style="display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600; color:#E2E8F0;"><span style="color:#FB7185; display:flex;"><svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1.6 L15.2 4 V8.6 c0 4 -2.7 6.4 -6.2 7.8 C5.5 15 2.8 12.6 2.8 8.6 V4 Z"></path></svg></span>Exam-prediction deck</span>
+                <span style="font-size:10.5px; color:#FB7185; font-weight:500; padding:2px 8px; border-radius:9999px; background:rgba(244,63,94,0.12);">{{ activeExam }}</span>
+              </div>
+              <div style="font-size:12.5px; color:#94A3B8; line-height:1.5; margin-bottom:14px;">{{ activeDeckCount }} predicted keywords, ranked by how many classmates flagged them. Updated as the room studies.</div>
+              <a href="#" data-btn style="display:flex; align-items:center; justify-content:center; gap:8px; height:40px; border-radius:10px; background:#6366F1; color:#09090F; font-size:13px; font-weight:500;" style-hover="background:#4F46E5;">
+                <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3 v8 M5.5 7.5 L9 11 L12.5 7.5 M3 14 H15"></path></svg>
+                Add deck to my vault
+              </a>
+            </div>
+
+            <div style="border:1px solid #1A1A26; border-radius:14px; background:#0D0D14; padding:17px 18px;">
+              <div style="font-size:12.5px; font-weight:600; color:#E2E8F0; margin-bottom:13px;">This week in the room</div>
+              <div style="display:flex; flex-direction:column; gap:11px;">
+                <sc-for list="{{ activity }}" as="a" hint-placeholder-count="3">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:12px; color:#94A3B8;">{{ a.label }}</span>
+                    <span style="font-size:12.5px; color:#E2E8F0; font-weight:500; font-family:'JetBrains Mono',monospace;">{{ a.value }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:flex-start; gap:9px; padding:13px 15px; border-radius:12px; border:1px solid rgba(99,102,241,0.2); background:rgba(99,102,241,0.05);">
+              <span style="color:#818CF8; display:flex; flex-shrink:0; margin-top:1px;"><svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="10" height="7" rx="1.5"></rect><path d="M6 8 V6 a3 3 0 0 1 6 0 v2"></path></svg></span>
+              <span style="font-size:11.5px; color:#94A3B8; line-height:1.5;">You're <span style="color:#A5B4FC; font-weight:500;">anonymous</span> here. No names, no profiles — classmates only see pooled keyword counts, never your transcripts or vault.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- discover / join -->
+      <div style="margin-top:18px; border:1px solid #1A1A26; border-radius:16px; background:#0C0C13; padding:20px 22px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:16px;">
+          <div>
+            <div style="font-size:15px; font-weight:600; color:#E2E8F0;">Find more course rooms</div>
+            <div style="font-size:12.5px; color:#5B6478; margin-top:2px;">Open rooms at UC San Diego with material that overlaps yours</div>
+          </div>
+          <div style="position:relative; width:280px; max-width:100%;">
+            <span style="position:absolute; left:13px; top:50%; transform:translateY(-50%); color:#5B6478; pointer-events:none; display:flex;"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="6"></circle><path d="M14 14 L18 18"></path></svg></span>
+            <input value="{{ query }}" onChange="{{ onQuery }}" type="text" placeholder="Search course code or name" style="width:100%; height:40px; padding:0 14px 0 38px; box-sizing:border-box; border-radius:10px; background:#0D0D14; border:1px solid #1E1E2E; color:#E2E8F0; font-size:13px; outline:none;" style-focus="border-color:#6366F1;">
+          </div>
+        </div>
+
+        <sc-if value="{{ hasDiscover }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex; flex-direction:column; gap:9px;">
+            <sc-for list="{{ discover }}" as="d" hint-placeholder-count="4">
+              <div style="display:flex; align-items:center; gap:14px; padding:13px 15px; border-radius:12px; border:1px solid #16151F; background:#0B0B11;">
+                <span style="width:40px; height:40px; flex-shrink:0; border-radius:11px; background:#13121C; border:1px solid #1E1E2E; display:flex; align-items:center; justify-content:center; color:#94A3B8; font-family:'JetBrains Mono',monospace; font-size:10px; text-align:center; line-height:1.1;">{{ d.short }}</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:13.5px; font-weight:500; color:#E2E8F0;">{{ d.name }}</div>
+                  <div style="font-size:11.5px; color:#5B6478;">{{ d.code }} · {{ d.members }} in room · {{ d.decks }} shared decks</div>
+                </div>
+                <sc-if value="{{ d.overlap }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:11px; color:#5EEAD4; flex-shrink:0; display:none;">{{ d.overlapLabel }}</span>
+                </sc-if>
+                <button type="button" data-join onClick="{{ d.onJoin }}" style="flex-shrink:0; height:34px; padding:0 16px; border-radius:9px; border:1px solid rgba(99,102,241,0.4); background:rgba(99,102,241,0.12); color:#A5B4FC; font-size:12.5px; font-weight:500; cursor:pointer;" style-hover="background:rgba(99,102,241,0.2);">Join</button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noDiscover }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center; padding:34px 20px; color:#5B6478; font-size:13px;">No rooms match "{{ query }}" yet — try another course code.</div>
+        </sc-if>
+      </div>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  state = { collapsed:false, activeRoom:'bibc102', joined:['bibc102','chem6b','cogs107b'], query:'' }
+
+  componentDidMount(){
+    try { if(localStorage.getItem('nocturne-design-nav-collapsed') === 'true') this.setState({ collapsed:true }) } catch(e){}
+  }
+  save(k,v){ try { localStorage.setItem(k,v) } catch(e){} }
+  toggleCollapse(){ this.setState(s => { const n=!s.collapsed; this.save('nocturne-design-nav-collapsed', String(n)); return { collapsed:n } }) }
+  selectRoom(id){ this.setState({ activeRoom:id }) }
+  joinRoom(id){ this.setState(s => ({ joined: s.joined.includes(id) ? s.joined : [...s.joined, id], activeRoom:id, query:'' })) }
+  onQuery(e){ this.setState({ query:e.target.value }) }
+
+  icon(name){
+    const I = {
+      vault:'<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="15" height="14" rx="2"></rect><circle cx="10" cy="10" r="3"></circle><path d="M10 5 V7 M10 13 v2 M5 10 h2 M13 10 h2"></path></svg>',
+      momentum:'<svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 1.5 L4 10 h4 l-1 6.5 L14 7 h-4 Z"></path></svg>',
+      community:'<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="2.6"></circle><path d="M2.5 16 c0 -2.8 2 -4.6 4.5 -4.6 s4.5 1.8 4.5 4.6"></path><path d="M13 4.6 a2.5 2.5 0 0 1 0 4.8 M14 11.6 c2.2 0.4 3.5 2 3.5 4.4"></path></svg>',
+      plus:'<svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 v10 M4 9 h10"></path></svg>',
+      help:'<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"></circle><path d="M7.7 7.4 a2.3 2.3 0 1 1 3 2.2 c-0.7 0.3 -0.9 0.7 -0.9 1.4"></path><path d="M10 14 v0.01"></path></svg>',
+      billing:'<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.2" y="4.5" width="15.6" height="11" rx="2"></rect><path d="M2.2 8.2 H17.8"></path><path d="M5 12.4 h3"></path></svg>',
+      settings:'<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.6"></circle><path d="M10 1.8 v2 M10 16.2 v2 M1.8 10 h2 M16.2 10 h2 M4.2 4.2 l1.4 1.4 M14.4 14.4 l1.4 1.4 M4.2 15.8 l1.4 -1.4 M14.4 5.6 l1.4 -1.4"></path></svg>',
+    }
+    return React.createElement('span', { style:{ display:'flex', lineHeight:0 }, dangerouslySetInnerHTML:{ __html: I[name] || '' } })
+  }
+
+  rooms(){
+    return {
+      bibc102: { code:'BIBC 102', short:'BIBC\n102', name:'Metabolic Biochemistry', members:47, online:6, pooledFrom:31, exam:'Midterm 2', deckCount:47, hasNew:true,
+        keywords:[
+          ['Substrate-level phosphorylation',41,true],
+          ['Allosteric regulation of PFK-1',38,true],
+          ['Citrate synthase regulation',33,false],
+          ['Anaplerotic reactions',29,false],
+          ['NADH shuttle systems',24,true],
+          ['Pyruvate dehydrogenase complex',22,false],
+        ],
+        threads:[
+          ['Why is PFK-1 the committed step?','9 studying · 14 notes','2h'],
+          ['TCA intermediates worth memorizing','6 studying · 8 notes','5h'],
+          ['Midterm 2 logistics & format','12 studying','1d'],
+        ],
+        activity:[['New keywords pooled','+18'],['Classmates studied','31 of 47'],['Deck updates','3']] },
+      chem6b: { code:'CHEM 6B', short:'CHEM\n6B', name:'General Chemistry II', members:38, online:4, pooledFrom:26, exam:'Final', deckCount:53, hasNew:false,
+        keywords:[
+          ['Nernst equation',35,true],
+          ['Buffer capacity & Henderson-Hasselbalch',31,true],
+          ['Ksp and common-ion effect',28,false],
+          ['Galvanic cell notation',23,false],
+          ['Rate law determination',19,true],
+        ],
+        threads:[
+          ['Electrochem sign conventions','7 studying · 11 notes','3h'],
+          ['Titration curve breakpoints','5 studying','8h'],
+        ],
+        activity:[['New keywords pooled','+11'],['Classmates studied','22 of 38'],['Deck updates','2']] },
+      cogs107b: { code:'COGS 107B', short:'COGS\n107B', name:'Systems Neuroscience', members:21, online:2, pooledFrom:15, exam:'Midterm 1', deckCount:29, hasNew:false,
+        keywords:[
+          ['Resting membrane potential',18,true],
+          ['Saltatory conduction',16,false],
+          ['Lateral inhibition',13,false],
+          ['Long-term potentiation',11,true],
+        ],
+        threads:[
+          ['Action potential phases — quick map','4 studying','6h'],
+          ['Receptive fields intuition','3 studying','1d'],
+        ],
+        activity:[['New keywords pooled','+7'],['Classmates studied','12 of 21'],['Deck updates','1']] },
+      // joinable (not joined by default)
+      bild1: { code:'BILD 1', short:'BILD\n1', name:'The Cell', members:120, online:14, pooledFrom:88, exam:'Midterm 1', deckCount:61, hasNew:false, decks:6,
+        keywords:[['Membrane transport',92,false],['Enzyme kinetics basics',81,false],['Cell cycle checkpoints',74,false],['Signal transduction',63,false]],
+        threads:[['Mitosis vs meiosis cheat thread','22 studying','1h']],
+        activity:[['New keywords pooled','+24'],['Classmates studied','71 of 120'],['Deck updates','4']] },
+      math20c: { code:'MATH 20C', short:'MATH\n20C', name:'Calculus & Analytic Geometry', members:86, online:9, pooledFrom:60, exam:'Midterm 2', deckCount:44, hasNew:false, decks:4,
+        keywords:[['Lagrange multipliers',58,false],['Gradient & directional derivatives',51,false],['Double integrals in polar',44,false]],
+        threads:[['Setting up Lagrange problems','15 studying','4h']],
+        activity:[['New keywords pooled','+13'],['Classmates studied','40 of 86'],['Deck updates','2']] },
+      psyc60: { code:'PSYC 60', short:'PSYC\n60', name:'Introduction to Statistics', members:64, online:5, pooledFrom:41, exam:'Final', deckCount:38, hasNew:false, decks:3,
+        keywords:[['Type I vs Type II error',49,false],['t-test assumptions',42,false],['ANOVA partitioning',33,false]],
+        threads:[['When to use which test (flowchart)','11 studying','2h']],
+        activity:[['New keywords pooled','+9'],['Classmates studied','30 of 64'],['Deck updates','2']] },
+      chem7l: { code:'CHEM 7L', short:'CHEM\n7L', name:'Organic Chemistry Lab', members:41, online:3, pooledFrom:28, exam:'Practical', deckCount:22, hasNew:false, decks:2,
+        keywords:[['TLC Rf interpretation',31,false],['Recrystallization solvent choice',26,false],['IR functional-group bands',24,false]],
+        threads:[['Common mechanism mistakes in reports','8 studying','7h']],
+        activity:[['New keywords pooled','+6'],['Classmates studied','19 of 41'],['Deck updates','1']] },
+    }
+  }
+
+  renderVals(){
+    const expanded = !this.state.collapsed
+    const sideW = expanded ? '224px' : '64px'
+    const sideStyle = { width:sideW, minWidth:sideW, maxWidth:sideW, flexGrow:0, flexShrink:0, height:'100vh', position:'sticky', top:0, display:'flex', flexDirection:'column', background:'#0B0B11', borderRight:'1px solid #16151F', transition:'min-width .22s cubic-bezier(.4,0,.2,1), max-width .22s cubic-bezier(.4,0,.2,1), width .22s cubic-bezier(.4,0,.2,1)', overflow:'hidden' }
+    const sideHeadStyle = { display:'flex', flexDirection: expanded ? 'row' : 'column', alignItems:'center', justifyContent: expanded ? 'space-between' : 'center', gap: expanded ? '8px' : '6px', minHeight:'58px', padding: expanded ? '0 14px' : '10px 0', borderBottom:'1px solid #16151F', flexShrink:0 }
+    const collapseBtnStyle = { width:'28px', height:'28px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'7px', background:'none', border:'none', color:'#5B6478', cursor:'pointer' }
+    const sideBottomStyle = { padding: expanded ? '14px' : '14px 0 18px', borderTop:'1px solid #16151F', flexShrink:0 }
+
+    const navDefs = [
+      { label:'Vault', icon:'vault', href:'Vault Dashboard.dc.html' },
+      { label:'Momentum', icon:'momentum', href:'Momentum.dc.html' },
+      { label:'Community', icon:'community', href:'Community.dc.html', active:true },
+      { label:'New session', icon:'plus', href:'Vault Dashboard.dc.html' },
+      { label:'Help', icon:'help', href:'Vault Dashboard.dc.html' },
+      { label:'Billing', icon:'billing', href:'Vault Dashboard.dc.html' },
+      { label:'Settings', icon:'settings', href:'Vault Dashboard.dc.html' },
+    ]
+    const navItems = navDefs.map(n => ({
+      label:n.label, icon:this.icon(n.icon), href:n.href, onClick:()=>{},
+      style:{ display:'flex', alignItems:'center', gap:'11px', height:'38px', padding: expanded ? '0 11px' : '0', justifyContent: expanded ? 'flex-start' : 'center', borderRadius:'9px', fontSize:'13.5px', fontWeight:500, textDecoration:'none', cursor:'pointer',
+        background: n.active ? 'rgba(99,102,241,0.13)' : 'transparent',
+        color: n.active ? '#C7CEF5' : '#94A3B8' },
+    }))
+
+    const ROOMS = this.rooms()
+    const joinedIds = this.state.joined
+    const activeId = ROOMS[this.state.activeRoom] ? this.state.activeRoom : joinedIds[0]
+    const a = ROOMS[activeId]
+
+    const joinedRooms = joinedIds.map(id => {
+      const r = ROOMS[id]; const sel = id === activeId
+      return {
+        code:r.code, name:r.name, members:r.members, hasNew:r.hasNew,
+        onSelect: () => this.selectRoom(id),
+        cardStyle:{ display:'flex', flexDirection:'column', textAlign:'left', padding:'15px 16px', borderRadius:'14px', cursor:'pointer',
+          border:'1px solid '+(sel?'rgba(99,102,241,0.45)':'#1A1A26'), background: sel?'rgba(99,102,241,0.08)':'#0D0D14' },
+        codeStyle:{ display:'inline-flex', alignItems:'center', padding:'3px 9px', borderRadius:'7px', fontSize:'11px', fontWeight:500, fontFamily:"'JetBrains Mono',monospace",
+          color: sel?'#A5B4FC':'#94A3B8', background: sel?'rgba(99,102,241,0.14)':'#16151F', border:'1px solid '+(sel?'rgba(99,102,241,0.3)':'#1E1E2E') },
+      }
+    })
+
+    // keyword bars
+    const kwMax = a.keywords[0][1]
+    const keywords = a.keywords.map((k, i) => ({
+      rank: String(i+1).padStart(2,'0'), term:k[0], count: k[1] + ' / ' + a.members,
+      inMine: k[2], notMine: !k[2],
+      barStyle:{ height:'100%', width: Math.round(k[1]/a.members*100) + '%', borderRadius:'9999px', background: i < 2 ? 'linear-gradient(90deg,#FB7185,#F43F5E)' : 'linear-gradient(90deg,#6366F1,#8B5CF6)' },
+    }))
+    const threads = a.threads.map(t => ({ title:t[0], meta:t[1], last:t[2] }))
+    const activity = a.activity.map(x => ({ label:x[0], value:x[1] }))
+
+    // discover
+    const q = this.state.query.trim().toLowerCase()
+    const discoverIds = Object.keys(ROOMS).filter(id => !joinedIds.includes(id))
+    const discoverFiltered = discoverIds.filter(id => {
+      if(!q) return true
+      const r = ROOMS[id]
+      return r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
+    })
+    const discover = discoverFiltered.map(id => {
+      const r = ROOMS[id]
+      return { short:r.short, name:r.name, code:r.code, members:r.members, decks:r.decks || r.deckCount,
+        overlap:false, overlapLabel:'',
+        onJoin: () => this.joinRoom(id) }
+    })
+
+    return {
+      expanded, collapsed: this.state.collapsed,
+      sideStyle, sideHeadStyle, collapseBtnStyle, sideBottomStyle,
+      chevTransform:{ transform: expanded ? 'none' : 'rotate(180deg)', transition:'transform .22s' },
+      navItems,
+      onToggleCollapse: () => this.toggleCollapse(),
+
+      joinedCount: joinedIds.length,
+      joinedRooms,
+
+      activeShort: a.short, activeName: a.name, activeCode: a.code, activeMembers: a.members,
+      activeOnline: a.online, activePooledFrom: a.pooledFrom, activeExam: a.exam, activeDeckCount: a.deckCount,
+      keywords, threads, activity,
+
+      query: this.state.query,
+      discover, hasDiscover: discover.length > 0, noDiscover: discover.length === 0,
+      onQuery: (e) => this.onQuery(e),
+    }
+  }
+}
+</script>
+</body>
+</html>

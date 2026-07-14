@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:#09090F; color:#E2E8F0; font-family:'Inter',system-ui,sans-serif; font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  *::-webkit-scrollbar { width:9px; height:9px; }
+  *::-webkit-scrollbar-track { background:transparent; }
+  *::-webkit-scrollbar-thumb { background:#1E1E2E; border-radius:9999px; }
+  *::-webkit-scrollbar-thumb:hover { background:#2D2B45; }
+  ::selection { background:rgba(99,102,241,0.28); color:#E2E8F0; }
+  a { color:inherit; text-decoration:none; }
+  button, input, textarea { font-family:inherit; }
+  input::placeholder, textarea::placeholder { color:#3F485C; }
+  @keyframes noct-livedot { 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:0.35; transform:scale(0.7);} }
+  @keyframes noct-fadein { from { transform:translateY(8px); } to { transform:translateY(0); } }
+  [data-card] { transition:transform .3s cubic-bezier(.34,1.4,.42,1), border-color .3s, background .3s; }
+  [data-card]:hover { transform:translateY(-3px); border-color:#3a3856 !important; }
+  [data-btn] { transition:transform .3s cubic-bezier(.34,1.4,.42,1), background .3s, border-color .3s, box-shadow .3s, color .3s, opacity .3s; }
+  [data-btn]:hover { transform:translateY(-2px); }
+  [data-navlink] { position:relative; }
+  [data-navlink]::after { content:""; position:absolute; left:10px; right:10px; bottom:4px; height:1px; background:#818CF8; transform:scaleX(0); transform-origin:right; transition:transform .3s cubic-bezier(.22,1,.36,1); }
+  [data-navlink]:hover::after { transform:scaleX(1); transform-origin:left; }
+  [data-q]:hover [data-qt] { color:#E2E8F0 !important; }
+  [data-ok] { animation:noct-fadein .5s cubic-bezier(.16,1,.3,1) both; }
+  @media (max-width: 860px) {
+    [data-cats] { grid-template-columns:1fr 1fr !important; }
+    [data-contact] { grid-template-columns:1fr !important; }
+  }
+  @media (max-width: 560px) {
+    [data-cats] { grid-template-columns:1fr !important; }
+  }
+</style>
+</helmet>
+
+<div style="min-height:100vh; background:#09090F; position:relative;">
+  <div style="position:fixed; top:0; left:0; right:0; height:420px; background:radial-gradient(720px 380px at 50% -120px, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.05) 42%, transparent 70%); pointer-events:none; z-index:0;"></div>
+
+  <!-- ===== TOP BAR ===== -->
+  <header style="position:sticky; top:0; height:60px; border-bottom:1px solid #191827; display:flex; align-items:center; justify-content:space-between; padding:0 26px; background:rgba(9,9,15,0.82); backdrop-filter:blur(10px); z-index:20;">
+    <a href="Nocturne Landing.dc.html" style="display:inline-flex; align-items:center; gap:10px;">
+      <span style="width:27px; height:27px; border-radius:8px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:14px; box-shadow:0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.32);">N</span>
+      <span style="font-size:17px; font-weight:600; letter-spacing:-0.01em; color:#E2E8F0;">Nocturne</span>
+      <span style="font-size:13px; color:#3F485C; margin-left:2px;">/ Help</span>
+    </a>
+    <nav style="display:flex; align-items:center; gap:6px;">
+      <a href="Nocturne Landing.dc.html" data-navlink style="height:34px; padding:0 12px; display:inline-flex; align-items:center; font-size:14px; color:#94A3B8;">Home</a>
+      <a href="Legal.dc.html" data-navlink style="height:34px; padding:0 12px; display:inline-flex; align-items:center; font-size:14px; color:#94A3B8;">Legal</a>
+      <a href="Canvas.dc.html" style="height:34px; padding:0 16px; display:inline-flex; align-items:center; border-radius:8px; font-size:14px; font-weight:500; color:#E2E8F0; border:1px solid #2D2B45; transition:background .25s, border-color .25s;" style-hover="background:#1C1B28; border-color:#3a3856;">Sign in</a>
+    </nav>
+  </header>
+
+  <div style="position:relative; z-index:1;">
+
+    <!-- ===== HERO + SEARCH ===== -->
+    <section style="max-width:680px; margin:0 auto; padding:64px 24px 8px; text-align:center;">
+      <div style="display:inline-flex; align-items:center; gap:9px; padding:5px 13px 5px 11px; border-radius:9999px; border:1px solid #2D2B45; background:rgba(17,17,24,0.6); margin-bottom:22px;">
+        <span style="width:6px; height:6px; border-radius:50%; background:#818CF8; box-shadow:0 0 8px rgba(129,140,248,0.6);"></span>
+        <span style="font-size:11.5px; letter-spacing:0.05em; color:#94A3B8;">Help Center</span>
+      </div>
+      <h1 style="font-size:clamp(30px,4vw,44px); font-weight:600; letter-spacing:-0.03em; line-height:1.08; margin:0; color:#E2E8F0;">How can we help?</h1>
+      <p style="font-size:16px; line-height:1.6; color:#94A3B8; margin:16px auto 30px; max-width:480px;">Search the documentation, or open a ticket and our team will get back to you within one business day.</p>
+
+      <div style="position:relative; max-width:520px; margin:0 auto;">
+        <span style="position:absolute; left:18px; top:50%; transform:translateY(-50%); color:#5B6478; pointer-events:none;">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="6"></circle><path d="M14 14 L18 18"></path></svg>
+        </span>
+        <input value="{{ query }}" onChange="{{ onSearch }}" type="text" placeholder="Search articles — try 'passphrase' or 'transcription'" style="width:100%; height:54px; padding:0 48px 0 50px; box-sizing:border-box; border-radius:13px; background:#13121C; border:1px solid #2D2B45; color:#E2E8F0; font-size:15.5px; outline:none; transition:border-color .2s, background .2s, box-shadow .2s;" style-focus="border-color:#6366F1; background:#16151F; box-shadow:0 0 0 4px rgba(99,102,241,0.1);">
+        <sc-if value="{{ hasQuery }}" hint-placeholder-val="{{ false }}">
+          <button type="button" onClick="{{ onClear }}" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:7px; background:#1E1E2E; border:none; color:#94A3B8; cursor:pointer;" style-hover="background:#2D2B45; color:#E2E8F0;">
+            <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4 L14 14 M14 4 L4 14"></path></svg>
+          </button>
+        </sc-if>
+      </div>
+    </section>
+
+    <!-- ===== CATEGORY CARDS ===== -->
+    <section style="max-width:920px; margin:0 auto; padding:40px 24px 0;">
+      <div data-cats style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px;">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="4">
+          <button type="button" data-card onClick="{{ c.onClick }}" style="{{ c.cardStyle }}">
+            <span style="{{ c.iconWrap }}">
+              <sc-if value="{{ c.isStart }}" hint-placeholder-val="{{ false }}"><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"></circle><path d="M8 7 L13 10 L8 13 Z"></path></svg></sc-if>
+              <sc-if value="{{ c.isEnc }}" hint-placeholder-val="{{ false }}"><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="9" width="11" height="8" rx="1.6"></rect><path d="M6.8 9 V6.5 a3.2 3.2 0 0 1 6.4 0 V9"></path></svg></sc-if>
+              <sc-if value="{{ c.isFeat }}" hint-placeholder-val="{{ false }}"><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 L11.8 7.2 L16.5 9 L11.8 10.8 L10 15.5 L8.2 10.8 L3.5 9 L8.2 7.2 Z"></path></svg></sc-if>
+              <sc-if value="{{ c.isTrouble }}" hint-placeholder-val="{{ false }}"><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"></circle><circle cx="10" cy="10" r="3"></circle><path d="M12.1 7.9 L15 5 M7.9 7.9 L5 5 M12.1 12.1 L15 15 M7.9 12.1 L5 15"></path></svg></sc-if>
+            </span>
+            <span style="font-size:14.5px; font-weight:600; color:#E2E8F0; margin-top:14px;">{{ c.heading }}</span>
+            <span style="font-size:12.5px; line-height:1.5; color:#94A3B8; margin-top:5px;">{{ c.blurb }}</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#5B6478; margin-top:11px;">{{ c.countLabel }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- ===== DOCUMENTATION ===== -->
+    <section style="max-width:720px; margin:0 auto; padding:48px 24px 0;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:22px; flex-wrap:wrap;">
+        <h2 style="font-size:21px; font-weight:600; letter-spacing:-0.015em; color:#E2E8F0; margin:0;">{{ docsTitle }}</h2>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="font-size:13px; color:#5B6478;">{{ resultLabel }}</span>
+          <sc-if value="{{ showReset }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ onResetFilter }}" style="font-size:13px; color:#A5B4FC; background:none; border:none; padding:0; cursor:pointer; display:inline-flex; align-items:center; gap:5px;" style-hover="color:#C7CEF5;">
+              <svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4 L14 14 M14 4 L4 14"></path></svg>Clear
+            </button>
+          </sc-if>
+        </div>
+      </div>
+
+      <sc-if value="{{ hasResults }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+            <div style="margin-bottom:30px;">
+              <div style="display:flex; align-items:center; gap:9px; margin-bottom:6px;">
+                <span style="width:6px; height:6px; border-radius:50%; background:#6366F1; box-shadow:0 0 7px rgba(99,102,241,0.6);"></span>
+                <span style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.1em; color:#818CF8; font-weight:600;">{{ g.heading }}</span>
+              </div>
+              <div>
+                <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+                  <div style="border-bottom:1px solid #191827;">
+                    <button type="button" data-q onClick="{{ it.onToggle }}" style="display:flex; align-items:flex-start; gap:14px; width:100%; text-align:left; padding:16px 0; background:none; border:none; cursor:pointer;">
+                      <span data-qt style="flex:1; font-size:15.5px; font-weight:500; line-height:1.5; color:#CBD5E1; transition:color .2s;">{{ it.qBefore }}<sc-if value="{{ it.hasMatch }}" hint-placeholder-val="{{ false }}"><mark style="background:rgba(99,102,241,0.28); color:#C7CEF5; border-radius:3px; padding:0 2px;">{{ it.qMatch }}</mark></sc-if>{{ it.qAfter }}</span>
+                      <span style="{{ it.chevStyle }}">
+                        <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7 L9 11.5 L13.5 7"></path></svg>
+                      </span>
+                    </button>
+                    <sc-if value="{{ it.open }}" hint-placeholder-val="{{ false }}">
+                      <p style="font-size:14.5px; line-height:1.7; color:#94A3B8; margin:-2px 0 18px; padding-right:30px;">{{ it.a }}</p>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+        <div style="text-align:center; padding:42px 24px; border:1px dashed #2D2B45; border-radius:14px; background:rgba(17,17,24,0.4);">
+          <div style="width:46px; height:46px; margin:0 auto 16px; border-radius:12px; background:#13121C; border:1px solid #1E1E2E; display:flex; align-items:center; justify-content:center; color:#5B6478;">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="6"></circle><path d="M14 14 L18 18"></path></svg>
+          </div>
+          <p style="font-size:15.5px; color:#E2E8F0; margin:0 0 6px; font-weight:500;">No articles match "{{ query }}"</p>
+          <p style="font-size:14px; color:#94A3B8; margin:0 0 18px;">Try a different term, or open a ticket and we'll help directly.</p>
+          <button type="button" onClick="{{ onGoTicket }}" data-btn style="height:42px; padding:0 20px; border-radius:9px; background:#6366F1; color:#09090F; font-size:14px; font-weight:500; border:none; cursor:pointer; box-shadow:0 8px 24px rgba(99,102,241,0.3);" style-hover="background:#4F46E5;">Contact support</button>
+        </div>
+      </sc-if>
+    </section>
+
+    <!-- ===== CONTACT / TICKET ===== -->
+    <section ref="{{ ticketRef }}" style="max-width:920px; margin:0 auto; padding:72px 24px 0; scroll-margin-top:80px;">
+      <div data-contact style="display:grid; grid-template-columns:0.82fr 1.18fr; gap:40px; align-items:start;">
+
+        <!-- left: channels -->
+        <div>
+          <h2 style="font-size:24px; font-weight:600; letter-spacing:-0.02em; color:#E2E8F0; margin:0 0 10px;">Still need help?</h2>
+          <p style="font-size:14.5px; line-height:1.6; color:#94A3B8; margin:0 0 26px;">Open a ticket and we'll reply within one business day. For anything else, reach us directly.</p>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <a href="#" style="display:flex; align-items:center; gap:13px; padding:14px 16px; border-radius:11px; border:1px solid #1E1E2E; background:#0D0D14; transition:border-color .25s, background .25s;" style-hover="border-color:#2D2B45; background:#111118;">
+              <span style="width:36px; height:36px; flex-shrink:0; border-radius:9px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.28); display:flex; align-items:center; justify-content:center; color:#A5B4FC;">
+                <svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.5" width="14" height="11" rx="2"></rect><path d="M3 5 L9 9.5 L15 5"></path></svg>
+              </span>
+              <span style="min-width:0;">
+                <span style="display:block; font-size:14px; font-weight:500; color:#E2E8F0;">Email support</span>
+                <span style="display:block; font-size:12.5px; color:#5B6478; font-family:'JetBrains Mono',monospace;">support@nocturne.app</span>
+              </span>
+            </a>
+            <a href="Legal.dc.html" style="display:flex; align-items:center; gap:13px; padding:14px 16px; border-radius:11px; border:1px solid #1E1E2E; background:#0D0D14; transition:border-color .25s, background .25s;" style-hover="border-color:#2D2B45; background:#111118;">
+              <span style="width:36px; height:36px; flex-shrink:0; border-radius:9px; background:rgba(244,63,94,0.1); border:1px solid rgba(244,63,94,0.26); display:flex; align-items:center; justify-content:center; color:#FB7185;">
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1.6 L15.2 4 V8.6 c0 4-2.7 6.4-6.2 7.8 C5.5 15 2.8 12.6 2.8 8.6 V4 Z"></path></svg>
+              </span>
+              <span style="min-width:0;">
+                <span style="display:block; font-size:14px; font-weight:500; color:#E2E8F0;">Report a security issue</span>
+                <span style="display:block; font-size:12.5px; color:#5B6478; font-family:'JetBrains Mono',monospace;">security@nocturne.app</span>
+              </span>
+            </a>
+            <a href="#" style="display:flex; align-items:center; gap:13px; padding:14px 16px; border-radius:11px; border:1px solid #1E1E2E; background:#0D0D14; transition:border-color .25s, background .25s;" style-hover="border-color:#2D2B45; background:#111118;">
+              <span style="width:36px; height:36px; flex-shrink:0; border-radius:9px; background:rgba(45,212,191,0.1); border:1px solid rgba(45,212,191,0.26); display:flex; align-items:center; justify-content:center; color:#2DD4BF;">
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9 H6 L7.5 5 L10.5 13 L12 9 H15.5"></path></svg>
+              </span>
+              <span style="min-width:0;">
+                <span style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:500; color:#E2E8F0;">System status <span style="width:7px; height:7px; border-radius:50%; background:#2DD4BF; box-shadow:0 0 8px rgba(45,212,191,0.7);"></span></span>
+                <span style="display:block; font-size:12.5px; color:#5B6478; font-family:'JetBrains Mono',monospace;">All systems operational</span>
+              </span>
+            </a>
+          </div>
+        </div>
+
+        <!-- right: ticket form -->
+        <div style="border:1px solid #1E1E2E; border-radius:16px; background:linear-gradient(180deg,#111118 0%,#0C0C13 100%); padding:28px;">
+          <sc-if value="{{ notSubmitted }}" hint-placeholder-val="{{ true }}">
+            <div>
+              <h3 style="font-size:17px; font-weight:600; color:#E2E8F0; margin:0 0 4px;">Submit a ticket</h3>
+              <p style="font-size:13.5px; color:#94A3B8; margin:0 0 22px;">Tell us what's going on and we'll dig in.</p>
+
+              <label style="display:block; font-size:12.5px; color:#94A3B8; margin:0 0 9px;">What's this about?</label>
+              <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px;">
+                <sc-for list="{{ ticketCats }}" as="tc" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ tc.onClick }}" style="{{ tc.chipStyle }}">{{ tc.label }}</button>
+                </sc-for>
+              </div>
+
+              <label style="display:block; font-size:12.5px; color:#94A3B8; margin:0 0 8px;">Subject</label>
+              <input value="{{ tSubject }}" onChange="{{ onSubject }}" type="text" placeholder="Brief summary of the issue" style="{{ subjectStyle }}" style-focus="border-color:#6366F1; background:#16151F;">
+              <sc-if value="{{ errSubject }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px; color:#FB7185; margin:7px 0 0;">Please add a short subject.</p></sc-if>
+
+              <label style="display:block; font-size:12.5px; color:#94A3B8; margin:18px 0 8px;">Description</label>
+              <textarea value="{{ tDesc }}" onChange="{{ onDesc }}" placeholder="What happened? What did you expect? Steps to reproduce help us move fast." style="{{ descStyle }}" style-focus="border-color:#6366F1; background:#16151F;"></textarea>
+              <sc-if value="{{ errDesc }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px; color:#FB7185; margin:7px 0 0;">Please describe the issue.</p></sc-if>
+
+              <label style="display:block; font-size:12.5px; color:#94A3B8; margin:18px 0 8px;">Your email</label>
+              <input value="{{ tEmail }}" onChange="{{ onEmail }}" type="email" placeholder="you@university.edu" style="{{ emailStyle }}" style-focus="border-color:#6366F1; background:#16151F;">
+              <sc-if value="{{ errEmail }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px; color:#FB7185; margin:7px 0 0;">Enter a valid email so we can reply.</p></sc-if>
+
+              <button type="button" onClick="{{ onToggleDiag }}" style="display:flex; align-items:flex-start; gap:11px; width:100%; margin-top:20px; padding:0; background:none; border:none; cursor:pointer; text-align:left;">
+                <span style="{{ diagBox }}">
+                  <sc-if value="{{ diag }}" hint-placeholder-val="{{ true }}"><svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="#09090F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5 L7.5 13 L14 5"></path></svg></sc-if>
+                </span>
+                <span style="font-size:13px; line-height:1.5; color:#94A3B8;">Attach diagnostic info (app version, browser, last error). <span style="color:#5B6478;">Never includes your passphrase or decrypted content.</span></span>
+              </button>
+
+              <button type="button" onClick="{{ onSubmit }}" data-btn style="{{ submitStyle }}">Submit ticket <span style="transition:transform .3s;">→</span></button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ submitted }}" hint-placeholder-val="{{ false }}">
+            <div data-ok style="text-align:center; padding:14px 4px 6px;">
+              <div style="width:56px; height:56px; margin:0 auto 18px; border-radius:15px; background:linear-gradient(145deg,rgba(99,102,241,0.18),rgba(139,92,246,0.12)); border:1px solid rgba(99,102,241,0.4); display:flex; align-items:center; justify-content:center; color:#A5B4FC; box-shadow:0 0 0 6px rgba(99,102,241,0.06);">
+                <svg width="26" height="26" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5 L7.5 13 L14 5"></path></svg>
+              </div>
+              <h3 style="font-size:19px; font-weight:600; color:#E2E8F0; margin:0 0 8px;">Ticket created</h3>
+              <p style="font-size:14px; line-height:1.6; color:#94A3B8; margin:0 auto 18px; max-width:300px;">We've logged <span style="font-family:'JetBrains Mono',monospace; color:#A5B4FC;">{{ ticketId }}</span> and sent a confirmation to <span style="color:#E2E8F0;">{{ submittedEmail }}</span>. Expect a reply within one business day.</p>
+              <button type="button" onClick="{{ onReset }}" style="font-size:13.5px; color:#818CF8; background:none; border:none; padding:0; cursor:pointer;" style-hover="color:#A5B4FC;">Submit another ticket</button>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+
+    <!-- footer -->
+    <footer style="max-width:920px; margin:64px auto 0; padding:26px 24px 40px; border-top:1px solid #191827; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+      <span style="font-size:12.5px; color:#5B6478;">© 2026 Nocturne Labs, Inc.</span>
+      <div style="display:flex; gap:18px; flex-wrap:wrap;">
+        <a href="Nocturne Landing.dc.html" style="font-size:12.5px; color:#5B6478;" style-hover="color:#94A3B8;">Home</a>
+        <a href="Legal.dc.html" style="font-size:12.5px; color:#5B6478;" style-hover="color:#94A3B8;">Privacy</a>
+        <a href="Legal.dc.html" style="font-size:12.5px; color:#5B6478;" style-hover="color:#94A3B8;">Terms</a>
+        <a href="Legal.dc.html" style="font-size:12.5px; color:#5B6478;" style-hover="color:#94A3B8;">Security</a>
+      </div>
+    </footer>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    query:'', activeCat:'all', open:{},
+    tCat:'broken', tSubject:'', tDesc:'', tEmail:'', diag:true,
+    submitted:false, submittedEmail:'', ticketId:'', errors:{}
+  }
+
+  constructor(props){
+    super(props)
+    this.ticketRef = React.createRef()
+    this.faqs = this.buildFaqs()
+  }
+
+  buildFaqs(){
+    return [
+      { id:'start', heading:'Getting started', blurb:'Uploads, sessions, and your first study guide.', items:[
+        { q:'How do I create my first session?', a:'After setting up your vault, go to your vault dashboard and click "New session". You\'ll be prompted to upload files — a PDF of your slides, your lecture audio, and optionally a study guide. You can upload any combination and add more files later.' },
+        { q:'What file types can I upload?', a:'PDF files for lecture slides, MP3/WAV/M4A files for audio recordings, and PDF or plain text for study guides. Audio is transcoded to Opus 64kbps in your browser before encryption, which dramatically reduces file size.' },
+        { q:'Do I need to upload all three files at once?', a:'No. Nocturne works with whatever you have. Slides only gives you the PDF viewer and Synthetic Study Guide. Audio only gives you transcription and Likely Zone scoring. The more inputs you provide, the more features unlock — but you\'re never blocked from starting.' },
+      ]},
+      { id:'enc', heading:'Encryption & security', blurb:'Your vault, passphrase, and how data is protected.', items:[
+        { q:'What is the vault passphrase?', a:'Your vault passphrase is separate from your Google login. It\'s used to derive an encryption key in your browser via PBKDF2. This key unlocks your Master Key, which encrypts all your files. The passphrase never leaves your device.' },
+        { q:'What if I forget my vault passphrase?', a:'Use your Recovery Kit — a file you downloaded at signup. It contains a backup of your Master Key. If you lose both your passphrase and your Recovery Kit, your data is permanently unrecoverable. There is no password reset by design.' },
+        { q:'Where is my data stored?', a:'Encrypted file blobs are stored in Supabase Storage. Nocturne servers see only opaque encrypted data — they cannot decrypt it. Your passphrase and Master Key exist only in your browser memory while your vault is open.' },
+      ]},
+      { id:'feat', heading:'Features', blurb:'Red Zone, Likely Zone, Anki import, transcription.', items:[
+        { q:'What is the Red Zone?', a:'Red Zone (shown in red) marks content that appears in your study guide AND was emphasized in your lecture — measured by how long your professor dwelled on each slide and how often they repeated key terms. It\'s the intersection of "you need to know this" and "your professor stressed this".' },
+        { q:'What is the Likely Zone?', a:'Likely Zone (shown in purple) is Nocturne\'s synthetic estimate when you haven\'t uploaded a study guide. It uses TF-IDF and professor dwell time to infer what\'s likely important. It upgrades automatically to Red Zone when you add a real study guide.' },
+        { q:'How does the Anki import work?', a:'Nocturne parses the SQLite database inside an .apkg file and extracts card fronts as your keyword list. This seeds the Study Guide automatically — all Red Zone scoring and heatmaps activate immediately based on your existing Anki deck.' },
+        { q:'How accurate is browser transcription?', a:'Nocturne uses Whisper-base running in WebAssembly in your browser. It handles STEM vocabulary reasonably well but can struggle with dense notation, equations spoken aloud, or heavy accents. Scholar tier adds VibeVoice-ASR (9B param) with hotword injection from your study guide for significantly higher accuracy.' },
+      ]},
+      { id:'trouble', heading:'Troubleshooting', blurb:'Slow transcription, failed uploads, blank slides.', items:[
+        { q:'Transcription is very slow — is that normal?', a:'Yes, on the first session. Whisper runs locally in your browser as a WebAssembly model (~140 MB download). After the first download it\'s cached and subsequent sessions are faster. A 60-minute lecture typically takes 5–15 minutes to transcribe in the browser, depending on your hardware.' },
+        { q:'My upload failed partway through — do I need to start over?', a:'No. Nocturne uses a local write-ahead buffer (IndexedDB) so partial uploads can resume. If your upload fails, reopen the session and the upload panel will show the failed files — you can retry without re-selecting them.' },
+        { q:'The PDF viewer shows blank slides — why?', a:'PDF.js needs the file to be decrypted first. Make sure your vault is unlocked (you\'ve entered your passphrase). If slides are still blank, the PDF may use fonts or rendering features that PDF.js doesn\'t support — try exporting a flattened PDF from your slide software.' },
+      ]},
+    ]
+  }
+
+  onSearch(e){ this.setState({ query:e.target.value }) }
+  onClear(){ this.setState({ query:'' }) }
+  setCat(id){ this.setState(s => ({ activeCat: s.activeCat === id ? 'all' : id, query:'' })) }
+  resetFilter(){ this.setState({ activeCat:'all', query:'' }) }
+  toggle(id){ this.setState(s => ({ open: { ...s.open, [id]: !s.open[id] } })) }
+
+  goToTicket(){
+    const el = this.ticketRef.current
+    if(!el) return
+    const scroller = document.scrollingElement || document.documentElement
+    const y = el.getBoundingClientRect().top + (scroller.scrollTop || window.scrollY || 0) - 70
+    window.scrollTo({ top:y, behavior:'smooth' })
+  }
+
+  // ticket
+  setTCat(id){ this.setState({ tCat:id }) }
+  onSubject(e){ this.setState({ tSubject:e.target.value }) }
+  onDesc(e){ this.setState({ tDesc:e.target.value }) }
+  onTEmail(e){ this.setState({ tEmail:e.target.value }) }
+  toggleDiag(){ this.setState(s => ({ diag:!s.diag })) }
+  validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||'').trim()) }
+  submit(){
+    const errors = {}
+    if(!this.state.tSubject.trim()) errors.subject = true
+    if(!this.state.tDesc.trim()) errors.desc = true
+    if(!this.validEmail(this.state.tEmail)) errors.email = true
+    if(Object.keys(errors).length){ this.setState({ errors }); return }
+    const id = 'NOC-' + Math.floor(10000 + Math.random()*90000)
+    this.setState({ submitted:true, submittedEmail:this.state.tEmail.trim(), ticketId:id, errors:{} })
+  }
+  resetTicket(){
+    this.setState({ submitted:false, tSubject:'', tDesc:'', tEmail:'', tCat:'broken', diag:true, ticketId:'', submittedEmail:'', errors:{} })
+  }
+
+  splitHL(text, q){
+    if(!q) return { qBefore:text, qMatch:'', qAfter:'', hasMatch:false }
+    const i = text.toLowerCase().indexOf(q.toLowerCase())
+    if(i < 0) return { qBefore:text, qMatch:'', qAfter:'', hasMatch:false }
+    return { qBefore:text.slice(0,i), qMatch:text.slice(i,i+q.length), qAfter:text.slice(i+q.length), hasMatch:true }
+  }
+
+  renderVals(){
+    const q = this.state.query.trim()
+    const ql = q.toLowerCase()
+    const activeCat = this.state.activeCat
+
+    // category cards
+    const cats = this.faqs.map(c => {
+      const on = activeCat === c.id
+      return {
+        heading:c.heading, blurb:c.blurb, id:c.id,
+        countLabel: c.items.length + ' article' + (c.items.length === 1 ? '' : 's'),
+        onClick: () => this.setCat(c.id),
+        isStart:c.id==='start', isEnc:c.id==='enc', isFeat:c.id==='feat', isTrouble:c.id==='trouble',
+        cardStyle:{ display:'flex', flexDirection:'column', alignItems:'flex-start', textAlign:'left', padding:'18px 18px 16px', borderRadius:'14px', cursor:'pointer',
+          border:'1px solid ' + (on ? 'rgba(99,102,241,0.5)' : '#1E1E2E'),
+          background: on ? 'rgba(99,102,241,0.08)' : '#0D0D14',
+          boxShadow: on ? '0 0 0 4px rgba(99,102,241,0.07)' : 'none' },
+        iconWrap:{ width:'40px', height:'40px', borderRadius:'10px', display:'flex', alignItems:'center', justifyContent:'center',
+          background: on ? 'rgba(99,102,241,0.16)' : '#13121C',
+          border:'1px solid ' + (on ? 'rgba(99,102,241,0.32)' : '#1E1E2E'),
+          color: on ? '#A5B4FC' : '#818CF8' },
+      }
+    })
+
+    // filter + group
+    let total = 0
+    const groups = this.faqs
+      .filter(c => activeCat === 'all' || c.id === activeCat)
+      .map(c => {
+        const items = c.items
+          .filter(it => !q || it.q.toLowerCase().includes(ql) || it.a.toLowerCase().includes(ql))
+          .map((it, i) => {
+            const id = c.id + '-' + i
+            const open = q ? true : !!this.state.open[id]
+            const hl = this.splitHL(it.q, q)
+            return {
+              ...hl, a:it.a, id, open,
+              onToggle: () => this.toggle(id),
+              chevStyle:{ flexShrink:0, marginTop:'1px', color: open ? '#A5B4FC' : '#5B6478', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition:'transform .3s cubic-bezier(.34,1.4,.42,1), color .2s' },
+            }
+          })
+        total += items.length
+        return { heading:c.heading, items }
+      })
+      .filter(g => g.items.length > 0)
+
+    const hasResults = total > 0
+    const docsTitle = q ? 'Search results' : (activeCat === 'all' ? 'Browse the documentation' : (this.faqs.find(c=>c.id===activeCat)||{}).heading)
+    const resultLabel = q
+      ? (total + ' result' + (total===1?'':'s') + ' for "' + q + '"')
+      : (total + ' article' + (total===1?'':'s'))
+
+    // ticket category chips
+    const tcDefs = [
+      { id:'broken', label:'Something is broken' },
+      { id:'vault', label:'Vault / encryption' },
+      { id:'billing', label:'Account & billing' },
+      { id:'feature', label:'Feature request' },
+      { id:'other', label:'Other' },
+    ]
+    const ticketCats = tcDefs.map(t => {
+      const on = this.state.tCat === t.id
+      return { label:t.label, onClick: () => this.setTCat(t.id),
+        chipStyle:{ padding:'8px 14px', borderRadius:'9999px', fontSize:'13px', fontWeight:500, cursor:'pointer',
+          border:'1px solid ' + (on ? 'rgba(99,102,241,0.5)' : '#2D2B45'),
+          background: on ? 'rgba(99,102,241,0.14)' : 'transparent',
+          color: on ? '#C7CEF5' : '#94A3B8', transition:'all .2s' } }
+    })
+
+    const fieldBase = { width:'100%', padding:'12px 14px', borderRadius:'9px', boxSizing:'border-box', background:'#13121C', color:'#E2E8F0', fontSize:'14px', outline:'none', transition:'border-color .2s, background .2s' }
+    const subjectStyle = { ...fieldBase, height:'44px', padding:'0 14px', border:'1px solid ' + (this.state.errors.subject ? 'rgba(244,63,94,0.55)' : '#1E1E2E') }
+    const descStyle = { ...fieldBase, minHeight:'104px', resize:'vertical', lineHeight:1.6, border:'1px solid ' + (this.state.errors.desc ? 'rgba(244,63,94,0.55)' : '#1E1E2E'), fontFamily:"'Inter',sans-serif" }
+    const emailStyle = { ...fieldBase, height:'44px', padding:'0 14px', border:'1px solid ' + (this.state.errors.email ? 'rgba(244,63,94,0.55)' : '#1E1E2E') }
+    const diagBox = { flexShrink:0, marginTop:'1px', width:'20px', height:'20px', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center',
+      background: this.state.diag ? '#6366F1' : 'transparent', border:'1px solid ' + (this.state.diag ? '#6366F1' : '#2D2B45'), transition:'background .2s, border-color .2s' }
+    const submitStyle = { width:'100%', height:'48px', marginTop:'24px', display:'flex', alignItems:'center', justifyContent:'center', gap:'9px', borderRadius:'10px', fontSize:'15px', fontWeight:500, background:'#6366F1', color:'#09090F', border:'none', cursor:'pointer', boxShadow:'0 8px 26px rgba(99,102,241,0.32)' }
+
+    return {
+      query:this.state.query, hasQuery: q.length > 0,
+      onSearch:(e)=>this.onSearch(e), onClear:()=>this.onClear(),
+      cats,
+      groups, hasResults, noResults: !hasResults,
+      docsTitle, resultLabel,
+      showReset: (activeCat !== 'all') || q.length > 0,
+      onResetFilter:()=>this.resetFilter(),
+      onGoTicket:()=>this.goToTicket(),
+      ticketRef:this.ticketRef,
+      // ticket
+      ticketCats,
+      tSubject:this.state.tSubject, tDesc:this.state.tDesc, tEmail:this.state.tEmail,
+      onSubject:(e)=>this.onSubject(e), onDesc:(e)=>this.onDesc(e), onEmail:(e)=>this.onTEmail(e),
+      subjectStyle, descStyle, emailStyle,
+      errSubject:!!this.state.errors.subject, errDesc:!!this.state.errors.desc, errEmail:!!this.state.errors.email,
+      diag:this.state.diag, diagBox, onToggleDiag:()=>this.toggleDiag(),
+      submitStyle, onSubmit:()=>this.submit(),
+      notSubmitted: !this.state.submitted, submitted: this.state.submitted,
+      ticketId:this.state.ticketId, submittedEmail:this.state.submittedEmail,
+      onReset:()=>this.resetTicket(),
+    }
+  }
+}
+</script>
+</body>
+</html>

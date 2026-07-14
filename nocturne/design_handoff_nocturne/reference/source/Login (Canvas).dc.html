@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:#09090F; color:#E2E8F0; font-family:'Inter',system-ui,sans-serif; font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  *::-webkit-scrollbar { width:8px; height:8px; }
+  *::-webkit-scrollbar-track { background:transparent; }
+  *::-webkit-scrollbar-thumb { background:#1E1E2E; border-radius:9999px; }
+  ::selection { background:rgba(99,102,241,0.28); color:#E2E8F0; }
+  a { color:inherit; text-decoration:none; }
+  button, input { font-family:inherit; }
+  input::placeholder { color:#3F485C; }
+  @keyframes noct-livedot { 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:0.35; transform:scale(0.7);} }
+  @keyframes noct-authin { from { transform:translateY(16px); } to { transform:translateY(0); } }
+  [data-btn] { transition:transform .3s cubic-bezier(.34,1.4,.42,1), background .3s, border-color .3s, box-shadow .3s, color .3s; }
+  [data-btn]:hover { transform:translateY(-2px); }
+  [data-arrow] { display:inline-block; transition:transform .3s cubic-bezier(.34,1.4,.42,1); }
+  [data-btn]:hover [data-arrow] { transform:translateX(4px); }
+  [data-shine] { position:relative; overflow:hidden; }
+  [data-shine]::before { content:""; position:absolute; top:0; left:-85%; width:55%; height:100%; background:linear-gradient(100deg, transparent, rgba(255,255,255,0.32), transparent); transform:skewX(-20deg); transition:left .6s cubic-bezier(.22,1,.36,1); pointer-events:none; }
+  [data-shine]:hover::before { left:150%; }
+  [data-link]::after { content:""; position:absolute; left:0; right:0; bottom:-2px; height:1px; background:#818CF8; transform:scaleX(0); transform-origin:right; transition:transform .3s cubic-bezier(.22,1,.36,1); }
+  [data-link]:hover::after { transform:scaleX(1); transform-origin:left; }
+  [data-anim] { animation:noct-authin .7s cubic-bezier(.16,1,.3,1) both; }
+  @media (prefers-reduced-motion: reduce) { [data-anim] { animation:none !important; } }
+  @media (max-width: 940px) {
+    [data-brand] { display:none !important; }
+    [data-form] { border-left:none !important; width:100% !important; }
+    [data-formbg] { display:block !important; }
+  }
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="min-height:100vh; display:flex; background:#09090F;">
+
+  <!-- ===== BRAND PANEL ===== -->
+  <section ref="{{ heroRef }}" data-brand style="position:relative; flex:1.05 1 0; min-width:0; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:48px 56px; border-right:1px solid #191827;">
+    <canvas ref="{{ canvasRef }}" style="position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none;"></canvas>
+    <div style="position:absolute; top:-6%; left:-4%; width:560px; max-width:80%; height:360px; background:radial-gradient(ellipse at center, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.05) 42%, transparent 72%); filter:blur(54px); z-index:0; pointer-events:none;"></div>
+    <div style="position:absolute; bottom:-10%; right:-6%; width:520px; max-width:80%; height:360px; background:radial-gradient(ellipse at center, rgba(244,63,94,0.08) 0%, rgba(139,92,246,0.04) 45%, transparent 72%); filter:blur(56px); z-index:0; pointer-events:none;"></div>
+    <div ref="{{ glowRef }}" style="position:absolute; top:0; left:0; width:340px; height:340px; margin:-170px 0 0 -170px; border-radius:50%; background:radial-gradient(circle at center, rgba(244,63,94,0.13) 0%, rgba(139,92,246,0.06) 45%, transparent 70%); filter:blur(14px); opacity:0; transition:opacity .4s; z-index:0; pointer-events:none; will-change:transform;"></div>
+
+    <!-- top: logo -->
+    <a href="#" style="position:relative; z-index:2; display:inline-flex; align-items:center; gap:10px; align-self:flex-start;">
+      <span style="width:28px; height:28px; border-radius:8px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:15px; box-shadow:0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.35);">N</span>
+      <span style="font-size:18px; font-weight:600; letter-spacing:-0.01em; color:#E2E8F0;">Nocturne</span>
+    </a>
+
+    <!-- middle: headline -->
+    <div style="position:relative; z-index:2; max-width:520px;">
+      <div style="display:inline-flex; align-items:center; gap:9px; padding:5px 13px 5px 11px; border-radius:9999px; border:1px solid #2D2B45; background:rgba(17,17,24,0.55); backdrop-filter:blur(8px); margin-bottom:26px;">
+        <span style="position:relative; width:7px; height:7px;"><span style="position:absolute; inset:0; border-radius:50%; background:#F43F5E; animation:noct-livedot 1.8s ease-in-out infinite;"></span></span>
+        <span style="font-size:12px; letter-spacing:0.04em; color:#94A3B8;">Measuring professor emphasis, live</span>
+      </div>
+      <h1 style="font-size:clamp(32px,3.6vw,46px); line-height:1.08; letter-spacing:-0.025em; font-weight:600; margin:0; color:#E2E8F0;">
+        Welcome back to<br>
+        <span style="background:linear-gradient(100deg,#A5B4FC 0%,#A78BFA 45%,#FB7185 100%); -webkit-background-clip:text; background-clip:text; color:transparent;">the Red Zone.</span>
+      </h1>
+      <p style="font-size:16px; line-height:1.65; color:#94A3B8; margin:22px 0 0; max-width:430px;">
+        Unlock your encrypted vault and pick up exactly where the lecture left off — every keyword still ranked by how likely it is to be on the exam.
+      </p>
+    </div>
+
+    <!-- bottom: trust -->
+    <div style="position:relative; z-index:2; display:flex; align-items:center; gap:22px; flex-wrap:wrap;">
+      <span style="display:inline-flex; align-items:center; gap:9px; font-size:12.5px; color:#5B6478;">
+        <span style="width:24px; height:24px; border-radius:7px; border:1px solid #2D2B45; display:flex; align-items:center; justify-content:center; color:#818CF8;">
+          <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="10" height="7" rx="1.5"></rect><path d="M6 8 V6 a3 3 0 0 1 6 0 v2"></path></svg>
+        </span>
+        Zero-knowledge encrypted
+      </span>
+      <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#3F485C;">Keys never leave your device</span>
+    </div>
+  </section>
+
+  <!-- ===== FORM PANEL ===== -->
+  <section data-form style="position:relative; width:520px; flex-shrink:0; display:flex; align-items:center; justify-content:center; padding:48px 32px; background:#09090F;">
+    <div data-formbg style="display:none; position:absolute; inset:0; background:radial-gradient(620px circle at 50% 0%, rgba(99,102,241,0.08), transparent 60%); pointer-events:none;"></div>
+
+    <div data-anim style="position:relative; z-index:2; width:100%; max-width:360px;">
+      <!-- mobile logo -->
+      <a href="#" data-formbg style="display:none; align-items:center; gap:9px; margin-bottom:30px;">
+        <span style="width:26px; height:26px; border-radius:7px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:14px;">N</span>
+        <span style="font-size:17px; font-weight:600; color:#E2E8F0;">Nocturne</span>
+      </a>
+
+      <h2 style="font-size:24px; font-weight:600; letter-spacing:-0.02em; margin:0 0 6px; color:#E2E8F0;">Sign in</h2>
+      <p style="font-size:14px; color:#94A3B8; margin:0 0 30px;">Continue to your vault to keep studying.</p>
+
+      <!-- Google -->
+      <button type="button" data-btn data-shine style="width:100%; height:48px; display:flex; align-items:center; justify-content:center; gap:11px; border-radius:9px; font-size:15px; font-weight:500; color:#E2E8F0; background:#13121C; border:1px solid #2D2B45; cursor:pointer;" style-hover="background:#1C1B28; border-color:#3a3856;">
+        <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"></path>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"></path>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"></path>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"></path>
+        </svg>
+        Continue with Google
+      </button>
+
+      <!-- divider -->
+      <div style="display:flex; align-items:center; gap:14px; margin:22px 0;">
+        <span style="flex:1; height:1px; background:#1E1E2E;"></span>
+        <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; white-space:nowrap;">or with email</span>
+        <span style="flex:1; height:1px; background:#1E1E2E;"></span>
+      </div>
+
+      <!-- email magic-link -->
+      <sc-if value="{{ notSent }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <label style="display:block; font-size:12.5px; color:#94A3B8; margin:0 0 8px;">Email address</label>
+          <input ref="{{ emailRef }}" type="email" placeholder="you@university.edu" onKeyDown="{{ onKey }}" style="{{ inputStyle }}" style-focus="border-color:#6366F1; background:#16151F;">
+          <sc-if value="{{ showError }}" hint-placeholder-val="{{ false }}">
+            <p style="font-size:12px; color:#FB7185; margin:8px 0 0;">Enter a valid email address.</p>
+          </sc-if>
+          <button type="button" onClick="{{ onSend }}" data-btn data-shine style="width:100%; height:46px; margin-top:14px; display:flex; align-items:center; justify-content:center; gap:9px; border-radius:9px; font-size:15px; font-weight:500; background:#6366F1; color:#09090F; border:none; cursor:pointer; box-shadow:0 8px 26px rgba(99,102,241,0.32);" style-hover="background:#4F46E5; box-shadow:0 10px 32px rgba(99,102,241,0.46);">
+            Send magic link <span data-arrow style="color:#09090F;">→</span>
+          </button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ sent }}" hint-placeholder-val="{{ false }}">
+        <div data-anim style="border:1px solid rgba(99,102,241,0.32); background:rgba(99,102,241,0.07); border-radius:11px; padding:20px;">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <span style="width:30px; height:30px; border-radius:8px; background:rgba(99,102,241,0.16); border:1px solid rgba(99,102,241,0.3); display:flex; align-items:center; justify-content:center; color:#A5B4FC;">
+              <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.5" width="14" height="11" rx="2"></rect><path d="M3 5 L9 9.5 L15 5"></path></svg>
+            </span>
+            <span style="font-size:15px; font-weight:600; color:#E2E8F0;">Check your inbox</span>
+          </div>
+          <p style="font-size:13.5px; line-height:1.6; color:#94A3B8; margin:0;">We sent a secure sign-in link to <span style="color:#E2E8F0;">{{ sentEmail }}</span>. It expires in 15 minutes.</p>
+          <button type="button" onClick="{{ onReset }}" data-link style="position:relative; margin-top:14px; background:none; border:none; padding:0; font-size:13px; color:#818CF8; cursor:pointer;">Use a different email</button>
+        </div>
+      </sc-if>
+
+      <!-- reassurance -->
+      <div style="display:flex; align-items:flex-start; gap:10px; margin-top:24px; padding-top:22px; border-top:1px solid #191827;">
+        <span style="margin-top:1px; flex-shrink:0; color:#5B6478;">
+          <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="10" height="7" rx="1.5"></rect><path d="M6 8 V6 a3 3 0 0 1 6 0 v2"></path></svg>
+        </span>
+        <p style="font-size:12.5px; line-height:1.55; color:#5B6478; margin:0;">Your passphrase and encryption keys never leave your device. Nocturne stores only opaque blobs it cannot read.</p>
+      </div>
+
+      <!-- footer -->
+      <p style="font-size:13.5px; color:#5B6478; margin:28px 0 0; text-align:center;">
+        New to Nocturne? <a href="#" data-link style="position:relative; color:#A5B4FC; font-weight:500;">Create your vault</a>
+      </p>
+    </div>
+
+    <p style="position:absolute; bottom:22px; left:0; right:0; text-align:center; font-size:11.5px; color:#3F485C; padding:0 24px;">
+      By continuing you agree to our <a href="#" style="color:#5B6478;" style-hover="color:#94A3B8;">Terms</a> &amp; <a href="#" style="color:#5B6478;" style-hover="color:#94A3B8;">Privacy Policy</a>.
+    </p>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1200,&quot;height&quot;:820}}">
+class Component extends DCLogic {
+  state = { sent:false, sentEmail:'', error:false }
+
+  constructor(props){
+    super(props)
+    this.rootRef = React.createRef()
+    this.heroRef = React.createRef()
+    this.canvasRef = React.createRef()
+    this.glowRef = React.createRef()
+    this.emailRef = React.createRef()
+  }
+
+  componentDidMount(){
+    this.reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    this.setupCanvas()
+  }
+
+  componentWillUnmount(){
+    cancelAnimationFrame(this._raf)
+    window.removeEventListener('resize', this._onResize)
+    if(this._hero){ this._hero.removeEventListener('pointermove', this._onMove); this._hero.removeEventListener('pointerleave', this._onLeave) }
+  }
+
+  validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||'').trim()) }
+  onSend(){
+    const el = this.emailRef.current
+    const v = el ? el.value.trim() : ''
+    if(this.validEmail(v)){ this.setState({ sent:true, sentEmail:v, error:false }) }
+    else { this.setState({ error:true }) }
+  }
+  onReset(){ this.setState({ sent:false, sentEmail:'', error:false }) }
+
+  // ---- Perlin noise ----
+  _buildPerm(){
+    const p = new Uint8Array(512); const src = []
+    for(let i=0;i<256;i++) src[i]=i
+    for(let i=255;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=src[i]; src[i]=src[j]; src[j]=t }
+    for(let i=0;i<512;i++) p[i]=src[i&255]
+    return p
+  }
+  _fade(t){ return t*t*t*(t*(t*6-15)+10) }
+  _lerp(a,b,t){ return a+t*(b-a) }
+  _grad(h,x,y,z){ h&=15; const u=h<8?x:y; const v=h<4?y:(h===12||h===14?x:z); return ((h&1)?-u:u)+((h&2)?-v:v) }
+  _perlin(perm,x,y,z){
+    const fl=Math.floor
+    let X=fl(x)&255, Y=fl(y)&255, Z=fl(z)&255
+    x-=fl(x); y-=fl(y); z-=fl(z)
+    const u=this._fade(x), v=this._fade(y), w=this._fade(z)
+    const A=perm[X]+Y, AA=perm[A]+Z, AB=perm[A+1]+Z
+    const B=perm[X+1]+Y, BA=perm[B]+Z, BB=perm[B+1]+Z
+    const g=this._grad.bind(this), L=this._lerp
+    return L(
+      L(L(g(perm[AA],x,y,z), g(perm[BA],x-1,y,z), u), L(g(perm[AB],x,y-1,z), g(perm[BB],x-1,y-1,z), u), v),
+      L(L(g(perm[AA+1],x,y,z-1), g(perm[BA+1],x-1,y,z-1), u), L(g(perm[AB+1],x,y-1,z-1), g(perm[BB+1],x-1,y-1,z-1), u), v),
+      w)
+  }
+
+  setupCanvas(){
+    const canvas = this.canvasRef.current, hero = this.heroRef.current
+    if(!canvas || !hero) return
+    this._hero = hero
+    const ctx = canvas.getContext('2d')
+    const perm = this._buildPerm()
+    const s = { w:0,h:0,dpr:1,cols:0,rows:0,cw:0,ch:0,mx:-99999,my:-99999,tmx:-99999,tmy:-99999 }
+    this._cs = s
+
+    const resize = () => {
+      const r = hero.getBoundingClientRect()
+      s.w = r.width; s.h = r.height
+      s.dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+      canvas.width = Math.round(s.w*s.dpr); canvas.height = Math.round(s.h*s.dpr)
+      ctx.setTransform(s.dpr,0,0,s.dpr,0,0)
+      s.cols = Math.max(20, Math.round(s.w/24))
+      s.rows = Math.max(24, Math.round(s.h/24))
+      s.cw = s.w/(s.cols-1); s.ch = s.h/(s.rows-1)
+      this._vals = new Float32Array(s.cols*s.rows)
+    }
+    this._onResize = resize
+    window.addEventListener('resize', resize, { passive:true })
+    resize()
+
+    this._onMove = (e) => { const r=hero.getBoundingClientRect(); s.tmx=e.clientX-r.left; s.tmy=e.clientY-r.top }
+    this._onLeave = () => { s.tmx=-99999; s.tmy=-99999 }
+    hero.addEventListener('pointermove', this._onMove)
+    hero.addEventListener('pointerleave', this._onLeave)
+
+    const LEVELS = 13
+    const noise = (x,y,z) => this._perlin(perm,x,y,z)
+
+    if(this.reduced){ this._draw(ctx,s,noise,LEVELS,0,0); return }
+
+    const startT = performance.now()
+    const loop = (now) => {
+      const t = (now-startT)/1000
+      if(s.tmx < -50000){ s.mx += (-99999-s.mx)*0.08; s.my += (-99999-s.my)*0.08 }
+      else { s.mx += (s.tmx-s.mx)*0.12; s.my += (s.tmy-s.my)*0.12 }
+      const g = this.glowRef.current
+      if(g){ if(s.tmx > -50000){ g.style.opacity='1'; g.style.transform='translate('+s.mx+'px,'+s.my+'px)' } else { g.style.opacity='0' } }
+      this._draw(ctx,s,noise,LEVELS,t,1)
+      this._raf = requestAnimationFrame(loop)
+    }
+    this._raf = requestAnimationFrame(loop)
+  }
+
+  _draw(ctx,s,noise,LEVELS,t,breathe){
+    const cols=s.cols, rows=s.rows, cw=s.cw, ch=s.ch, vals=this._vals
+    const ns=0.085, zt=t*0.10
+    const hasMouse = s.mx > -50000
+    for(let gy=0; gy<rows; gy++){
+      for(let gx=0; gx<cols; gx++){
+        let v = noise(gx*ns, gy*ns, zt)*0.5 + 0.5
+        if(hasMouse){
+          const dx=gx*cw - s.mx, dy=gy*ch - s.my, d2=dx*dx+dy*dy
+          if(d2 < 60000) v += 0.34*Math.exp(-d2/16000)
+        }
+        vals[gx+gy*cols] = v
+      }
+    }
+    ctx.clearRect(0,0,s.w,s.h)
+    ctx.lineJoin='round'; ctx.lineCap='round'
+    const breath = breathe ? (0.62 + 0.38*Math.sin(t*1.5)) : 1
+    const seg=(ax,ay,bx,by)=>{ ctx.moveTo(ax,ay); ctx.lineTo(bx,by) }
+    for(let li=0; li<LEVELS; li++){
+      const f = li/(LEVELS-1)
+      const thr = 0.16 + f*0.70
+      let color, alpha, lw, glow
+      if(f > 0.84){ color='244,63,94'; alpha=0.6*breath; lw=1.6; glow=12 }
+      else if(f > 0.66){ color='167,139,250'; alpha=0.5; lw=1.25; glow=6 }
+      else { color='99,102,241'; alpha=0.09 + 0.20*f; lw=1; glow=0 }
+      ctx.beginPath()
+      for(let gy=0; gy<rows-1; gy++){
+        for(let gx=0; gx<cols-1; gx++){
+          const i=gx+gy*cols
+          const tl=vals[i], tr=vals[i+1], bl=vals[i+cols], br=vals[i+cols+1]
+          let idx=0
+          if(tl>thr) idx|=8; if(tr>thr) idx|=4; if(br>thr) idx|=2; if(bl>thr) idx|=1
+          if(idx===0 || idx===15) continue
+          const x0=gx*cw, y0=gy*ch, x1=x0+cw, y1=y0+ch
+          const tpx=x0+(thr-tl)/(tr-tl)*cw
+          const rpy=y0+(thr-tr)/(br-tr)*ch
+          const bpx=x0+(thr-bl)/(br-bl)*cw
+          const lpy=y0+(thr-tl)/(bl-tl)*ch
+          switch(idx){
+            case 1: seg(x0,lpy,bpx,y1); break
+            case 2: seg(bpx,y1,x1,rpy); break
+            case 3: seg(x0,lpy,x1,rpy); break
+            case 4: seg(tpx,y0,x1,rpy); break
+            case 5: seg(tpx,y0,x1,rpy); seg(x0,lpy,bpx,y1); break
+            case 6: seg(tpx,y0,bpx,y1); break
+            case 7: seg(tpx,y0,x0,lpy); break
+            case 8: seg(tpx,y0,x0,lpy); break
+            case 9: seg(tpx,y0,bpx,y1); break
+            case 10: seg(tpx,y0,x0,lpy); seg(bpx,y1,x1,rpy); break
+            case 11: seg(tpx,y0,x1,rpy); break
+            case 12: seg(x0,lpy,x1,rpy); break
+            case 13: seg(bpx,y1,x1,rpy); break
+            case 14: seg(x0,lpy,bpx,y1); break
+          }
+        }
+      }
+      ctx.strokeStyle='rgba('+color+','+alpha+')'
+      ctx.lineWidth=lw
+      if(glow>0){ ctx.shadowBlur=glow; ctx.shadowColor='rgba('+color+',0.85)' } else { ctx.shadowBlur=0 }
+      ctx.stroke()
+    }
+    ctx.shadowBlur=0
+  }
+
+  renderVals(){
+    const inputStyle = {
+      width:'100%', height:'46px', padding:'0 14px', borderRadius:'9px', boxSizing:'border-box',
+      background:'#13121C', border:'1px solid ' + (this.state.error ? 'rgba(244,63,94,0.55)' : '#1E1E2E'),
+      color:'#E2E8F0', fontSize:'14px', outline:'none', transition:'border-color .2s, background .2s'
+    }
+    return {
+      rootRef:this.rootRef, heroRef:this.heroRef, canvasRef:this.canvasRef, glowRef:this.glowRef, emailRef:this.emailRef,
+      notSent: !this.state.sent,
+      sent: this.state.sent,
+      sentEmail: this.state.sentEmail,
+      showError: this.state.error,
+      inputStyle,
+      onSend: () => this.onSend(),
+      onReset: () => this.onReset(),
+      onKey: (e) => { if(e.key === 'Enter') this.onSend() },
+    }
+  }
+}
+</script>
+</body>
+</html>

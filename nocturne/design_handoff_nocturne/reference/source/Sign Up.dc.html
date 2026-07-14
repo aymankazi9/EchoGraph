@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:#09090F; color:#E2E8F0; font-family:'Inter',system-ui,sans-serif; font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  *::-webkit-scrollbar { width:8px; height:8px; }
+  *::-webkit-scrollbar-track { background:transparent; }
+  *::-webkit-scrollbar-thumb { background:#1E1E2E; border-radius:9999px; }
+  ::selection { background:rgba(99,102,241,0.28); color:#E2E8F0; }
+  a { color:inherit; text-decoration:none; }
+  button, input { font-family:inherit; }
+  input::placeholder { color:#3F485C; }
+  @keyframes noct-livedot { 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:0.35; transform:scale(0.7);} }
+  @keyframes noct-stepin { from { transform:translateY(16px); } to { transform:translateY(0); } }
+  @keyframes noct-pop { 0%{ transform:scale(0.4); opacity:0;} 60%{ transform:scale(1.12);} 100%{ transform:scale(1); opacity:1;} }
+  [data-btn] { transition:transform .3s cubic-bezier(.34,1.4,.42,1), background .3s, border-color .3s, box-shadow .3s, color .3s, opacity .3s; }
+  [data-btn]:hover { transform:translateY(-2px); }
+  [data-arrow] { display:inline-block; transition:transform .3s cubic-bezier(.34,1.4,.42,1); }
+  [data-btn]:hover [data-arrow] { transform:translateX(4px); }
+  [data-shine] { position:relative; overflow:hidden; }
+  [data-shine]::before { content:""; position:absolute; top:0; left:-85%; width:55%; height:100%; background:linear-gradient(100deg, transparent, rgba(255,255,255,0.32), transparent); transform:skewX(-20deg); transition:left .6s cubic-bezier(.22,1,.36,1); pointer-events:none; }
+  [data-shine]:hover::before { left:150%; }
+  [data-link]::after { content:""; position:absolute; left:0; right:0; bottom:-2px; height:1px; background:#818CF8; transform:scaleX(0); transform-origin:right; transition:transform .3s cubic-bezier(.22,1,.36,1); }
+  [data-link]:hover::after { transform:scaleX(1); transform-origin:left; }
+  [data-step] { animation:noct-stepin .55s cubic-bezier(.16,1,.3,1) both; }
+  [data-pop] { animation:noct-pop .6s cubic-bezier(.34,1.56,.42,1) both; }
+  @media (prefers-reduced-motion: reduce) { [data-step],[data-pop] { animation:none !important; } }
+  @media (max-width: 940px) {
+    [data-brand] { display:none !important; }
+    [data-form] { border-left:none !important; width:100% !important; }
+    [data-formbg] { display:block !important; }
+  }
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="min-height:100vh; display:flex; background:#09090F;">
+
+  <!-- ===== BRAND PANEL ===== -->
+  <section ref="{{ heroRef }}" data-brand style="position:relative; flex:1.05 1 0; min-width:0; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:48px 56px; border-right:1px solid #191827;">
+    <canvas ref="{{ canvasRef }}" style="position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none;"></canvas>
+    <div style="position:absolute; top:-6%; left:-4%; width:560px; max-width:80%; height:360px; background:radial-gradient(ellipse at center, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.05) 42%, transparent 72%); filter:blur(54px); z-index:0; pointer-events:none;"></div>
+    <div style="position:absolute; bottom:-10%; right:-6%; width:520px; max-width:80%; height:360px; background:radial-gradient(ellipse at center, rgba(244,63,94,0.08) 0%, rgba(139,92,246,0.04) 45%, transparent 72%); filter:blur(56px); z-index:0; pointer-events:none;"></div>
+    <div ref="{{ glowRef }}" style="position:absolute; top:0; left:0; width:340px; height:340px; margin:-170px 0 0 -170px; border-radius:50%; background:radial-gradient(circle at center, rgba(244,63,94,0.13) 0%, rgba(139,92,246,0.06) 45%, transparent 70%); filter:blur(14px); opacity:0; transition:opacity .4s; z-index:0; pointer-events:none; will-change:transform;"></div>
+
+    <a href="#" style="position:relative; z-index:2; display:inline-flex; align-items:center; gap:10px; align-self:flex-start;">
+      <span style="width:28px; height:28px; border-radius:8px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:15px; box-shadow:0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.35);">N</span>
+      <span style="font-size:18px; font-weight:600; letter-spacing:-0.01em; color:#E2E8F0;">Nocturne</span>
+    </a>
+
+    <div style="position:relative; z-index:2; max-width:460px;">
+      <div style="display:inline-flex; align-items:center; gap:9px; padding:5px 13px 5px 11px; border-radius:9999px; border:1px solid #2D2B45; background:rgba(17,17,24,0.55); backdrop-filter:blur(8px); margin-bottom:26px;">
+        <span style="position:relative; width:7px; height:7px;"><span style="position:absolute; inset:0; border-radius:50%; background:#F43F5E; animation:noct-livedot 1.8s ease-in-out infinite;"></span></span>
+        <span style="font-size:12px; letter-spacing:0.04em; color:#94A3B8;">End-to-end encrypted setup</span>
+      </div>
+      <h1 style="font-size:clamp(30px,3.4vw,42px); line-height:1.1; letter-spacing:-0.025em; font-weight:600; margin:0 0 36px; color:#E2E8F0;">
+        Set up your<br>
+        <span style="background:linear-gradient(100deg,#A5B4FC 0%,#A78BFA 45%,#FB7185 100%); -webkit-background-clip:text; background-clip:text; color:transparent;">private vault.</span>
+      </h1>
+
+      <!-- vertical stepper -->
+      <div>
+        <sc-for list="{{ wizSteps }}" as="s" hint-placeholder-count="3">
+          <div style="display:flex; gap:16px;">
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <span style="{{ s.badgeStyle }}">
+                <sc-if value="{{ s.isDone }}" hint-placeholder-val="{{ false }}">
+                  <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5 L7.5 13 L14 5"></path></svg>
+                </sc-if>
+                <sc-if value="{{ s.notDone }}" hint-placeholder-val="{{ true }}">{{ s.num }}</sc-if>
+              </span>
+              <sc-if value="{{ s.showRail }}" hint-placeholder-val="{{ true }}">
+                <span style="{{ s.railStyle }}"></span>
+              </sc-if>
+            </div>
+            <div style="padding-bottom:22px;">
+              <div style="{{ s.titleStyle }}">{{ s.title }}</div>
+              <div style="{{ s.descStyle }}">{{ s.desc }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="position:relative; z-index:2; display:flex; align-items:center; gap:22px; flex-wrap:wrap;">
+      <span style="display:inline-flex; align-items:center; gap:9px; font-size:12.5px; color:#5B6478;">
+        <span style="width:24px; height:24px; border-radius:7px; border:1px solid #2D2B45; display:flex; align-items:center; justify-content:center; color:#818CF8;">
+          <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="10" height="7" rx="1.5"></rect><path d="M6 8 V6 a3 3 0 0 1 6 0 v2"></path></svg>
+        </span>
+        Zero-knowledge encrypted
+      </span>
+      <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#3F485C;">Keys never leave your device</span>
+    </div>
+  </section>
+
+  <!-- ===== FORM PANEL ===== -->
+  <section data-form style="position:relative; width:520px; flex-shrink:0; display:flex; align-items:center; justify-content:center; padding:48px 32px; background:#09090F;">
+    <div data-formbg style="display:none; position:absolute; inset:0; background:radial-gradient(620px circle at 50% 0%, rgba(99,102,241,0.08), transparent 60%); pointer-events:none;"></div>
+
+    <div style="position:relative; z-index:2; width:100%; max-width:360px;">
+      <a href="#" data-formbg style="display:none; align-items:center; gap:9px; margin-bottom:28px;">
+        <span style="width:26px; height:26px; border-radius:7px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:14px;">N</span>
+        <span style="font-size:17px; font-weight:600; color:#E2E8F0;">Nocturne</span>
+      </a>
+
+      <!-- step counter -->
+      <sc-if value="{{ showCounter }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:22px;">
+          <div style="display:flex; gap:6px;">
+            <sc-for list="{{ progressBars }}" as="pb" hint-placeholder-count="3">
+              <span style="{{ pb }}"></span>
+            </sc-for>
+          </div>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#5B6478; white-space:nowrap;">{{ counterText }}</span>
+        </div>
+      </sc-if>
+
+      <!-- ============ STEP 1: ACCOUNT ============ -->
+      <sc-if value="{{ isStep0 }}" hint-placeholder-val="{{ true }}">
+        <div data-step>
+          <h2 style="font-size:24px; font-weight:600; letter-spacing:-0.02em; margin:0 0 6px; color:#E2E8F0;">Create your account</h2>
+          <p style="font-size:14px; color:#94A3B8; margin:0 0 28px;">Start with the full core product — free forever, no card.</p>
+
+          <button type="button" data-btn data-shine style="width:100%; height:48px; display:flex; align-items:center; justify-content:center; gap:11px; border-radius:9px; font-size:15px; font-weight:500; color:#E2E8F0; background:#13121C; border:1px solid #2D2B45; cursor:pointer;" style-hover="background:#1C1B28; border-color:#3a3856;">
+            <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"></path>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"></path>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"></path>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"></path>
+            </svg>
+            Sign up with Google
+          </button>
+
+          <div style="display:flex; align-items:center; gap:14px; margin:22px 0;">
+            <span style="flex:1; height:1px; background:#1E1E2E;"></span>
+            <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478; white-space:nowrap;">or with email</span>
+            <span style="flex:1; height:1px; background:#1E1E2E;"></span>
+          </div>
+
+          <label style="display:block; font-size:12.5px; color:#94A3B8; margin:0 0 8px;">Email address</label>
+          <input value="{{ emailVal }}" onChange="{{ onEmail }}" type="email" placeholder="you@university.edu" onKeyDown="{{ onEmailKey }}" style="{{ emailStyle }}" style-focus="border-color:#6366F1; background:#16151F;">
+          <sc-if value="{{ emailError }}" hint-placeholder-val="{{ false }}">
+            <p style="font-size:12px; color:#FB7185; margin:8px 0 0;">Enter a valid email address.</p>
+          </sc-if>
+
+          <button type="button" onClick="{{ onAccountNext }}" data-btn data-shine style="width:100%; height:46px; margin-top:16px; display:flex; align-items:center; justify-content:center; gap:9px; border-radius:9px; font-size:15px; font-weight:500; background:#6366F1; color:#09090F; border:none; cursor:pointer; box-shadow:0 8px 26px rgba(99,102,241,0.32);" style-hover="background:#4F46E5; box-shadow:0 10px 32px rgba(99,102,241,0.46);">
+            Continue <span data-arrow style="color:#09090F;">→</span>
+          </button>
+
+          <p style="font-size:13.5px; color:#5B6478; margin:24px 0 0; text-align:center;">
+            Already have an account? <a href="Canvas.dc.html" data-link style="position:relative; color:#A5B4FC; font-weight:500;">Sign in</a>
+          </p>
+        </div>
+      </sc-if>
+
+      <!-- ============ STEP 2: VAULT PASSPHRASE ============ -->
+      <sc-if value="{{ isStep1 }}" hint-placeholder-val="{{ false }}">
+        <div data-step>
+          <h2 style="font-size:24px; font-weight:600; letter-spacing:-0.02em; margin:0 0 6px; color:#E2E8F0;">Create your vault passphrase</h2>
+          <p style="font-size:14px; line-height:1.55; color:#94A3B8; margin:0 0 24px;">This derives the key that encrypts everything you upload. Make it strong — and memorable.</p>
+
+          <label style="display:block; font-size:12.5px; color:#94A3B8; margin:0 0 8px;">Vault passphrase</label>
+          <div style="position:relative;">
+            <input value="{{ pass }}" onChange="{{ onPass }}" type="{{ passType }}" placeholder="At least 8 characters" style="{{ passStyle }}" style-focus="border-color:#6366F1; background:#16151F;">
+            <button type="button" onClick="{{ toggleShow }}" style="position:absolute; top:0; right:0; height:46px; padding:0 14px; background:none; border:none; font-size:12px; color:#5B6478; cursor:pointer;" style-hover="color:#94A3B8;">{{ showLabel }}</button>
+          </div>
+
+          <!-- strength meter -->
+          <div style="display:flex; gap:5px; margin-top:12px;">
+            <sc-for list="{{ meterSegs }}" as="m" hint-placeholder-count="4">
+              <span style="{{ m }}"></span>
+            </sc-for>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:7px; min-height:16px;">
+            <span style="font-size:12px; color:{{ strengthColor }};">{{ strengthLabel }}</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#3F485C;">PBKDF2 · 310,000 iterations</span>
+          </div>
+
+          <label style="display:block; font-size:12.5px; color:#94A3B8; margin:18px 0 8px;">Confirm passphrase</label>
+          <input value="{{ confirm }}" onChange="{{ onConfirm }}" type="{{ passType }}" placeholder="Re-enter your passphrase" style="{{ confirmStyle }}" style-focus="border-color:#6366F1; background:#16151F;">
+          <sc-if value="{{ showMismatch }}" hint-placeholder-val="{{ false }}">
+            <p style="font-size:12px; color:#FB7185; margin:8px 0 0;">Passphrases don't match yet.</p>
+          </sc-if>
+
+          <!-- no-backdoor warning -->
+          <div style="display:flex; gap:12px; margin-top:22px; padding:14px 16px; border-radius:10px; border:1px solid rgba(244,63,94,0.3); background:rgba(244,63,94,0.08);">
+            <span style="flex-shrink:0; margin-top:1px; color:#FB7185;">
+              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 L16.5 15.5 H1.5 Z"></path><path d="M9 7 v3.5"></path><path d="M9 13 v0.01"></path></svg>
+            </span>
+            <p style="font-size:12.5px; line-height:1.55; color:#FCA5B5; margin:0;"><span style="color:#FB7185; font-weight:600;">No password reset exists. There is no backdoor.</span> If you forget this passphrase, your encrypted data is permanently unrecoverable.</p>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:24px;">
+            <button type="button" onClick="{{ onBack }}" data-btn style="height:46px; padding:0 18px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; border-radius:9px; font-size:14px; color:#94A3B8; background:transparent; border:1px solid #2D2B45; cursor:pointer;" style-hover="background:#1C1B28; color:#E2E8F0;">Back</button>
+            <button type="button" onClick="{{ onCreateVault }}" data-btn data-shine style="{{ createBtnStyle }}">Create vault <span data-arrow style="color:#09090F;">→</span></button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ STEP 3: RECOVERY KIT ============ -->
+      <sc-if value="{{ isStep2 }}" hint-placeholder-val="{{ false }}">
+        <div data-step>
+          <h2 style="font-size:24px; font-weight:600; letter-spacing:-0.02em; margin:0 0 6px; color:#E2E8F0;">Save your Recovery Kit</h2>
+          <p style="font-size:14px; line-height:1.55; color:#94A3B8; margin:0 0 22px;">Your one backup if you ever forget your passphrase. We can't store it for you — download it and keep it somewhere safe.</p>
+
+          <div style="border:1px solid #1E1E2E; border-radius:11px; background:#0D0D14; overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid #1E1E2E; background:rgba(22,21,31,0.5);">
+              <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.1em; color:#5B6478;">nocturne-recovery-kit.txt</span>
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:10.5px; color:#818CF8; white-space:nowrap;">
+                <span style="width:6px; height:6px; border-radius:50%; background:#818CF8; box-shadow:0 0 8px rgba(129,140,248,0.7); flex-shrink:0;"></span>local only
+              </span>
+            </div>
+            <div style="padding:14px; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.6; color:#A5B4FC; word-break:break-all;">{{ recoveryKit }}</div>
+          </div>
+
+          <button type="button" onClick="{{ onDownload }}" data-btn data-shine style="{{ downloadBtnStyle }}">
+            <span style="{{ downloadIconWrap }}">
+              <sc-if value="{{ notDownloaded }}" hint-placeholder-val="{{ true }}">
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 v9"></path><path d="M5 8 l4 4 l4 -4"></path><path d="M3 15 h12"></path></svg>
+              </sc-if>
+              <sc-if value="{{ downloaded }}" hint-placeholder-val="{{ false }}">
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5 L7.5 13 L14 5"></path></svg>
+              </sc-if>
+            </span>
+            {{ downloadLabel }}
+          </button>
+
+          <!-- confirm checkbox -->
+          <button type="button" onClick="{{ toggleSaved }}" style="display:flex; align-items:flex-start; gap:11px; width:100%; margin-top:18px; padding:0; background:none; border:none; cursor:pointer; text-align:left;">
+            <span style="{{ checkboxStyle }}">
+              <sc-if value="{{ saved }}" hint-placeholder-val="{{ false }}">
+                <svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="#09090F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5 L7.5 13 L14 5"></path></svg>
+              </sc-if>
+            </span>
+            <span style="font-size:13.5px; line-height:1.5; color:#94A3B8;">I've saved my Recovery Kit somewhere safe. I understand Nocturne cannot recover it for me.</span>
+          </button>
+
+          <div style="display:flex; gap:10px; margin-top:24px;">
+            <button type="button" onClick="{{ onBack }}" data-btn style="height:46px; padding:0 18px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; border-radius:9px; font-size:14px; color:#94A3B8; background:transparent; border:1px solid #2D2B45; cursor:pointer;" style-hover="background:#1C1B28; color:#E2E8F0;">Back</button>
+            <button type="button" onClick="{{ onFinish }}" data-btn data-shine style="{{ finishBtnStyle }}">Enter Nocturne <span data-arrow style="color:#09090F;">→</span></button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ DONE ============ -->
+      <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+        <div data-step style="text-align:center;">
+          <div data-pop style="width:64px; height:64px; margin:0 auto 22px; border-radius:18px; background:linear-gradient(145deg,rgba(99,102,241,0.18),rgba(139,92,246,0.12)); border:1px solid rgba(99,102,241,0.4); display:flex; align-items:center; justify-content:center; color:#A5B4FC; box-shadow:0 0 0 6px rgba(99,102,241,0.06), 0 12px 36px rgba(99,102,241,0.22);">
+            <svg width="30" height="30" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="10" height="7" rx="1.5"></rect><path d="M6 8 V6 a3 3 0 0 1 6 0 v2"></path><path d="M9 11 v1.5"></path></svg>
+          </div>
+          <h2 style="font-size:25px; font-weight:600; letter-spacing:-0.02em; margin:0 0 10px; color:#E2E8F0;">Your vault is ready.</h2>
+          <p style="font-size:14.5px; line-height:1.6; color:#94A3B8; margin:0 auto 28px; max-width:300px;">Everything you upload is now encrypted on this device before it ever leaves. Time to find your Red Zone.</p>
+          <a href="#" data-btn data-shine style="width:100%; height:48px; display:inline-flex; align-items:center; justify-content:center; gap:9px; border-radius:9px; font-size:15px; font-weight:500; background:#6366F1; color:#09090F; border:none; box-shadow:0 10px 32px rgba(99,102,241,0.4);" style-hover="background:#4F46E5;">Go to dashboard <span data-arrow style="color:#09090F;">→</span></a>
+        </div>
+      </sc-if>
+    </div>
+
+    <p style="position:absolute; bottom:22px; left:0; right:0; text-align:center; font-size:11.5px; color:#3F485C; padding:0 24px;">
+      By continuing you agree to our <a href="#" style="color:#5B6478;" style-hover="color:#94A3B8;">Terms</a> &amp; <a href="#" style="color:#5B6478;" style-hover="color:#94A3B8;">Privacy Policy</a>.
+    </p>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1200,&quot;height&quot;:860}}">
+class Component extends DCLogic {
+  state = { step:0, emailVal:'', emailError:false, pass:'', confirm:'', showPass:false, touchedConfirm:false, downloaded:false, saved:false }
+
+  constructor(props){
+    super(props)
+    this.rootRef = React.createRef()
+    this.heroRef = React.createRef()
+    this.canvasRef = React.createRef()
+    this.glowRef = React.createRef()
+    this.recoveryKit = 'EG-v1:' + this.genKey()
+  }
+
+  componentDidMount(){
+    this.reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    this.setupCanvas()
+  }
+  componentWillUnmount(){
+    cancelAnimationFrame(this._raf)
+    window.removeEventListener('resize', this._onResize)
+    if(this._hero){ this._hero.removeEventListener('pointermove', this._onMove); this._hero.removeEventListener('pointerleave', this._onLeave) }
+  }
+
+  genKey(){
+    const bytes = new Uint8Array(48)
+    if(window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes)
+    else for(let i=0;i<bytes.length;i++) bytes[i] = (Math.random()*256)|0
+    let bin = ''
+    for(let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i])
+    return btoa(bin)
+  }
+
+  validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||'').trim()) }
+
+  onEmail(e){ this.setState({ emailVal:e.target.value, emailError:false }) }
+  onEmailKey(e){ if(e.key === 'Enter') this.onAccountNext() }
+  onAccountNext(){
+    if(this.validEmail(this.state.emailVal)) this.setState({ step:1, emailError:false })
+    else this.setState({ emailError:true })
+  }
+
+  scorePass(p){
+    if(!p) return 0
+    let s = 0
+    if(p.length >= 8) s++
+    if(p.length >= 14) s++
+    if(/[a-z]/.test(p) && /[A-Z]/.test(p)) s++
+    if(/\d/.test(p)) s++
+    if(/[^A-Za-z0-9]/.test(p)) s++
+    return Math.min(4, s)
+  }
+  onPass(e){ this.setState({ pass:e.target.value }) }
+  onConfirm(e){ this.setState({ confirm:e.target.value, touchedConfirm:true }) }
+  toggleShow(){ this.setState(s => ({ showPass:!s.showPass })) }
+  canCreate(){ const p=this.state.pass; return p.length>=8 && this.scorePass(p)>=2 && p===this.state.confirm && this.state.confirm.length>0 }
+  onCreateVault(){ if(this.canCreate()) this.setState({ step:2 }) }
+
+  onBack(){ this.setState(s => ({ step: Math.max(0, s.step-1) })) }
+
+  onDownload(){
+    try {
+      const blob = new Blob([this.recoveryKit], { type:'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = 'nocturne-recovery-kit.txt'
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch(err){ /* download blocked in sandbox — still mark as downloaded */ }
+    this.setState({ downloaded:true })
+  }
+  toggleSaved(){ this.setState(s => ({ saved:!s.saved })) }
+  canFinish(){ return this.state.downloaded && this.state.saved }
+  onFinish(){ if(this.canFinish()) this.setState({ step:3 }) }
+
+  // ---- Perlin noise contour field ----
+  _buildPerm(){
+    const p = new Uint8Array(512); const src = []
+    for(let i=0;i<256;i++) src[i]=i
+    for(let i=255;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=src[i]; src[i]=src[j]; src[j]=t }
+    for(let i=0;i<512;i++) p[i]=src[i&255]
+    return p
+  }
+  _fade(t){ return t*t*t*(t*(t*6-15)+10) }
+  _lerp(a,b,t){ return a+t*(b-a) }
+  _grad(h,x,y,z){ h&=15; const u=h<8?x:y; const v=h<4?y:(h===12||h===14?x:z); return ((h&1)?-u:u)+((h&2)?-v:v) }
+  _perlin(perm,x,y,z){
+    const fl=Math.floor
+    let X=fl(x)&255, Y=fl(y)&255, Z=fl(z)&255
+    x-=fl(x); y-=fl(y); z-=fl(z)
+    const u=this._fade(x), v=this._fade(y), w=this._fade(z)
+    const A=perm[X]+Y, AA=perm[A]+Z, AB=perm[A+1]+Z
+    const B=perm[X+1]+Y, BA=perm[B]+Z, BB=perm[B+1]+Z
+    const g=this._grad.bind(this), L=this._lerp
+    return L(
+      L(L(g(perm[AA],x,y,z), g(perm[BA],x-1,y,z), u), L(g(perm[AB],x,y-1,z), g(perm[BB],x-1,y-1,z), u), v),
+      L(L(g(perm[AA+1],x,y,z-1), g(perm[BA+1],x-1,y,z-1), u), L(g(perm[AB+1],x,y-1,z-1), g(perm[BB+1],x-1,y-1,z-1), u), v),
+      w)
+  }
+
+  setupCanvas(){
+    const canvas = this.canvasRef.current, hero = this.heroRef.current
+    if(!canvas || !hero) return
+    this._hero = hero
+    const ctx = canvas.getContext('2d')
+    const perm = this._buildPerm()
+    const s = { w:0,h:0,dpr:1,cols:0,rows:0,cw:0,ch:0,mx:-99999,my:-99999,tmx:-99999,tmy:-99999 }
+
+    const resize = () => {
+      const r = hero.getBoundingClientRect()
+      s.w = r.width; s.h = r.height
+      s.dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+      canvas.width = Math.round(s.w*s.dpr); canvas.height = Math.round(s.h*s.dpr)
+      ctx.setTransform(s.dpr,0,0,s.dpr,0,0)
+      s.cols = Math.max(20, Math.round(s.w/24))
+      s.rows = Math.max(24, Math.round(s.h/24))
+      s.cw = s.w/(s.cols-1); s.ch = s.h/(s.rows-1)
+      this._vals = new Float32Array(s.cols*s.rows)
+    }
+    this._onResize = resize
+    window.addEventListener('resize', resize, { passive:true })
+    resize()
+
+    this._onMove = (e) => { const r=hero.getBoundingClientRect(); s.tmx=e.clientX-r.left; s.tmy=e.clientY-r.top }
+    this._onLeave = () => { s.tmx=-99999; s.tmy=-99999 }
+    hero.addEventListener('pointermove', this._onMove)
+    hero.addEventListener('pointerleave', this._onLeave)
+
+    const LEVELS = 13
+    const noise = (x,y,z) => this._perlin(perm,x,y,z)
+
+    if(this.reduced){ this._draw(ctx,s,noise,LEVELS,0,0); return }
+
+    const startT = performance.now()
+    const loop = (now) => {
+      const t = (now-startT)/1000
+      if(s.tmx < -50000){ s.mx += (-99999-s.mx)*0.08; s.my += (-99999-s.my)*0.08 }
+      else { s.mx += (s.tmx-s.mx)*0.12; s.my += (s.tmy-s.my)*0.12 }
+      const g = this.glowRef.current
+      if(g){ if(s.tmx > -50000){ g.style.opacity='1'; g.style.transform='translate('+s.mx+'px,'+s.my+'px)' } else { g.style.opacity='0' } }
+      this._draw(ctx,s,noise,LEVELS,t,1)
+      this._raf = requestAnimationFrame(loop)
+    }
+    this._raf = requestAnimationFrame(loop)
+  }
+
+  _draw(ctx,s,noise,LEVELS,t,breathe){
+    const cols=s.cols, rows=s.rows, cw=s.cw, ch=s.ch, vals=this._vals
+    const ns=0.085, zt=t*0.10
+    const hasMouse = s.mx > -50000
+    for(let gy=0; gy<rows; gy++){
+      for(let gx=0; gx<cols; gx++){
+        let v = noise(gx*ns, gy*ns, zt)*0.5 + 0.5
+        if(hasMouse){
+          const dx=gx*cw - s.mx, dy=gy*ch - s.my, d2=dx*dx+dy*dy
+          if(d2 < 60000) v += 0.34*Math.exp(-d2/16000)
+        }
+        vals[gx+gy*cols] = v
+      }
+    }
+    ctx.clearRect(0,0,s.w,s.h)
+    ctx.lineJoin='round'; ctx.lineCap='round'
+    const breath = breathe ? (0.62 + 0.38*Math.sin(t*1.5)) : 1
+    const seg=(ax,ay,bx,by)=>{ ctx.moveTo(ax,ay); ctx.lineTo(bx,by) }
+    for(let li=0; li<LEVELS; li++){
+      const f = li/(LEVELS-1)
+      const thr = 0.16 + f*0.70
+      let color, alpha, lw, glow
+      if(f > 0.84){ color='244,63,94'; alpha=0.6*breath; lw=1.6; glow=12 }
+      else if(f > 0.66){ color='167,139,250'; alpha=0.5; lw=1.25; glow=6 }
+      else { color='99,102,241'; alpha=0.09 + 0.20*f; lw=1; glow=0 }
+      ctx.beginPath()
+      for(let gy=0; gy<rows-1; gy++){
+        for(let gx=0; gx<cols-1; gx++){
+          const i=gx+gy*cols
+          const tl=vals[i], tr=vals[i+1], bl=vals[i+cols], br=vals[i+cols+1]
+          let idx=0
+          if(tl>thr) idx|=8; if(tr>thr) idx|=4; if(br>thr) idx|=2; if(bl>thr) idx|=1
+          if(idx===0 || idx===15) continue
+          const x0=gx*cw, y0=gy*ch, x1=x0+cw, y1=y0+ch
+          const tpx=x0+(thr-tl)/(tr-tl)*cw
+          const rpy=y0+(thr-tr)/(br-tr)*ch
+          const bpx=x0+(thr-bl)/(br-bl)*cw
+          const lpy=y0+(thr-tl)/(bl-tl)*ch
+          switch(idx){
+            case 1: seg(x0,lpy,bpx,y1); break
+            case 2: seg(bpx,y1,x1,rpy); break
+            case 3: seg(x0,lpy,x1,rpy); break
+            case 4: seg(tpx,y0,x1,rpy); break
+            case 5: seg(tpx,y0,x1,rpy); seg(x0,lpy,bpx,y1); break
+            case 6: seg(tpx,y0,bpx,y1); break
+            case 7: seg(tpx,y0,x0,lpy); break
+            case 8: seg(tpx,y0,x0,lpy); break
+            case 9: seg(tpx,y0,bpx,y1); break
+            case 10: seg(tpx,y0,x0,lpy); seg(bpx,y1,x1,rpy); break
+            case 11: seg(tpx,y0,x1,rpy); break
+            case 12: seg(x0,lpy,x1,rpy); break
+            case 13: seg(bpx,y1,x1,rpy); break
+            case 14: seg(x0,lpy,bpx,y1); break
+          }
+        }
+      }
+      ctx.strokeStyle='rgba('+color+','+alpha+')'
+      ctx.lineWidth=lw
+      if(glow>0){ ctx.shadowBlur=glow; ctx.shadowColor='rgba('+color+',0.85)' } else { ctx.shadowBlur=0 }
+      ctx.stroke()
+    }
+    ctx.shadowBlur=0
+  }
+
+  renderVals(){
+    const step = this.state.step
+
+    // ---- brand stepper ----
+    const stepDefs = [
+      { title:'Create account', desc:'Sign in with Google or email' },
+      { title:'Set vault passphrase', desc:'Derives your non-extractable key' },
+      { title:'Save Recovery Kit', desc:'Your only backdoor-free backup' },
+    ]
+    const wizSteps = stepDefs.map((d,i) => {
+      const done = i < step
+      const active = i === step
+      return {
+        title:d.title, desc:d.desc, num:String(i+1),
+        isDone:done, notDone:!done, showRail:i < 2,
+        badgeStyle:{ width:'34px', height:'34px', borderRadius:'10px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', fontWeight:600, fontFamily:"'JetBrains Mono',monospace",
+          background: active ? 'rgba(99,102,241,0.14)' : '#09090F',
+          border:'1px solid ' + (done ? 'rgba(99,102,241,0.5)' : active ? 'rgba(99,102,241,0.65)' : '#2D2B45'),
+          color: done ? '#818CF8' : active ? '#A5B4FC' : '#5B6478',
+          boxShadow: active ? '0 0 0 4px rgba(99,102,241,0.08)' : 'none', transition:'all .4s' },
+        railStyle:{ flex:'1', width:'1.5px', minHeight:'24px', margin:'6px 0', background: done ? 'linear-gradient(#6366F1,rgba(99,102,241,0.3))' : '#1E1E2E', transition:'background .4s' },
+        titleStyle:{ fontSize:'15px', fontWeight:600, color: (done||active) ? '#E2E8F0' : '#5B6478', transition:'color .4s' },
+        descStyle:{ fontSize:'13px', color: active ? '#94A3B8' : '#5B6478', marginTop:'2px', transition:'color .4s' },
+      }
+    })
+
+    // ---- step counter ----
+    const filled = '#6366F1', empty = '#1E1E2E'
+    const progressBars = [0,1,2].map(i => ({ width:'22px', height:'3px', borderRadius:'9999px', background: i <= step ? filled : empty, transition:'background .4s' }))
+    const counterText = 'Step ' + Math.min(step+1,3) + ' of 3'
+
+    // ---- step 1 email ----
+    const emailStyle = { width:'100%', height:'46px', padding:'0 14px', borderRadius:'9px', boxSizing:'border-box', background:'#13121C', border:'1px solid ' + (this.state.emailError ? 'rgba(244,63,94,0.55)' : '#1E1E2E'), color:'#E2E8F0', fontSize:'14px', outline:'none', transition:'border-color .2s, background .2s' }
+
+    // ---- step 2 passphrase ----
+    const score = this.scorePass(this.state.pass)
+    const sColors = ['#FB7185','#FB7185','#FBBF24','#A78BFA','#2DD4BF']
+    const sLabels = ['','Weak — add length & variety','Fair — keep going','Good passphrase','Strong passphrase']
+    const strengthColor = this.state.pass ? sColors[score] : '#5B6478'
+    const strengthLabel = this.state.pass ? sLabels[score] : 'Use a phrase only you would know'
+    const meterSegs = [0,1,2,3].map(i => ({ flex:'1', height:'4px', borderRadius:'9999px', background: (this.state.pass && i < score) ? sColors[score] : '#1C1B28', transition:'background .35s' }))
+    const mismatch = this.state.touchedConfirm && this.state.confirm.length > 0 && this.state.confirm !== this.state.pass
+    const passType = this.state.showPass ? 'text' : 'password'
+    const fieldBase = { width:'100%', height:'46px', padding:'0 14px', borderRadius:'9px', boxSizing:'border-box', background:'#13121C', color:'#E2E8F0', fontSize:'14px', outline:'none', transition:'border-color .2s, background .2s' }
+    const passStyle = { ...fieldBase, paddingRight:'62px', border:'1px solid #1E1E2E' }
+    const confirmStyle = { ...fieldBase, border:'1px solid ' + (mismatch ? 'rgba(244,63,94,0.55)' : '#1E1E2E') }
+    const canCreate = this.canCreate()
+    const solidBase = { flex:'1', height:'46px', display:'inline-flex', alignItems:'center', justifyContent:'center', gap:'8px', borderRadius:'9px', fontSize:'15px', fontWeight:500, color:'#09090F', border:'none', background:'#6366F1', boxShadow:'0 8px 26px rgba(99,102,241,0.32)' }
+    const createBtnStyle = canCreate ? { ...solidBase, cursor:'pointer' } : { ...solidBase, opacity:0.4, cursor:'not-allowed', boxShadow:'none' }
+
+    // ---- step 3 recovery ----
+    const dl = this.state.downloaded
+    const downloadBtnStyle = { width:'100%', height:'46px', marginTop:'16px', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', borderRadius:'9px', fontSize:'14.5px', fontWeight:500, cursor:'pointer',
+      background: dl ? 'rgba(99,102,241,0.1)' : '#6366F1',
+      color: dl ? '#A5B4FC' : '#09090F',
+      border: '1px solid ' + (dl ? 'rgba(99,102,241,0.4)' : 'transparent'),
+      boxShadow: dl ? 'none' : '0 8px 26px rgba(99,102,241,0.32)' }
+    const downloadIconWrap = { display:'inline-flex', alignItems:'center', justifyContent:'center' }
+    const downloadLabel = dl ? 'Recovery Kit downloaded' : 'Download Recovery Kit (.txt)'
+    const checkboxStyle = { flexShrink:0, marginTop:'1px', width:'20px', height:'20px', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center',
+      background: this.state.saved ? '#6366F1' : 'transparent',
+      border:'1px solid ' + (this.state.saved ? '#6366F1' : '#2D2B45'), transition:'background .2s, border-color .2s' }
+    const canFinish = this.canFinish()
+    const finishBase = { flex:'1', height:'46px', display:'inline-flex', alignItems:'center', justifyContent:'center', gap:'8px', borderRadius:'9px', fontSize:'15px', fontWeight:500, color:'#09090F', border:'none', background:'#6366F1', boxShadow:'0 8px 26px rgba(99,102,241,0.32)' }
+    const finishBtnStyle = canFinish ? { ...finishBase, cursor:'pointer' } : { ...finishBase, opacity:0.4, cursor:'not-allowed', boxShadow:'none' }
+
+    return {
+      rootRef:this.rootRef, heroRef:this.heroRef, canvasRef:this.canvasRef, glowRef:this.glowRef,
+      wizSteps,
+      showCounter: step < 3,
+      progressBars, counterText,
+      isStep0: step===0, isStep1: step===1, isStep2: step===2, isDone: step===3,
+      // step 1
+      emailVal:this.state.emailVal, emailStyle, emailError:this.state.emailError,
+      onEmail:(e) => this.onEmail(e), onEmailKey:(e) => this.onEmailKey(e), onAccountNext:() => this.onAccountNext(),
+      // step 2
+      pass:this.state.pass, confirm:this.state.confirm, passType,
+      onPass:(e) => this.onPass(e), onConfirm:(e) => this.onConfirm(e), toggleShow:() => this.toggleShow(),
+      showLabel: this.state.showPass ? 'Hide' : 'Show',
+      passStyle, confirmStyle, meterSegs, strengthColor, strengthLabel, showMismatch:mismatch,
+      createBtnStyle, onCreateVault:() => this.onCreateVault(),
+      // step 3
+      recoveryKit:this.recoveryKit, downloaded:dl, notDownloaded:!dl,
+      downloadBtnStyle, downloadIconWrap, downloadLabel, onDownload:() => this.onDownload(),
+      saved:this.state.saved, checkboxStyle, toggleSaved:() => this.toggleSaved(),
+      finishBtnStyle, onFinish:() => this.onFinish(),
+      onBack:() => this.onBack(),
+    }
+  }
+}
+</script>
+</body>
+</html>

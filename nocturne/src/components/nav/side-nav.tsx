@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { LayoutDashboard, Plus, Settings, ChevronLeft, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, Plus, Settings, ChevronLeft, ChevronRight, Flame, Users, HelpCircle, CreditCard } from 'lucide-react'
 import { NavItem } from './nav-item'
 import { PrivacyBadge } from './privacy-badge'
 import { StorageIndicator } from './storage-indicator'
@@ -11,7 +11,11 @@ import { NotificationStrip } from './notification-strip'
 
 const NAV_ITEMS = [
   { href: '/vault', icon: LayoutDashboard, label: 'Vault' },
+  { href: '/momentum', icon: Flame, label: 'Momentum' },
+  { href: '/community', icon: Users, label: 'Community' },
   { href: '/session/new', icon: Plus, label: 'New session' },
+  { href: '/help', icon: HelpCircle, label: 'Help' },
+  { href: '/billing', icon: CreditCard, label: 'Billing' },
   { href: '/vault/settings', icon: Settings, label: 'Settings' },
 ]
 
@@ -45,13 +49,13 @@ export function SideNav({ email, usedBytes }: Props) {
 
   return (
     <motion.nav
-      animate={{ width: mounted ? (collapsed ? 48 : 220) : 220 }}
+      animate={{ width: mounted ? (collapsed ? 64 : 224) : 224 }}
       transition={
         animationReady
           ? { duration: 0.2, ease: [0.4, 0.0, 0.2, 1.0] }
           : { duration: 0 }
       }
-      className="flex flex-col h-screen sticky top-0 bg-bg-elevated border-r border-border-default shrink-0 overflow-hidden"
+      className="flex flex-col h-screen sticky top-0 bg-bg-rail border-r border-border-default shrink-0 overflow-hidden"
     >
       {/* Top: wordmark/monogram + collapse toggle */}
       {collapsed ? (

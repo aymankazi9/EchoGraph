@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:#09090F; color:#E2E8F0; font-family:'Inter',system-ui,sans-serif; font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  *::-webkit-scrollbar { width:9px; height:9px; }
+  *::-webkit-scrollbar-track { background:transparent; }
+  *::-webkit-scrollbar-thumb { background:#1E1E2E; border-radius:9999px; }
+  *::-webkit-scrollbar-thumb:hover { background:#2D2B45; }
+  ::selection { background:rgba(99,102,241,0.28); color:#E2E8F0; }
+  a { color:inherit; text-decoration:none; }
+  button { font-family:inherit; }
+  @keyframes noct-livedot { 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:0.35; transform:scale(0.7);} }
+  @keyframes noct-docin { from { transform:translateY(10px); } to { transform:translateY(0); } }
+  [data-docbody] { animation:noct-docin .5s cubic-bezier(.16,1,.3,1) both; }
+  [data-navlink] { position:relative; }
+  [data-navlink]::after { content:""; position:absolute; left:10px; right:10px; bottom:4px; height:1px; background:#818CF8; transform:scaleX(0); transform-origin:right; transition:transform .3s cubic-bezier(.22,1,.36,1); }
+  [data-navlink]:hover::after { transform:scaleX(1); transform-origin:left; }
+  @media (prefers-reduced-motion: reduce) { [data-docbody] { animation:none !important; } }
+  @media (max-width: 940px) {
+    [data-side] { display:none !important; }
+    [data-mobswitch] { display:flex !important; }
+    [data-compare] { grid-template-columns:1fr !important; }
+    [data-topnav-extra] { display:none !important; }
+  }
+</style>
+</helmet>
+
+<div style="height:100vh; display:flex; flex-direction:column; background:#09090F;">
+
+  <!-- ===== TOP BAR ===== -->
+  <header style="flex-shrink:0; height:60px; border-bottom:1px solid #191827; display:flex; align-items:center; justify-content:space-between; padding:0 26px; background:rgba(9,9,15,0.82); backdrop-filter:blur(10px); position:relative; z-index:5;">
+    <a href="Nocturne Landing.dc.html" style="display:inline-flex; align-items:center; gap:10px;">
+      <span style="width:27px; height:27px; border-radius:8px; background:linear-gradient(145deg,#6366F1,#8B5CF6); display:flex; align-items:center; justify-content:center; color:#09090F; font-weight:700; font-size:14px; box-shadow:0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.32);">N</span>
+      <span style="font-size:17px; font-weight:600; letter-spacing:-0.01em; color:#E2E8F0;">Nocturne</span>
+      <span style="font-size:13px; color:#3F485C; margin-left:2px;">/ Legal</span>
+    </a>
+    <nav style="display:flex; align-items:center; gap:6px;">
+      <a href="Nocturne Landing.dc.html" data-navlink data-topnav-extra style="height:34px; padding:0 12px; display:inline-flex; align-items:center; font-size:14px; color:#94A3B8;">Home</a>
+      <a href="Nocturne Landing.dc.html#privacy" data-navlink data-topnav-extra style="height:34px; padding:0 12px; display:inline-flex; align-items:center; font-size:14px; color:#94A3B8;">Security</a>
+      <a href="Canvas.dc.html" style="height:34px; padding:0 16px; display:inline-flex; align-items:center; border-radius:8px; font-size:14px; font-weight:500; color:#E2E8F0; border:1px solid #2D2B45; transition:background .25s, border-color .25s;" style-hover="background:#1C1B28; border-color:#3a3856;">Sign in</a>
+    </nav>
+  </header>
+
+  <!-- ===== BODY ===== -->
+  <div style="flex:1; min-height:0; display:flex;">
+
+    <!-- sidebar -->
+    <aside data-side style="width:288px; flex-shrink:0; border-right:1px solid #191827; overflow-y:auto; padding:30px 22px 48px;">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.13em; color:#5B6478; margin:0 0 13px 4px;">Legal documents</div>
+      <div style="display:flex; flex-direction:column; gap:3px; margin-bottom:30px;">
+        <sc-for list="{{ docs }}" as="d" hint-placeholder-count="4">
+          <button type="button" onClick="{{ d.onClick }}" style="{{ d.tabStyle }}">
+            <span style="{{ d.tabDotStyle }}"></span>{{ d.label }}
+          </button>
+        </sc-for>
+      </div>
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.13em; color:#5B6478; margin:0 0 12px 4px;">On this page</div>
+      <div style="display:flex; flex-direction:column;">
+        <sc-for list="{{ toc }}" as="t" hint-placeholder-count="9">
+          <button type="button" onClick="{{ t.onClick }}" style="{{ t.tocStyle }}"><span style="{{ t.tocNumStyle }}">{{ t.num }}</span>{{ t.heading }}</button>
+        </sc-for>
+      </div>
+    </aside>
+
+    <!-- main scroll column -->
+    <main ref="{{ mainRef }}" style="flex:1; min-width:0; overflow-y:auto; position:relative;">
+      <div style="position:absolute; top:0; left:0; right:0; height:260px; background:radial-gradient(640px 260px at 32% -40px, rgba(99,102,241,0.09) 0%, rgba(139,92,246,0.03) 45%, transparent 72%); pointer-events:none; z-index:0;"></div>
+
+      <div data-docbody key="{{ activeDoc }}" style="position:relative; z-index:1; max-width:768px; margin:0 auto; padding:46px 44px 84px;">
+
+        <!-- mobile switcher -->
+        <div data-mobswitch style="display:none; gap:8px; margin-bottom:28px; flex-wrap:wrap;">
+          <sc-for list="{{ docs }}" as="d" hint-placeholder-count="4">
+            <button type="button" onClick="{{ d.onClick }}" style="{{ d.chipStyle }}">{{ d.label }}</button>
+          </sc-for>
+        </div>
+
+        <!-- doc header -->
+        <div style="display:inline-flex; align-items:center; gap:9px; padding:5px 13px 5px 11px; border-radius:9999px; border:1px solid #2D2B45; background:rgba(17,17,24,0.6); margin-bottom:18px;">
+          <span style="width:6px; height:6px; border-radius:50%; background:#818CF8; box-shadow:0 0 8px rgba(129,140,248,0.6);"></span>
+          <span style="font-size:11.5px; letter-spacing:0.05em; color:#94A3B8;">{{ activeTag }}</span>
+        </div>
+        <h1 style="font-size:clamp(28px,3.2vw,37px); font-weight:600; letter-spacing:-0.025em; color:#E2E8F0; margin:0 0 14px; line-height:1.12;">{{ activeTitle }}</h1>
+        <p style="font-size:16px; line-height:1.62; color:#94A3B8; margin:0 0 24px; max-width:580px;">{{ activeSubtitle }}</p>
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding-bottom:28px; margin-bottom:8px; border-bottom:1px solid #191827; font-size:12.5px; color:#5B6478;">
+          <span>Effective {{ effectiveDate }}</span>
+          <span style="color:#2D2B45;">•</span>
+          <span>Last updated {{ updatedDate }}</span>
+          <span style="color:#2D2B45;">•</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px;">{{ readTime }}</span>
+        </div>
+
+        <!-- sections -->
+        <sc-for list="{{ sections }}" as="sec" hint-placeholder-count="7">
+          <section data-sec="{{ sec.domId }}" style="padding-top:30px;">
+            <div style="display:flex; align-items:baseline; gap:13px; margin-bottom:14px;">
+              <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#6366F1; font-weight:500; flex-shrink:0;">{{ sec.num }}</span>
+              <h2 style="font-size:19px; font-weight:600; letter-spacing:-0.012em; color:#E2E8F0; margin:0; line-height:1.3;">{{ sec.heading }}</h2>
+            </div>
+            <div>
+              <sc-for list="{{ sec.blocks }}" as="b" hint-placeholder-count="2">
+                <sc-if value="{{ b.isText }}" hint-placeholder-val="{{ false }}">
+                  <p style="font-size:15.5px; line-height:1.75; color:#C2CCDA; margin:0 0 15px;">{{ b.text }}</p>
+                </sc-if>
+                <sc-if value="{{ b.isSub }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:12.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#818CF8; margin:20px 0 9px;">{{ b.text }}</div>
+                </sc-if>
+                <sc-if value="{{ b.isList }}" hint-placeholder-val="{{ false }}">
+                  <ul style="list-style:none; margin:2px 0 16px; padding:0; display:flex; flex-direction:column; gap:11px;">
+                    <sc-for list="{{ b.items }}" as="it" hint-placeholder-count="3">
+                      <li style="display:flex; gap:13px; font-size:15px; line-height:1.65; color:#C2CCDA;">
+                        <span style="flex-shrink:0; width:5px; height:5px; border-radius:50%; background:#6366F1; margin-top:9px; box-shadow:0 0 6px rgba(99,102,241,0.5);"></span>
+                        <span>{{ it }}</span>
+                      </li>
+                    </sc-for>
+                  </ul>
+                </sc-if>
+                <sc-if value="{{ b.isCalloutIndigo }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; gap:13px; margin:8px 0 18px; padding:16px 18px; border-radius:11px; border:1px solid rgba(99,102,241,0.3); background:rgba(99,102,241,0.07);">
+                    <span style="flex-shrink:0; margin-top:1px; color:#A5B4FC;">
+                      <svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1.6 L15.2 4 V8.6 c0 4-2.7 6.4-6.2 7.8 C5.5 15 2.8 12.6 2.8 8.6 V4 Z"></path><path d="M6.4 9 L8.2 10.8 L11.8 6.8"></path></svg>
+                    </span>
+                    <p style="font-size:14px; line-height:1.65; color:#C7CEF5; margin:0;">{{ b.text }}</p>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ b.isCalloutRose }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; gap:13px; margin:8px 0 18px; padding:16px 18px; border-radius:11px; border:1px solid rgba(244,63,94,0.32); background:rgba(244,63,94,0.08);">
+                    <span style="flex-shrink:0; margin-top:1px; color:#FB7185;">
+                      <svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 L16.5 15.5 H1.5 Z"></path><path d="M9 7 v3.5"></path><path d="M9 13 v0.01"></path></svg>
+                    </span>
+                    <p style="font-size:14px; line-height:1.65; color:#FCA5B5; margin:0;">{{ b.text }}</p>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ b.isKeys }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin:8px 0 18px; border:1px solid #1E1E2E; border-radius:12px; background:#0C0C13; padding:18px 20px;">
+                    <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.11em; color:#5B6478; margin-bottom:13px;">3-Tier key hierarchy</div>
+                    <div style="font-family:'JetBrains Mono',monospace; font-size:13px; line-height:1.55;">
+                      <sc-for list="{{ b.lines }}" as="ln" hint-placeholder-count="7">
+                        <sc-if value="{{ ln.isArrow }}" hint-placeholder-val="{{ false }}">
+                          <div style="padding-left:14px; color:#5B6478; margin:2px 0;">{{ ln.text }}</div>
+                        </sc-if>
+                        <sc-if value="{{ ln.isKey }}" hint-placeholder-val="{{ true }}">
+                          <div style="color:#A5B4FC; margin:2px 0;">{{ ln.text }} <span style="color:#5B6478;">{{ ln.noteParen }}</span></div>
+                        </sc-if>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ b.isCompare }}" hint-placeholder-val="{{ false }}">
+                  <div data-compare style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:8px 0 18px;">
+                    <div style="border:1px solid #1E1E2E; border-radius:12px; background:#0C0C13; padding:16px 18px;">
+                      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#94A3B8; margin-bottom:13px;">
+                        <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 9 S4 3.5 9 3.5 16.5 9 16.5 9 14 14.5 9 14.5 1.5 9 1.5 9 Z"></path><circle cx="9" cy="9" r="2"></circle></svg>
+                        {{ b.canTitle }}
+                      </div>
+                      <ul style="list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px;">
+                        <sc-for list="{{ b.can }}" as="c" hint-placeholder-count="3">
+                          <li style="display:flex; gap:10px; font-size:13.5px; line-height:1.5; color:#94A3B8;"><span style="flex-shrink:0; width:4px; height:4px; border-radius:50%; background:#5B6478; margin-top:8px;"></span><span>{{ c }}</span></li>
+                        </sc-for>
+                      </ul>
+                    </div>
+                    <div style="border:1px solid rgba(99,102,241,0.3); border-radius:12px; background:rgba(99,102,241,0.05); padding:16px 18px;">
+                      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#A5B4FC; margin-bottom:13px;">
+                        <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="#A5B4FC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="10" height="7" rx="1.5"></rect><path d="M6 8 V6 a3 3 0 0 1 6 0 v2"></path></svg>
+                        {{ b.cannotTitle }}
+                      </div>
+                      <ul style="list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px;">
+                        <sc-for list="{{ b.cannot }}" as="c" hint-placeholder-count="3">
+                          <li style="display:flex; gap:10px; font-size:13.5px; line-height:1.5; color:#C7CEF5;"><span style="flex-shrink:0; margin-top:2px; color:#818CF8;"><svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5 L7 13 L4 10"></path></svg></span><span>{{ c }}</span></li>
+                        </sc-for>
+                      </ul>
+                    </div>
+                  </div>
+                </sc-if>
+              </sc-for>
+            </div>
+          </section>
+        </sc-for>
+
+        <!-- footer -->
+        <div style="margin-top:58px; padding-top:26px; border-top:1px solid #191827; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+          <span style="font-size:12.5px; color:#5B6478;">© 2026 Nocturne Labs, Inc.</span>
+          <div style="display:flex; gap:18px; flex-wrap:wrap;">
+            <sc-for list="{{ docs }}" as="d" hint-placeholder-count="4">
+              <button type="button" onClick="{{ d.onClick }}" style="{{ d.footStyle }}">{{ d.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <p style="margin-top:18px; font-size:11.5px; line-height:1.55; color:#3F485C;">This document is a design artifact for the Nocturne product and is not legal advice.</p>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:860}}">
+class Component extends DCLogic {
+  state = { activeDoc:'privacy', activeSection:null }
+
+  constructor(props){
+    super(props)
+    this.mainRef = React.createRef()
+    this.docs = this.buildDocs()
+  }
+
+  componentDidMount(){ this.setupSpy() }
+  componentDidUpdate(prevProps, prevState){
+    if(prevState.activeDoc !== this.state.activeDoc) this.setupSpy()
+  }
+  componentWillUnmount(){ if(this._obs) this._obs.disconnect() }
+
+  switchDoc(id){
+    if(id === this.state.activeDoc) return
+    this.setState({ activeDoc:id, activeSection:null }, () => {
+      const root = this.mainRef.current
+      if(root) root.scrollTo({ top:0 })
+    })
+  }
+
+  goTo(domId){
+    const root = this.mainRef.current
+    if(!root) return
+    const el = root.querySelector('[data-sec="'+domId+'"]')
+    if(!el) return
+    const cRect = root.getBoundingClientRect(), eRect = el.getBoundingClientRect()
+    root.scrollTo({ top: root.scrollTop + (eRect.top - cRect.top) - 22, behavior:'smooth' })
+  }
+
+  setupSpy(){
+    if(this._obs) this._obs.disconnect()
+    const root = this.mainRef.current
+    if(!root) return
+    const secs = [...root.querySelectorAll('[data-sec]')]
+    if(!secs.length) return
+    const order = secs.map(s => s.dataset.sec)
+    this._visible = new Set()
+    this._obs = new IntersectionObserver((entries) => {
+      for(const e of entries){
+        if(e.isIntersecting) this._visible.add(e.target.dataset.sec)
+        else this._visible.delete(e.target.dataset.sec)
+      }
+      const active = order.find(id => this._visible.has(id))
+      if(active && active !== this.state.activeSection) this.setState({ activeSection:active })
+    }, { root, rootMargin:'-12% 0px -72% 0px', threshold:0 })
+    secs.forEach(s => this._obs.observe(s))
+  }
+
+  buildDocs(){
+    const T = (text) => ({ k:'text', text })
+    const S = (text) => ({ k:'sub', text })
+    const L = (...items) => ({ k:'list', items })
+    const CI = (text) => ({ k:'callout-i', text })
+    const CR = (text) => ({ k:'callout-r', text })
+    const KEYS = (lines) => ({ k:'keys', lines })
+    const CMP = (canTitle, can, cannotTitle, cannot) => ({ k:'compare', canTitle, can, cannotTitle, cannot })
+
+    return [
+      {
+        id:'privacy', label:'Privacy Policy', tag:'Privacy Policy',
+        subtitle:"How Nocturne collects, uses, and protects your information — and the categories of data we've engineered ourselves to be unable to read.",
+        sections:[
+          { h:'Overview', blocks:[
+            T(`Nocturne Labs, Inc. ("Nocturne", "we", "us") builds privacy-first study intelligence for students. This Privacy Policy explains what we collect, how we use it, and — just as importantly — the categories of data we have deliberately engineered ourselves to be unable to read.`),
+            T(`Nocturne is built on a zero-knowledge architecture. Your uploaded lectures, slides, transcripts, and study guides are encrypted on your device before they ever reach our servers. We store the resulting ciphertext, never the contents.`),
+          ]},
+          { h:'Information we collect', blocks:[
+            S(`Account information`),
+            T(`When you create a vault we collect your email address, your authentication provider identifier (for example, your Google account ID if you sign in with Google), and an optional display name. This is the minimum required to authenticate you and associate your encrypted data with your account.`),
+            S(`Encrypted content`),
+            T(`Lecture audio, slide decks, transcripts, study guides, and the keyword rankings derived from them are encrypted client-side with AES-GCM 256 and uploaded as opaque .bin blobs. We can see that a blob exists and its size — never what it contains.`),
+            S(`Technical and usage data`),
+            T(`We collect limited information needed to operate and secure the service:`),
+            L(`Device and browser type, operating system, and approximate region derived from IP`, `Aggregate, non-identifying feature usage — for example, how many sessions were created, without their contents`, `Error and crash diagnostics, scrubbed of any vault content`),
+          ]},
+          { h:'What we can never access', blocks:[
+            T(`The following are structurally inaccessible to Nocturne. This is not a policy we could quietly reverse — it is enforced by the cryptography itself:`),
+            L(`Your vault passphrase — it never leaves your device, not even in hashed form`, `Your Master Key, which is created as a non-extractable key and cannot be exported`, `The decrypted contents of any lecture, slide, transcript, or study guide`, `Your Recovery Kit, which only ever exists on devices where you choose to save it`),
+            CI(`Because of this design, no Nocturne employee, contractor, or automated process can read your study content. See our Security disclosure for the full technical model.`),
+          ]},
+          { h:'How we use information', blocks:[
+            T(`We use the limited information we can access only to:`),
+            L(`Authenticate you and maintain your session`, `Store and sync your encrypted blobs across your devices`, `Operate, secure, debug, and improve the service`, `Send essential service notices, and — only if you opt in — product updates`, `Comply with legal obligations and enforce our Terms of Service`),
+          ]},
+          { h:'Local-first processing', blocks:[
+            T(`On the Free tier, speech-to-text (Whisper) and keyword modeling (BERT) run entirely in your browser via WebAssembly. Your lecture audio and transcript text are processed locally and are never transmitted to our servers or any third party for that processing.`),
+          ]},
+          { h:'Third parties and subprocessors', blocks:[
+            T(`We rely on a small set of vetted subprocessors. They process only the limited data described below, and never your decrypted content:`),
+            L(`Supabase — authentication, database, and encrypted blob storage`, `Google — OAuth sign-in, if you choose it`, `YouTube Data API — only when you explicitly connect a video, to match Red Zone keywords against captions over HTTPS`, `Stripe — payment processing for paid plans; we never receive your full card number`, `Vercel — application hosting and content delivery`),
+          ]},
+          { h:'Cookies', blocks:[
+            T(`We use a minimal set of strictly necessary cookies for authentication and vault state. We do not use advertising or cross-site tracking cookies. See our Cookie Policy for specifics.`),
+          ]},
+          { h:'Data retention', blocks:[
+            T(`We retain your account record and encrypted blobs for as long as your account is active. When you delete a session, its blobs are removed from storage. When you delete your account, your encrypted content is permanently deleted and your authentication record is removed within 30 days, subject to any legal retention obligations.`),
+          ]},
+          { h:'Your rights', blocks:[
+            T(`Depending on your location, you may have the right to access, correct, export, or delete your personal information, and to object to or restrict certain processing. Because your content is encrypted under a key only you hold, you already hold the strongest possible form of access control over it.`),
+            T(`To exercise any right, contact privacy@nocturne.app. We will respond within the timeframe required by applicable law, including the GDPR and CCPA.`),
+          ]},
+          { h:'International transfers', blocks:[
+            T(`Nocturne is operated from the United States. Where we transfer data internationally, we rely on appropriate safeguards such as Standard Contractual Clauses. Because your content is encrypted in transit and at rest, its confidentiality does not depend on the jurisdiction in which a blob happens to be stored.`),
+          ]},
+          { h:"Children's privacy", blocks:[
+            T(`Nocturne is intended for users aged 16 and older. We do not knowingly collect personal information from children under 16. If you believe a child has provided us information, contact us and we will delete it.`),
+          ]},
+          { h:'Changes to this policy', blocks:[
+            T(`We may update this Privacy Policy as the product evolves. Material changes will be announced in-app or by email before they take effect. The "Last updated" date above always reflects the current version.`),
+          ]},
+          { h:'Contact', blocks:[
+            T(`Questions about this policy or your data can be sent to privacy@nocturne.app.`),
+          ]},
+        ],
+      },
+
+      {
+        id:'terms', label:'Terms of Service', tag:'Terms of Service',
+        subtitle:`The agreement that governs your use of Nocturne, including your responsibilities as the sole holder of your vault key.`,
+        sections:[
+          { h:'Acceptance of these Terms', blocks:[
+            T(`These Terms of Service ("Terms") are a binding agreement between you and Nocturne Labs, Inc. By creating a vault or using Nocturne, you agree to these Terms and to our Privacy Policy. If you do not agree, do not use the service.`),
+          ]},
+          { h:'Eligibility', blocks:[
+            T(`You must be at least 16 years old to use Nocturne. If you use Nocturne in connection with an educational institution, you are responsible for ensuring your use complies with that institution's policies. Nocturne is offered in stages, including private beta features that may be limited or change.`),
+          ]},
+          { h:'Your account', blocks:[
+            T(`You are responsible for the information you provide at sign-up and for all activity under your account. Keep your authentication credentials secure and notify us promptly of any unauthorized use.`),
+          ]},
+          { h:'Your vault and encryption', blocks:[
+            T(`Nocturne encrypts your content under a key derived from a vault passphrase that only you know. This gives you complete control — and complete responsibility — over access to your data.`),
+            CR(`No password reset exists. There is no backdoor. If you lose both your passphrase and your Recovery Kit, your encrypted content is permanently and irreversibly inaccessible — to you and to us. You agree that Nocturne is not liable for content lost in this way.`),
+            T(`You are responsible for storing your Recovery Kit somewhere safe. We strongly recommend saving it the moment your vault is created.`),
+          ]},
+          { h:'Acceptable use', blocks:[
+            T(`You agree not to:`),
+            L(`Use Nocturne for any unlawful purpose or in violation of applicable law`, `Upload content you do not have the right to use, or that infringes others' rights`, `Attempt to breach, probe, or circumvent the security or access controls of the service`, `Reverse engineer, resell, or build a competing service from Nocturne, except as permitted by law`, `Interfere with or disrupt the integrity or performance of the service`),
+          ]},
+          { h:'Your content', blocks:[
+            T(`You retain all ownership of the content you upload. You grant Nocturne only the limited, revocable license necessary to store your encrypted blobs and provide the service to you. Because we cannot decrypt your content, we make no other use of it. We claim no rights to your content and will never sell it.`),
+          ]},
+          { h:'Academic integrity', blocks:[
+            T(`Nocturne is a study aid that highlights likely-important material. It does not guarantee exam outcomes and is not a substitute for studying, attending class, or following your instructor's guidance. You are solely responsible for complying with your institution's academic integrity policies.`),
+          ]},
+          { h:'Subscriptions and billing', blocks:[
+            T(`Nocturne offers a Free tier and paid plans. Paid subscriptions are billed in advance on a recurring basis through our payment processor and renew automatically until cancelled.`),
+            L(`You can cancel at any time; cancellation takes effect at the end of the current billing period`, `Fees are non-refundable except where required by law`, `We may change pricing with reasonable advance notice; changes apply to the next billing period`),
+          ]},
+          { h:'Beta features', blocks:[
+            T(`Some features are offered on a beta basis and are provided "as is" without warranty. Beta features may change, break, or be removed at any time, and may carry usage limits.`),
+          ]},
+          { h:'Disclaimers', blocks:[
+            T(`To the maximum extent permitted by law, Nocturne is provided "as is" and "as available" without warranties of any kind, express or implied, including fitness for a particular purpose and non-infringement. We do not warrant that the service will be uninterrupted or error-free, or that keyword rankings will be accurate or complete.`),
+          ]},
+          { h:'Limitation of liability', blocks:[
+            T(`To the maximum extent permitted by law, Nocturne and its affiliates will not be liable for any indirect, incidental, special, consequential, or punitive damages, or for lost data, lost profits, or content rendered inaccessible due to a lost passphrase or Recovery Kit. Our total liability for any claim relating to the service will not exceed the greater of the amount you paid us in the twelve months before the claim or USD $100.`),
+          ]},
+          { h:'Termination', blocks:[
+            T(`You may stop using Nocturne and delete your account at any time. We may suspend or terminate access if you breach these Terms or use the service in a way that risks harm to others or to the service. On termination, your encrypted content is deleted as described in our Privacy Policy.`),
+          ]},
+          { h:'Governing law', blocks:[
+            T(`These Terms are governed by the laws of the State of California, without regard to its conflict-of-laws rules. Any dispute will be resolved in the state or federal courts located in California, and you consent to their jurisdiction.`),
+          ]},
+          { h:'Changes to these Terms', blocks:[
+            T(`We may update these Terms as the service evolves. We will provide notice of material changes before they take effect. Continued use after changes take effect constitutes acceptance.`),
+          ]},
+          { h:'Contact', blocks:[
+            T(`Questions about these Terms can be sent to legal@nocturne.app.`),
+          ]},
+        ],
+      },
+
+      {
+        id:'cookies', label:'Cookie Policy', tag:'Cookie Policy',
+        subtitle:`The minimal set of cookies and local storage Nocturne relies on — and the tracking we deliberately don't do.`,
+        sections:[
+          { h:'Overview', blocks:[
+            T(`This Cookie Policy explains how Nocturne uses cookies and similar local storage technologies. We take the same minimalist approach here as everywhere else: we use only what is required to sign you in and keep your vault working.`),
+          ]},
+          { h:'Strictly necessary cookies', blocks:[
+            T(`These cookies are essential and cannot be switched off without breaking core functionality:`),
+            L(`nocturne-vault-warm — a short-lived flag (about one hour, SameSite=Strict) indicating your vault has been unlocked this session, so the app doesn't lock you out mid-task`, `Supabase authentication cookies — secure tokens that keep you signed in and authorize requests to your encrypted blobs`),
+            T(`None of these cookies contain your passphrase, your keys, or any decrypted content.`),
+          ]},
+          { h:"What we don't use", blocks:[
+            T(`We do not use advertising cookies, cross-site tracking pixels, or third-party analytics that profile you across the web. We do not sell or share cookie data with advertisers.`),
+          ]},
+          { h:'Local storage and IndexedDB', blocks:[
+            T(`Most of Nocturne's state lives on your device, not in cookies. We use browser local storage and IndexedDB to hold vault metadata, wrapped (encrypted) key material, and cached on-device models. This data stays on your device and is never transmitted in readable form.`),
+          ]},
+          { h:'Managing cookies', blocks:[
+            T(`You can clear or block cookies through your browser settings. Note that clearing Nocturne's cookies or local storage will sign you out and lock your vault — you will need your passphrase to unlock it again. Blocking strictly necessary cookies will prevent the app from functioning.`),
+          ]},
+          { h:'Changes to this policy', blocks:[
+            T(`We will update this policy if our use of cookies changes. The "Last updated" date above reflects the current version.`),
+          ]},
+          { h:'Contact', blocks:[
+            T(`Questions about cookies can be sent to privacy@nocturne.app.`),
+          ]},
+        ],
+      },
+
+      {
+        id:'security', label:'Security', tag:'Security Disclosure',
+        subtitle:`A concrete, technical account of Nocturne's zero-knowledge architecture — what protects your data, and what we can and cannot see.`,
+        sections:[
+          { h:'Our security model', blocks:[
+            T(`Nocturne's privacy guarantees are structural, not promotional. The service is designed so that the server stores data it cannot read. This page documents how that works in concrete terms.`),
+            T(`Your vault passphrase derives the key that wraps your Master Key. That passphrase never leaves your browser, and the Master Key is created so that it can never be exported.`),
+          ]},
+          { h:'Key hierarchy', blocks:[
+            KEYS([
+              { text:`Passphrase`, note:`your memory only` },
+              { text:`↓ PBKDF2 · 310,000 iterations · SHA-256`, arrow:true },
+              { text:`KEK`, note:`memory only, discarded after unwrap` },
+              { text:`↓ AES-KW unwrap`, arrow:true },
+              { text:`Master Key`, note:`non-extractable CryptoKey` },
+              { text:`↓ AES-GCM 256 · unique IV per file`, arrow:true },
+              { text:`Encrypted .bin blob`, note:`stored in Supabase` },
+            ]),
+          ]},
+          { h:'Encryption specifics', blocks:[
+            L(`Key derivation — PBKDF2 with 310,000 iterations and SHA-256, run in a Web Worker so it never blocks or touches the main thread`, `Master Key — an AES-GCM 256 key created with extractable: false, so the browser will not let it be exported by us or anyone`, `File encryption — AES-GCM 256 with a unique initialization vector per file`, `Key wrapping — your Master Key is wrapped with a Key-Encryption Key using AES-KW and unwrapped only in memory`),
+          ]},
+          { h:'On-device processing', blocks:[
+            T(`On the Free tier, Whisper (speech-to-text) and BERT (keyword modeling) run locally in your browser via WebAssembly. Lecture audio and transcript text are never uploaded for this processing.`),
+          ]},
+          { h:'Infrastructure and access controls', blocks:[
+            L(`Row-Level Security is enforced on every database table and storage bucket, so a row is only ever reachable by its owner`, `Encryption in transit (TLS) and at rest across all infrastructure`, `Least-privilege access for our small team, with no path to decrypt user content`, `Encrypted blobs are stored as opaque files with no readable metadata about their contents`),
+          ]},
+          { h:'What we can and cannot see', blocks:[
+            CMP(`Nocturne can see`, [`That an account exists, and its email`, `That an encrypted blob exists, and its size`, `Aggregate, non-identifying usage counts`], `Nocturne can never see`, [`Your passphrase or Recovery Kit`, `Your Master Key`, `The decrypted contents of anything you upload`]),
+          ]},
+          { h:'No backdoor', blocks:[
+            CR(`No password reset exists. There is no backdoor. This is the direct cost of true zero-knowledge encryption: if you lose both your passphrase and your Recovery Kit, no one — including us — can recover your data. We consider that a feature, which is why the Recovery Kit step is built into onboarding.`),
+          ]},
+          { h:'Responsible disclosure', blocks:[
+            T(`We welcome reports from security researchers. If you believe you've found a vulnerability, email security@nocturne.app with details and steps to reproduce. We commit to acknowledging reports promptly, working with you in good faith, and not pursuing legal action for good-faith research that respects user privacy and avoids data destruction.`),
+          ]},
+          { h:'Subprocessors', blocks:[
+            T(`A current list of subprocessors is maintained in our Privacy Policy. Each is limited to the minimal data required to operate the service and never receives decrypted content.`),
+          ]},
+        ],
+      },
+    ]
+  }
+
+  wordsIn(doc){
+    let n = 0
+    for(const s of doc.sections){
+      n += s.h.split(/\s+/).length
+      for(const b of s.blocks){
+        if(b.text) n += b.text.split(/\s+/).length
+        if(b.items) for(const it of b.items) n += it.split(/\s+/).length
+        if(b.can) for(const it of b.can) n += it.split(/\s+/).length
+        if(b.cannot) for(const it of b.cannot) n += it.split(/\s+/).length
+      }
+    }
+    return n
+  }
+
+  renderVals(){
+    const activeId = this.state.activeDoc
+    const doc = this.docs.find(d => d.id === activeId) || this.docs[0]
+
+    // ---- nav styles ----
+    const docs = this.docs.map(d => {
+      const on = d.id === activeId
+      return {
+        label:d.label, id:d.id,
+        onClick: () => this.switchDoc(d.id),
+        tabStyle:{ display:'flex', alignItems:'center', gap:'10px', width:'100%', textAlign:'left', padding:'9px 12px', borderRadius:'8px', fontSize:'14px', fontWeight:500, cursor:'pointer',
+          border:'1px solid ' + (on ? 'rgba(99,102,241,0.32)' : 'transparent'),
+          background: on ? 'rgba(99,102,241,0.12)' : 'transparent',
+          color: on ? '#C7CEF5' : '#94A3B8', transition:'background .2s, color .2s, border-color .2s' },
+        tabDotStyle:{ width:'6px', height:'6px', borderRadius:'50%', flexShrink:0, background: on ? '#818CF8' : '#2D2B45', boxShadow: on ? '0 0 8px rgba(129,140,248,0.7)' : 'none', transition:'background .2s' },
+        chipStyle:{ padding:'8px 14px', borderRadius:'9999px', fontSize:'13px', fontWeight:500, cursor:'pointer',
+          border:'1px solid ' + (on ? 'rgba(99,102,241,0.4)' : '#2D2B45'),
+          background: on ? 'rgba(99,102,241,0.12)' : 'transparent',
+          color: on ? '#C7CEF5' : '#94A3B8' },
+        footStyle:{ background:'none', border:'none', padding:0, cursor:'pointer', fontSize:'12.5px',
+          color: on ? '#A5B4FC' : '#5B6478', transition:'color .2s' },
+      }
+    })
+
+    // ---- sections + blocks ----
+    const sections = doc.sections.map((s, i) => {
+      const num = String(i+1).padStart(2,'0')
+      const domId = doc.id + '-' + i
+      const blocks = s.blocks.map(b => {
+        const base = { isText:false, isSub:false, isList:false, isCalloutIndigo:false, isCalloutRose:false, isKeys:false, isCompare:false }
+        if(b.k === 'text') return { ...base, isText:true, text:b.text }
+        if(b.k === 'sub') return { ...base, isSub:true, text:b.text }
+        if(b.k === 'list') return { ...base, isList:true, items:b.items }
+        if(b.k === 'callout-i') return { ...base, isCalloutIndigo:true, text:b.text }
+        if(b.k === 'callout-r') return { ...base, isCalloutRose:true, text:b.text }
+        if(b.k === 'keys') return { ...base, isKeys:true, lines: b.lines.map(ln => ({ text:ln.text, isArrow:!!ln.arrow, isKey:!ln.arrow, noteParen: ln.note ? '('+ln.note+')' : '' })) }
+        if(b.k === 'compare') return { ...base, isCompare:true, canTitle:b.canTitle, cannotTitle:b.cannotTitle, can:b.can, cannot:b.cannot }
+        return base
+      })
+      return { num, domId, heading:s.h, blocks }
+    })
+
+    // ---- toc ----
+    const activeSection = this.state.activeSection || (sections[0] && sections[0].domId)
+    const toc = sections.map(s => {
+      const on = s.domId === activeSection
+      return {
+        num:s.num, heading:s.heading, domId:s.domId,
+        onClick: () => this.goTo(s.domId),
+        tocStyle:{ display:'flex', gap:'9px', alignItems:'baseline', width:'100%', textAlign:'left', padding:'6px 0 6px 13px', marginLeft:'-1px', cursor:'pointer', background:'none',
+          borderLeft:'2px solid ' + (on ? '#6366F1' : '#191827'),
+          fontSize:'13px', lineHeight:1.4, color: on ? '#E2E8F0' : '#5B6478', transition:'color .2s, border-color .2s' },
+        tocNumStyle:{ fontFamily:"'JetBrains Mono',monospace", fontSize:'10.5px', flexShrink:0, color: on ? '#818CF8' : '#3F485C', transition:'color .2s' },
+      }
+    })
+
+    const mins = Math.max(2, Math.round(this.wordsIn(doc)/200))
+
+    return {
+      mainRef:this.mainRef,
+      activeDoc:activeId,
+      docs, sections, toc,
+      activeTag:doc.tag, activeTitle:doc.label, activeSubtitle:doc.subtitle,
+      effectiveDate:'June 1, 2026', updatedDate:'June 1, 2026',
+      readTime: mins + ' min read',
+    }
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; height:100%; }
+  body { background:#09090F; color:#E2E8F0; font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  ::selection { background:rgba(99,102,241,0.28); color:#E2E8F0; }
+  *::-webkit-scrollbar { width:9px; height:9px; }
+  *::-webkit-scrollbar-track { background:transparent; }
+  *::-webkit-scrollbar-thumb { background:#1E1E2E; border-radius:9999px; }
+  *::-webkit-scrollbar-thumb:hover { background:#2D2B45; }
+  button { font-family:inherit; cursor:pointer; }
+  @keyframes nd-pulse { 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:0.4; transform:scale(0.7);} }
+</style>
+</helmet>
+
+<div style="height:100vh; display:flex; flex-direction:column; background:#09090F; color:#E2E8F0; overflow:hidden;">
+
+  <!-- ===================== TOP BAR ===================== -->
+  <div style="height:54px; flex-shrink:0; display:flex; align-items:center; padding:0 16px; border-bottom:1px solid #16151E; background:#0B0B11;">
+    <!-- left: breadcrumb -->
+    <div style="flex:1; min-width:0; display:flex; align-items:center; gap:11px;">
+      <a href="Vault Dashboard.dc.html" style="width:30px; height:30px; flex-shrink:0; border-radius:8px; border:1px solid #1E1E2E; background:#0D0D14; display:flex; align-items:center; justify-content:center; color:#94A3B8; text-decoration:none;">
+        <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4 L6 9 L11 14"></path></svg>
+      </a>
+      <a href="Vault Dashboard.dc.html" style="font-size:12.5px; color:#5B6478; text-decoration:none; white-space:nowrap;">Vault</a>
+      <span style="color:#2D2B45;">/</span>
+      <span style="font-size:13.5px; font-weight:600; color:#E2E8F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ sessionTitle }}</span>
+      <span style="display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:9999px; border:1px solid rgba(139,92,246,0.3); background:rgba(139,92,246,0.1); flex-shrink:0;">
+        <span style="width:5px; height:5px; border-radius:50%; background:#A78BFA;"></span>
+        <span style="font-size:10.5px; color:#C4B5FD; font-weight:500;">Synced</span>
+      </span>
+    </div>
+
+    <!-- center: mode tabs -->
+    <div style="display:flex; gap:3px; padding:3px; border-radius:10px; border:1px solid #1E1E2E; background:#0D0D14; flex-shrink:0;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <button type="button" onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+
+    <!-- right: search + export -->
+    <div style="flex:1; min-width:0; display:flex; align-items:center; gap:10px; justify-content:flex-end;">
+      <div style="display:flex; align-items:center; gap:8px; height:32px; padding:0 12px; border-radius:8px; border:1px solid #1E1E2E; background:#0D0D14; width:208px;">
+        <span style="color:#3F485C; display:flex; flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"></circle><path d="M12.5 12.5 L16 16"></path></svg></span>
+        <span style="font-size:12px; color:#3F485C; white-space:nowrap;">Search transcript &amp; keywords</span>
+      </div>
+      <button type="button" style="height:32px; padding:0 13px; display:inline-flex; align-items:center; gap:7px; border-radius:8px; border:1px solid #2D2B45; background:transparent; font-size:12.5px; color:#CBD5E1;">
+        <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 V11 M5.5 7.5 L9 11 L12.5 7.5 M3 14 H15"></path></svg>
+        Export
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================== BODY ===================== -->
+  <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+
+    <!-- ======== LECTURE MODE ======== -->
+    <sc-if value="{{ isLecture }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+
+        <!-- row: outline + slide -->
+        <div style="flex:1; min-height:0; display:flex;">
+
+          <!-- outline rail -->
+          <div style="width:170px; flex-shrink:0; border-right:1px solid #16151E; background:#0A0A0F; display:flex; flex-direction:column;">
+            <div style="padding:13px 14px 9px; display:flex; align-items:center; justify-content:space-between;">
+              <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#5B6478;">Outline</span>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#3F485C;">{{ slideTotal }}</span>
+            </div>
+            <div data-outline-scroll style="flex:1; overflow-y:auto; padding:2px 12px 12px; display:flex; flex-direction:column; gap:9px;">
+              <sc-for list="{{ outline }}" as="s" hint-placeholder-count="8">
+                <button type="button" onClick="{{ s.onClick }}" style="{{ s.btnStyle }}">
+                  <div style="{{ s.thumbStyle }}">
+                    <span style="position:absolute; bottom:4px; left:6px; font-family:'JetBrains Mono',monospace; font-size:9px; color:#94A3B8;">{{ s.num }}</span>
+                    <sc-if value="{{ s.hasDot }}" hint-placeholder-val="{{ false }}"><span style="{{ s.dotStyle }}"></span></sc-if>
+                  </div>
+                  <span style="{{ s.titleStyle }}">{{ s.title }}</span>
+                </button>
+              </sc-for>
+            </div>
+            <div style="padding:9px 14px; border-top:1px solid #16151E; display:flex; align-items:center; gap:14px;">
+              <span style="display:flex; align-items:center; gap:6px;"><span style="width:6px; height:6px; border-radius:50%; background:#FB7185;"></span><span style="font-size:10px; color:#7C8398;">Red</span></span>
+              <span style="display:flex; align-items:center; gap:6px;"><span style="width:6px; height:6px; border-radius:50%; background:#FBBF24;"></span><span style="font-size:10px; color:#7C8398;">Likely</span></span>
+            </div>
+          </div>
+
+          <!-- slide hero -->
+          <div style="flex:1; min-width:0; background:#070709; display:flex; flex-direction:column; padding:22px 26px;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px;">
+              <div style="display:flex; align-items:baseline; gap:11px; min-width:0;">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#5B6478;">{{ slideCountLabel }}</span>
+                <span style="font-size:15px; font-weight:600; color:#E2E8F0; letter-spacing:-0.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ curTitleText }}</span>
+              </div>
+              <div style="display:flex; gap:8px; flex-shrink:0;">
+                <button type="button" onClick="{{ onPrev }}" style="width:32px; height:32px; border-radius:8px; border:1px solid #23222F; background:#0D0D14; display:flex; align-items:center; justify-content:center; color:#94A3B8;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4 L6 9 L11 14"></path></svg></button>
+                <button type="button" onClick="{{ onNext }}" style="width:32px; height:32px; border-radius:8px; border:1px solid #23222F; background:#0D0D14; display:flex; align-items:center; justify-content:center; color:#94A3B8;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 L12 9 L7 14"></path></svg></button>
+              </div>
+            </div>
+            <div style="flex:1; min-height:0; position:relative; border-radius:12px; border:1px solid #1B1B27; background:repeating-linear-gradient(135deg,#0e0e16,#0e0e16 13px,#0b0b12 13px,#0b0b12 26px); display:flex; align-items:center; justify-content:center;">
+              <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#3F485C;">rendered slide · {{ curNum }}</span>
+              <sc-if value="{{ curHasZone }}" hint-placeholder-val="{{ true }}">
+                <div style="{{ curZoneChipStyle }}">
+                  <span style="{{ curZoneDotStyle }}"></span>
+                  <span style="font-size:11px; font-weight:500;">{{ curZoneLabel }}</span>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======== UNIFIED TIMELINE SPINE ======== -->
+        <div style="flex-shrink:0; border-top:1px solid #16151E; background:#0A0A0F; padding:13px 26px 15px;">
+          <!-- header row: ribbon toggle + clock -->
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:11px;">
+            <div style="display:flex; gap:3px; padding:3px; border-radius:9px; border:1px solid #1E1E2E; background:#0D0D14;">
+              <button type="button" onClick="{{ onRibbonTranscript }}" style="{{ transToggleStyle }}">Transcript</button>
+              <button type="button" onClick="{{ onRibbonDensity }}" style="{{ densToggleStyle }}">Red Zone density</button>
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#5B6478;">{{ slideCountLabel }} · {{ clockLabel }}</span>
+          </div>
+
+          <!-- ribbon body (swaps) -->
+          <div style="height:62px; margin-bottom:11px;">
+            <!-- transcript -->
+            <sc-if value="{{ ribbonIsTranscript }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex; align-items:center; gap:16px; height:100%;">
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:13.5px; line-height:1.55; color:#7C8398; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                    <sc-for list="{{ tokens }}" as="tok" hint-placeholder-count="14"><span style="{{ tok.style }}">{{ tok.text }}</span></sc-for>
+                  </div>
+                </div>
+                <button type="button" onClick="{{ onPlayFromHere }}" style="flex-shrink:0; display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 13px; border-radius:8px; border:1px solid rgba(99,102,241,0.34); background:rgba(99,102,241,0.1); color:#A5B4FC; font-size:12px;">
+                  <svg width="11" height="11" viewBox="0 0 18 18" fill="#A5B4FC"><path d="M5 3 L14 9 L5 15 Z"></path></svg>
+                  Play from here
+                </button>
+              </div>
+            </sc-if>
+            <!-- density -->
+            <sc-if value="{{ ribbonIsDensity }}" hint-placeholder-val="{{ false }}">
+              <div style="height:100%; display:flex; flex-direction:column; justify-content:flex-end;">
+                <div style="display:flex; align-items:flex-end; gap:2px; height:46px;">
+                  <sc-for list="{{ bars }}" as="b" hint-placeholder-count="12"><div style="{{ b.style }}"></div></sc-for>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+
+          <!-- scrubber -->
+          <div style="display:flex; align-items:center; gap:14px;">
+            <button type="button" onClick="{{ onToggle }}" style="width:38px; height:38px; flex-shrink:0; border-radius:50%; background:#6366F1; display:flex; align-items:center; justify-content:center; color:#09090F; border:none;">
+              <sc-if value="{{ playing }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 18 18" fill="#09090F"><rect x="4" y="3" width="3.4" height="12" rx="1"></rect><rect x="10.6" y="3" width="3.4" height="12" rx="1"></rect></svg></sc-if>
+              <sc-if value="{{ notPlaying }}" hint-placeholder-val="{{ true }}"><svg width="14" height="14" viewBox="0 0 18 18" fill="#09090F"><path d="M5 3 L14 9 L5 15 Z"></path></svg></sc-if>
+            </button>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#94A3B8; flex-shrink:0; width:38px;">{{ curTime }}</span>
+            <div onPointerDown="{{ onTrackDown }}" style="position:relative; flex:1; height:18px; display:flex; align-items:center; cursor:pointer;">
+              <!-- baseline -->
+              <div style="position:absolute; left:0; right:0; height:5px; border-radius:9999px; background:#16151F;"></div>
+              <!-- density tint (always-on faint) -->
+              <div style="position:absolute; left:0; right:0; height:5px; border-radius:9999px; overflow:hidden; display:flex; gap:1px; opacity:0.5;">
+                <sc-for list="{{ tint }}" as="t" hint-placeholder-count="12"><div style="{{ t.style }}"></div></sc-for>
+              </div>
+              <!-- fill -->
+              <div style="{{ fillStyle }}"></div>
+              <!-- slide ticks -->
+              <sc-for list="{{ ticks }}" as="k" hint-placeholder-count="12"><span style="{{ k.style }}"></span></sc-for>
+              <!-- playhead -->
+              <span style="{{ playheadStyle }}"></span>
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#5B6478; flex-shrink:0; width:38px; text-align:right;">{{ totalTime }}</span>
+          </div>
+
+          <div style="margin-top:9px; font-size:11px; color:#3F485C; text-align:center;">Scrub the timeline or pick a slide — audio, transcript and slides stay locked together.</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ======== STUDY MODE ======== -->
+    <sc-if value="{{ isStudy }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+        <!-- study header -->
+        <div style="flex-shrink:0; padding:16px 26px; border-bottom:1px solid #16151E; display:flex; align-items:center; justify-content:space-between; gap:20px;">
+          <div>
+            <div style="display:flex; align-items:baseline; gap:10px;">
+              <h2 style="font-size:18px; font-weight:600; color:#F1F5F9; margin:0; letter-spacing:-0.01em;">Study</h2>
+              <span style="font-size:12px; color:#5B6478;">night-before-the-exam mode</span>
+            </div>
+            <div style="font-size:12.5px; color:#94A3B8; margin-top:5px;">Red Zone focus — <span style="color:#FDA4AF;">{{ redMastered }} of {{ redTotal }}</span> Red Zone keywords mastered</div>
+          </div>
+          <div style="width:200px;">
+            <div style="height:6px; border-radius:9999px; background:#16151F; overflow:hidden;"><div style="{{ overallBarStyle }}"></div></div>
+            <div style="font-size:11px; color:#5B6478; margin-top:6px; text-align:right;">{{ masteredCount }} / {{ totalCount }} mastered</div>
+          </div>
+        </div>
+
+        <div style="flex:1; min-height:0; display:flex;">
+          <!-- left: what to study -->
+          <div style="width:344px; flex-shrink:0; border-right:1px solid #16151E; background:#0A0A0F; display:flex; flex-direction:column;">
+            <div style="padding:15px 16px 11px;">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#5B6478;">What to study</div>
+              <div style="display:flex; gap:6px; margin-top:12px; flex-wrap:wrap;">
+                <sc-for list="{{ studyFilters }}" as="f" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }} <span style="{{ f.countStyle }}">{{ f.count }}</span></button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding:2px 12px 14px; display:flex; flex-direction:column; gap:7px;">
+              <sc-for list="{{ studyList }}" as="k" hint-placeholder-count="6">
+                <button type="button" onClick="{{ k.onClick }}" style="{{ k.rowStyle }}">
+                  <span style="{{ k.zoneBarStyle }}"></span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:12.5px; color:#E2E8F0; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ k.term }}</div>
+                    <div style="display:flex; align-items:center; gap:9px; margin-top:7px;">
+                      <div style="flex:1; height:3px; border-radius:9999px; background:#16151F; overflow:hidden;"><div style="{{ k.masteryBarStyle }}"></div></div>
+                      <span style="font-size:10px; color:#5B6478; white-space:nowrap; width:54px; text-align:right;">{{ k.masteryLabel }}</span>
+                    </div>
+                  </div>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- center: flashcard drill -->
+          <div style="flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:24px 30px; background:#070709;">
+            <sc-if value="{{ hasCards }}" hint-placeholder-val="{{ true }}">
+              <div style="width:100%; max-width:560px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#5B6478;">Flashcard {{ deckPos }} / {{ deckLen }}</span>
+                  <span style="{{ cardZoneChipStyle }}"><span style="{{ cardZoneDotStyle }}"></span>{{ cardZoneLabel }}</span>
+                </div>
+                <div onClick="{{ onFlip }}" style="height:286px; cursor:pointer;">
+                  <div style="{{ cardFaceStyle }}">
+                    <sc-if value="{{ flippedFalse }}" hint-placeholder-val="{{ true }}">
+                      <span style="position:absolute; top:15px; left:17px; font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.08em; text-transform:uppercase; color:#475569;">Question</span>
+                      <div style="font-size:18px; line-height:1.5; color:#E2E8F0; text-align:center;">{{ cardFront }}</div>
+                      <span style="position:absolute; bottom:16px; left:0; right:0; text-align:center; font-size:11px; color:#5B6478;">tap to flip · space</span>
+                    </sc-if>
+                    <sc-if value="{{ flippedTrue }}" hint-placeholder-val="{{ false }}">
+                      <span style="position:absolute; top:15px; left:17px; font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.08em; text-transform:uppercase; color:#818CF8;">Answer · {{ cardTerm }}</span>
+                      <div style="font-size:15.5px; line-height:1.6; color:#CBD5E1; text-align:center;">{{ cardBack }}</div>
+                      <button type="button" onClick="{{ onJumpSlide }}" style="position:absolute; bottom:14px; left:50%; transform:translateX(-50%); display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 12px; border-radius:7px; border:1px solid #2D2B45; background:#0D0D14; color:#A5B4FC; font-size:11.5px; cursor:pointer;">View on slide {{ cardSlide }} →</button>
+                    </sc-if>
+                  </div>
+                </div>
+                <div style="display:flex; gap:9px; margin-top:20px;">
+                  <sc-for list="{{ ratings }}" as="r" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</button>
+                  </sc-for>
+                </div>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-top:15px;">
+                  <button type="button" onClick="{{ onDeckPrev }}" style="height:30px; padding:0 12px; border-radius:8px; border:1px solid #23222F; background:transparent; color:#7C8398; font-size:12px; cursor:pointer;">← Prev</button>
+                  <span style="font-size:11px; color:#3F485C;">How well did you know it?</span>
+                  <button type="button" onClick="{{ onDeckNext }}" style="height:30px; padding:0 12px; border-radius:8px; border:1px solid #23222F; background:transparent; color:#7C8398; font-size:12px; cursor:pointer;">Next →</button>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ noCards }}" hint-placeholder-val="{{ false }}">
+              <div style="text-align:center;">
+                <div style="font-size:15px; color:#94A3B8; margin-bottom:6px;">All caught up</div>
+                <div style="font-size:13px; color:#5B6478;">No cards in this filter — try another.</div>
+              </div>
+            </sc-if>
+          </div>
+
+          <!-- right: progress + export -->
+          <div style="width:300px; flex-shrink:0; border-left:1px solid #16151E; background:#0A0A0F; display:flex; flex-direction:column; padding:24px 20px;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:13px;">
+              <div style="{{ ringStyle }}">
+                <div style="width:80px; height:80px; border-radius:50%; background:#0A0A0F; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                  <span style="font-size:21px; font-weight:600; color:#F1F5F9;">{{ masteredCount }}</span>
+                  <span style="font-size:10px; color:#5B6478;">of {{ totalCount }}</span>
+                </div>
+              </div>
+              <span style="font-size:12px; color:#94A3B8;">keywords mastered</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:22px;">
+              <div style="display:flex; align-items:center; gap:9px;"><span style="width:8px; height:8px; border-radius:50%; background:#2DD4BF;"></span><span style="color:#CBD5E1; flex:1; font-size:12.5px;">Mastered</span><span style="color:#94A3B8; font-family:'JetBrains Mono',monospace; font-size:11.5px;">{{ masteredCount }}</span></div>
+              <div style="display:flex; align-items:center; gap:9px;"><span style="width:8px; height:8px; border-radius:50%; background:#FBBF24;"></span><span style="color:#CBD5E1; flex:1; font-size:12.5px;">Learning</span><span style="color:#94A3B8; font-family:'JetBrains Mono',monospace; font-size:11.5px;">{{ learningCount }}</span></div>
+              <div style="display:flex; align-items:center; gap:9px;"><span style="width:8px; height:8px; border-radius:50%; background:#3F485C;"></span><span style="color:#CBD5E1; flex:1; font-size:12.5px;">Not started</span><span style="color:#94A3B8; font-family:'JetBrains Mono',monospace; font-size:11.5px;">{{ newCount }}</span></div>
+            </div>
+            <div style="margin-top:auto; padding-top:22px;">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#5B6478; margin-bottom:12px;">Export</div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <button type="button" style="height:38px; padding:0 14px; display:flex; align-items:center; gap:10px; border-radius:9px; border:1px solid #2D2B45; background:#0D0D14; color:#CBD5E1; font-size:12.5px; cursor:pointer; text-align:left;"><span style="color:#818CF8; display:flex;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 L16 6 L9 10 L2 6 Z"></path><path d="M2 12 L9 16 L16 12"></path></svg></span>Anki deck<span style="margin-left:auto; color:#475569; font-family:'JetBrains Mono',monospace; font-size:10.5px;">.apkg</span></button>
+                <button type="button" style="height:38px; padding:0 14px; display:flex; align-items:center; gap:10px; border-radius:9px; border:1px solid #2D2B45; background:#0D0D14; color:#CBD5E1; font-size:12.5px; cursor:pointer; text-align:left;"><span style="color:#818CF8; display:flex;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2.5" width="12" height="13" rx="1.5"></rect><path d="M6 6.5 H12 M6 9 H12 M6 11.5 H10"></path></svg></span>CSV<span style="margin-left:auto; color:#475569; font-family:'JetBrains Mono',monospace; font-size:10.5px;">.csv</span></button>
+                <button type="button" style="height:38px; padding:0 14px; display:flex; align-items:center; gap:10px; border-radius:9px; border:1px solid #2D2B45; background:#0D0D14; color:#CBD5E1; font-size:12.5px; cursor:pointer; text-align:left;"><span style="color:#818CF8; display:flex;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5 H11 L15 6.5 V15.5 H4 Z"></path><path d="M11 2.5 V6.5 H15"></path></svg></span>PDF summary<span style="margin-left:auto; color:#475569; font-family:'JetBrains Mono',monospace; font-size:10.5px;">.pdf</span></button>
+              </div>
+              <p style="font-size:11px; line-height:1.5; color:#475569; margin:12px 0 0;">Exports your Red Zone keywords and the flashcards above.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ======== NOTES MODE ======== -->
+    <sc-if value="{{ isNotes }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1; min-height:0; display:flex;">
+        <!-- left: contents -->
+        <div style="width:212px; flex-shrink:0; border-right:1px solid #16151E; background:#0A0A0F; display:flex; flex-direction:column;">
+          <div style="padding:15px 16px 11px; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#5B6478;">Contents</div>
+          <div style="flex:1; overflow-y:auto; padding:0 10px 12px; display:flex; flex-direction:column; gap:2px;">
+            <sc-for list="{{ guideToc }}" as="g" hint-placeholder-count="6">
+              <button type="button" onClick="{{ g.onClick }}" style="{{ g.style }}">
+                <span style="{{ g.numStyle }}">{{ g.num }}</span>
+                <span style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ g.title }}</span>
+                <sc-if value="{{ g.hasZone }}" hint-placeholder-val="{{ false }}"><span style="{{ g.dotStyle }}"></span></sc-if>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- center: study guide -->
+        <div style="flex:1; min-width:0; display:flex; flex-direction:column; background:#070709;">
+          <div style="flex-shrink:0; padding:16px 26px; border-bottom:1px solid #16151E; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+            <div>
+              <h2 style="font-size:18px; font-weight:600; color:#F1F5F9; margin:0; letter-spacing:-0.01em;">Study guide</h2>
+              <div style="font-size:12.5px; color:#5B6478; margin-top:4px;">Auto-generated from your slides &amp; transcript · {{ guideCount }} sections</div>
+            </div>
+            <button type="button" style="height:32px; padding:0 13px; display:inline-flex; align-items:center; gap:7px; border-radius:8px; border:1px solid #2D2B45; background:transparent; color:#CBD5E1; font-size:12.5px; cursor:pointer;">
+              <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5 a6 6 0 1 0 1.2 4"></path><path d="M15.5 2 V6 H11.5"></path></svg>
+              Regenerate
+            </button>
+          </div>
+          <div data-guide-scroll style="flex:1; overflow-y:auto; padding:26px 26px 48px; position:relative;">
+            <div style="max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:30px;">
+              <sc-for list="{{ guideRender }}" as="s" hint-placeholder-count="4">
+                <div data-sec="{{ s.id }}">
+                  <div style="display:flex; align-items:baseline; justify-content:space-between; gap:14px; margin-bottom:13px;">
+                    <h3 style="display:flex; align-items:baseline; gap:10px; font-size:16px; font-weight:600; color:#E2E8F0; margin:0;">
+                      <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#5B6478;">{{ s.num }}</span>
+                      <span>{{ s.title }}</span>
+                      <sc-if value="{{ s.hasZone }}" hint-placeholder-val="{{ false }}"><span style="font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.04em; color:#FDA4AF; border:1px solid rgba(251,113,133,0.34); background:rgba(251,113,133,0.1); padding:2px 7px; border-radius:9999px;">RED ZONE</span></sc-if>
+                    </h3>
+                    <button type="button" onClick="{{ s.onJump }}" style="flex-shrink:0; font-size:12px; color:#818CF8; background:none; border:none; cursor:pointer; white-space:nowrap;">{{ s.slideLabel }} →</button>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:9px;">
+                    <sc-for list="{{ s.points }}" as="p" hint-placeholder-count="2">
+                      <sc-if value="{{ p.rz }}" hint-placeholder-val="{{ false }}">
+                        <div style="{{ p.calloutStyle }}">
+                          <span style="width:3px; border-radius:9999px; background:#FB7185; flex-shrink:0;"></span>
+                          <span style="{{ p.textStyle }}">{{ p.text }}</span>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ p.notRz }}" hint-placeholder-val="{{ true }}">
+                        <div style="display:flex; gap:11px; align-items:flex-start;">
+                          <span style="width:5px; height:5px; border-radius:50%; background:#3F485C; margin-top:8px; flex-shrink:0;"></span>
+                          <span style="{{ p.textStyle }}">{{ p.text }}</span>
+                        </div>
+                      </sc-if>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <!-- right: my notes -->
+        <div style="width:344px; flex-shrink:0; border-left:1px solid #16151E; background:#0A0A0F; display:flex; flex-direction:column;">
+          <div style="padding:16px 18px 13px; border-bottom:1px solid #16151E; display:flex; align-items:baseline; justify-content:space-between;">
+            <span style="font-size:14px; font-weight:600; color:#E2E8F0;">My notes</span>
+            <span style="font-size:11.5px; color:#5B6478;">{{ notesCount }} pinned</span>
+          </div>
+          <!-- composer -->
+          <div style="padding:14px 16px; border-bottom:1px solid #16151E;">
+            <textarea value="{{ noteDraft }}" onChange="{{ onDraft }}" placeholder="Add a note…" style="width:100%; min-height:62px; resize:none; box-sizing:border-box; border-radius:9px; border:1px solid #1E1E2E; background:#0D0D14; color:#E2E8F0; font-size:13px; line-height:1.5; padding:10px 11px; outline:none;"></textarea>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+              <div style="display:flex; align-items:center; gap:5px;">
+                <button type="button" onClick="{{ onPinPrev }}" style="width:24px; height:24px; border-radius:6px; border:1px solid #23222F; background:#0D0D14; color:#7C8398; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;">◀</button>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#A5B4FC; border:1px solid rgba(99,102,241,0.26); background:rgba(99,102,241,0.07); padding:4px 9px; border-radius:7px; white-space:nowrap;">{{ composerPinLabel }}</span>
+                <button type="button" onClick="{{ onPinNext }}" style="width:24px; height:24px; border-radius:6px; border:1px solid #23222F; background:#0D0D14; color:#7C8398; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;">▶</button>
+              </div>
+              <button type="button" onClick="{{ onAddNote }}" style="{{ addBtnStyle }}">Add</button>
+            </div>
+          </div>
+          <!-- list -->
+          <div style="flex:1; overflow-y:auto; padding:13px 16px; display:flex; flex-direction:column; gap:10px;">
+            <sc-for list="{{ notesList }}" as="n" hint-placeholder-count="3">
+              <div style="border:1px solid #1B1B25; background:#0D0D13; border-radius:10px; padding:11px 12px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                  <button type="button" onClick="{{ n.onJump }}" style="display:inline-flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#A5B4FC; border:1px solid rgba(99,102,241,0.26); background:rgba(99,102,241,0.07); padding:3px 8px; border-radius:7px; cursor:pointer; white-space:nowrap;">
+                    <svg width="10" height="10" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 C5.5 2 4 4.5 4 7 C4 10.5 9 16 9 16 C9 16 14 10.5 14 7 C14 4.5 12.5 2 9 2 Z"></path><circle cx="9" cy="7" r="1.6"></circle></svg>
+                    {{ n.pinLabel }}
+                  </button>
+                  <button type="button" onClick="{{ n.onDelete }}" style="width:22px; height:22px; flex-shrink:0; border-radius:6px; border:none; background:none; color:#475569; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                    <svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 5 L13 13 M13 5 L5 13"></path></svg>
+                  </button>
+                </div>
+                <div style="font-size:12.5px; line-height:1.55; color:#CBD5E1;">{{ n.text }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ======== ASK MODE ======== -->
+    <sc-if value="{{ isAsk }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+        <div style="flex-shrink:0; padding:16px 26px; border-bottom:1px solid #16151E; display:flex; align-items:baseline; gap:10px;">
+          <h2 style="font-size:18px; font-weight:600; color:#F1F5F9; margin:0; letter-spacing:-0.01em;">Ask</h2>
+          <span style="font-size:12.5px; color:#5B6478;">grounded Q&amp;A over this lecture</span>
+        </div>
+
+        <!-- thread -->
+        <div data-ask-scroll style="flex:1; min-height:0; overflow-y:auto; padding:24px;">
+          <div style="max-width:720px; margin:0 auto;">
+            <!-- empty state -->
+            <sc-if value="{{ askEmpty }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:36px 0 10px; text-align:center;">
+                <div style="width:52px; height:52px; margin:0 auto 18px; border-radius:14px; border:1px solid #23222F; background:#0D0D14; display:flex; align-items:center; justify-content:center; color:#A5B4FC;">
+                  <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5 h14 a1.5 1.5 0 0 1 1.5 1.5 v7 a1.5 1.5 0 0 1 -1.5 1.5 h-8 l-4 3 v-3 h-2 a1.5 1.5 0 0 1 -1.5 -1.5 v-7 a1.5 1.5 0 0 1 1.5 -1.5 Z"></path></svg>
+                </div>
+                <h3 style="font-size:18px; font-weight:600; color:#F1F5F9; margin:0 0 9px;">Ask this lecture anything</h3>
+                <p style="font-size:13.5px; line-height:1.65; color:#94A3B8; margin:0 auto; max-width:430px;">Answers are grounded in this lecture's transcript and slides — every claim cites the slide and timestamp it came from, and you can jump straight there.</p>
+                <div style="display:flex; flex-direction:column; gap:9px; margin:24px auto 0; max-width:480px;">
+                  <sc-for list="{{ askSuggestions }}" as="s" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ s.onClick }}" style="display:flex; align-items:center; gap:11px; text-align:left; padding:12px 15px; border-radius:11px; border:1px solid #1E1E2E; background:#0C0C12; color:#CBD5E1; font-size:13px; cursor:pointer;">
+                      <span style="color:#5B6478; display:flex; flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="7"></circle><path d="M7 7 a2 2 0 1 1 2.4 2 c-0.7 0.3 -0.9 0.7 -0.9 1.4 M9 13 h0.01"></path></svg></span>
+                      {{ s.label }}
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- conversation -->
+            <sc-if value="{{ askNotEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; flex-direction:column; gap:16px;">
+                <sc-for list="{{ askThread }}" as="m" hint-placeholder-count="2">
+                  <div style="{{ m.rowStyle }}">
+                    <div style="{{ m.bubbleStyle }}">
+                      <div style="{{ m.textStyle }}">{{ m.text }}</div>
+                      <sc-if value="{{ m.hasCites }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:11px; padding-top:11px; border-top:1px solid #1B1B25;">
+                          <span style="font-family:'JetBrains Mono',monospace; font-size:9.5px; text-transform:uppercase; letter-spacing:0.06em; color:#475569;">Sources</span>
+                          <sc-for list="{{ m.cites }}" as="c" hint-placeholder-count="1">
+                            <button type="button" onClick="{{ c.onJump }}" style="display:inline-flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#A5B4FC; border:1px solid rgba(99,102,241,0.26); background:rgba(99,102,241,0.07); padding:3px 9px; border-radius:7px; cursor:pointer; white-space:nowrap;">
+                              <svg width="10" height="10" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 C5.5 2 4 4.5 4 7 C4 10.5 9 16 9 16 C9 16 14 10.5 14 7 C14 4.5 12.5 2 9 2 Z"></path><circle cx="9" cy="7" r="1.6"></circle></svg>
+                              {{ c.label }}
+                            </button>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ asking }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; justify-content:flex-start;">
+                    <div style="padding:14px 16px; border-radius:14px 14px 14px 4px; background:#0D0D13; border:1px solid #1B1B25; display:flex; gap:5px; align-items:center;">
+                      <span style="width:6px; height:6px; border-radius:50%; background:#5B6478; animation:nd-pulse 1s ease-in-out infinite;"></span>
+                      <span style="width:6px; height:6px; border-radius:50%; background:#5B6478; animation:nd-pulse 1s ease-in-out infinite; animation-delay:0.15s;"></span>
+                      <span style="width:6px; height:6px; border-radius:50%; background:#5B6478; animation:nd-pulse 1s ease-in-out infinite; animation-delay:0.3s;"></span>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <!-- composer -->
+        <div style="flex-shrink:0; border-top:1px solid #16151E; padding:14px 24px 16px; background:#0A0A0F;">
+          <div style="max-width:720px; margin:0 auto;">
+            <div style="display:flex; gap:9px; align-items:flex-end; border:1px solid #1E1E2E; background:#0D0D14; border-radius:12px; padding:7px 7px 7px 14px;">
+              <textarea value="{{ askDraft }}" onChange="{{ onAskDraft }}" onKeyDown="{{ onAskKey }}" placeholder="Ask about this lecture…" rows="1" style="flex:1; resize:none; border:none; background:transparent; color:#E2E8F0; font-size:13.5px; line-height:1.5; outline:none; padding:7px 0; max-height:120px;"></textarea>
+              <button type="button" onClick="{{ onAskSend }}" style="{{ askSendStyle }}">
+                <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 V4 M4.5 8.5 L9 4 L13.5 8.5"></path></svg>
+              </button>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:9px;">
+              <span style="font-size:11px; color:#3F485C;">Grounded in this lecture · every answer cites its slide &amp; timestamp.</span>
+              <sc-if value="{{ askHasMessages }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ onClearAsk }}" style="font-size:11.5px; color:#5B6478; background:none; border:none; cursor:pointer;">Clear</button></sc-if>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  duration = 2830000;
+  slides = [
+    { n:1,  startMs:0,        density:0.12, zone:null,     title:'Course roadmap & ATP basics',           t:"Today we'll walk the whole pathway, from glucose all the way to pyruvate, and account for every ATP along the way.", terms:[] },
+    { n:2,  startMs:150000,   density:0.22, zone:null,     title:'Glucose: structure & priming',           t:"Glucose gets primed right here — notice the phosphate group locking it inside the cell.", terms:[] },
+    { n:3,  startMs:330000,   density:0.34, zone:'likely', title:'Step 1 — Hexokinase',                    t:"Hexokinase catalyzes the first committed step, trapping glucose as glucose-6-phosphate.", terms:['Hexokinase'] },
+    { n:4,  startMs:520000,   density:0.46, zone:'likely', title:'The energy investment phase',            t:"We spend two ATP up front — think of this as the investment phase, before any payoff.", terms:['two ATP'] },
+    { n:5,  startMs:730000,   density:0.30, zone:'likely', title:'Glyceraldehyde-3-phosphate',             t:"From here the three-carbon sugars are interconverted and readied for oxidation.", terms:[] },
+    { n:6,  startMs:920000,   density:0.55, zone:'likely', title:'The payoff phase begins',                t:"Now the payoff phase begins, and this is where the cell finally starts earning energy back.", terms:[] },
+    { n:7,  startMs:1104000,  density:0.95, zone:'red',    title:'Step 3 — PFK-1, the rate-limiting step', t:"The key regulatory step is catalyzed by phosphofructokinase, and this is exactly what I want you to remember for the exam.", terms:['phosphofructokinase','exam'] },
+    { n:8,  startMs:1350000,  density:0.72, zone:'red',    title:'Net ATP yield accounting',               t:"So the net ATP yield from glycolysis is two — this number shows up on the test every single year.", terms:['net ATP yield','test'] },
+    { n:9,  startMs:1630000,  density:0.40, zone:'likely', title:'Pyruvate & the link reaction',           t:"Pyruvate is then converted by the link reaction, feeding carbon into the next cycle.", terms:['link reaction'] },
+    { n:10, startMs:1980000,  density:0.33, zone:'likely', title:'Entering the citric acid cycle',         t:"Acetyl-CoA enters the citric acid cycle, and the carbons begin their full oxidation.", terms:['citric acid cycle'] },
+    { n:11, startMs:2360000,  density:0.60, zone:'likely', title:'NADH / FADH2 harvest',                   t:"Each turn harvests NADH and FADH2 — the real energy currency headed for the electron transport chain.", terms:['NADH','FADH2'] },
+    { n:12, startMs:2640000,  density:0.26, zone:null,     title:'Summary & exam focus',                   t:"For the exam, focus on the regulated steps and the final ATP tally — that's where the points are.", terms:['exam','ATP tally'] },
+  ];
+  studySeed = [
+    { id:1,  zone:'red',    mastery:2, slides:[7],   term:'Phosphofructokinase (PFK-1)', front:'Which enzyme catalyzes the rate-limiting step of glycolysis?', back:'Phosphofructokinase-1 (PFK-1) — it converts fructose-6-phosphate to fructose-1,6-bisphosphate.' },
+    { id:2,  zone:'red',    mastery:3, slides:[8],   term:'Net ATP yield', front:'What is the net ATP yield of glycolysis per glucose?', back:'2 ATP — four are produced and two are invested in the early steps.' },
+    { id:3,  zone:'red',    mastery:1, slides:[6,8], term:'Substrate-level phosphorylation', front:'How is ATP generated directly during glycolysis?', back:'By substrate-level phosphorylation — a phosphate is transferred straight from a substrate to ADP.' },
+    { id:4,  zone:'likely', mastery:2, slides:[3],   term:'Hexokinase', front:'What enzyme catalyzes the very first step of glycolysis?', back:'Hexokinase — it phosphorylates glucose to glucose-6-phosphate.' },
+    { id:5,  zone:'likely', mastery:0, slides:[9],   term:'Pyruvate', front:'What is the end product of glycolysis?', back:'Two molecules of pyruvate (three carbons each) per glucose.' },
+    { id:6,  zone:'red',    mastery:0, slides:[11],  term:'NADH', front:'How many NADH are produced per glucose in glycolysis?', back:'2 NADH, formed at the glyceraldehyde-3-phosphate dehydrogenase step.' },
+    { id:7,  zone:'likely', mastery:1, slides:[3],   term:'Glucose-6-phosphate', front:'What keeps glucose trapped inside the cell?', back:'Phosphorylation to glucose-6-phosphate, which cannot cross the membrane.' },
+    { id:8,  zone:'likely', mastery:0, slides:[4],   term:'Energy investment phase', front:'What happens during the energy investment phase?', back:'Two ATP are spent to phosphorylate and destabilize glucose.' },
+    { id:9,  zone:'likely', mastery:0, slides:[6],   term:'Energy payoff phase', front:'What happens during the payoff phase?', back:'4 ATP and 2 NADH are produced — the net energy gain begins here.' },
+    { id:10, zone:'likely', mastery:2, slides:[10],  term:'Citric acid cycle', front:'Where do the carbons from pyruvate go next?', back:'Into the citric acid cycle, as acetyl-CoA, for full oxidation.' },
+    { id:11, zone:'likely', mastery:0, slides:[11],  term:'FADH2', front:'Which electron carrier feeds complex II of the chain?', back:'FADH2 — it delivers electrons to the electron transport chain.' },
+    { id:12, zone:'red',    mastery:1, slides:[7],   term:'Rate-limiting step', front:'Which step commits glucose irreversibly to glycolysis?', back:'The PFK-1 step — the committed, rate-limiting reaction of the pathway.' },
+  ];
+  state = { currentMs: 1104000, playing:false, tab:'lecture', ribbon:'transcript', studyFilter:'all', studySelectedId:1, flipped:false, studyItems:null, notesItems:null, noteDraft:'', notePinSlide:null, activeSec:0, askMessages:null, askDraft:'', asking:false };
+  askBank = [
+    { a:"The rate-limiting step is the reaction catalyzed by phosphofructokinase-1 (PFK-1), converting fructose-6-phosphate to fructose-1,6-bisphosphate. It is the committed, irreversible step and the pathway's main regulatory point — your lecture flagged it as the single most important thing to know.", cites:[7,12], terms:['rate','limiting','pfk','phosphofructokinase','regulat','committed','irreversible'] },
+    { a:"Glycolysis nets 2 ATP per glucose: four are produced by substrate-level phosphorylation in the payoff phase, minus the two invested up front. It also yields 2 NADH.", cites:[4,8], terms:['atp','yield','net','how many atp','energy gain'] },
+    { a:"Glycolysis itself produces 2 NADH, at the glyceraldehyde-3-phosphate dehydrogenase step. FADH2 is not made in glycolysis — it comes later in the citric acid cycle. Both carriers ultimately feed the electron transport chain.", cites:[8,11], terms:['nadh','fadh','electron carrier','reducing'] },
+    { a:"Hexokinase catalyzes the first step, phosphorylating glucose to glucose-6-phosphate. The added charge traps the molecule inside the cell, since it can no longer cross the membrane.", cites:[3], terms:['hexokinase','first step','glucose-6','trap'] },
+    { a:"Each glucose is split into two pyruvate (three carbons each), plus a net 2 ATP and 2 NADH. The pyruvate then moves to the link reaction and on into the citric acid cycle.", cites:[1,9], terms:['product','pyruvate','end product','output','what does glycolysis produce'] },
+    { a:"The investment phase spends 2 ATP to phosphorylate and destabilize glucose; the payoff phase then generates 4 ATP and 2 NADH, for a net gain of 2 ATP. The payoff begins once the six-carbon sugar is split.", cites:[4,6], terms:['investment','payoff','phase','difference'] },
+    { a:"Your Red Zone keywords — terms that appear in your study guide AND were emphasized in lecture — center on PFK-1 / the rate-limiting step, the net ATP yield, substrate-level phosphorylation, and NADH. Those are the highest-priority items to study.", cites:[7,8], terms:['red zone','what to study','focus','most important','study for the exam'] },
+  ];
+  askSuggestions = [
+    'What is the rate-limiting step of glycolysis?',
+    'What is the net ATP yield, and why?',
+    'What counts as the Red Zone for this lecture?',
+    'What are the products of glycolysis?',
+  ];
+  guideSections = [
+    { id:0, title:'What glycolysis does', slide:1, zone:null, points:[
+      { text:'Splits one glucose (6C) into two pyruvate (3C) in the cytoplasm — no oxygen required.', rz:false },
+      { text:'Net output per glucose: 2 ATP and 2 NADH.', rz:true },
+    ] },
+    { id:1, title:'Energy investment phase', slide:3, zone:null, points:[
+      { text:'Two ATP are spent up front to phosphorylate and destabilize glucose.', rz:false },
+      { text:'Hexokinase traps glucose as glucose-6-phosphate, which cannot leave the cell.', rz:true },
+    ] },
+    { id:2, title:'The rate-limiting step — PFK-1', slide:7, zone:'red', points:[
+      { text:'Phosphofructokinase-1 converts fructose-6-phosphate to fructose-1,6-bisphosphate.', rz:true },
+      { text:'This is the committed, irreversible step and the main regulatory point of the pathway.', rz:true },
+      { text:'Heavily emphasized in lecture — expect an exam question here.', rz:false },
+    ] },
+    { id:3, title:'Energy payoff phase', slide:8, zone:'red', points:[
+      { text:'Substrate-level phosphorylation produces 4 ATP (gross).', rz:true },
+      { text:'Glyceraldehyde-3-phosphate dehydrogenase yields 2 NADH.', rz:true },
+      { text:'Net ATP yield = 4 produced minus 2 invested = 2 ATP.', rz:true },
+    ] },
+    { id:4, title:'Products and what comes next', slide:9, zone:null, points:[
+      { text:'Two pyruvate move to the link reaction, forming acetyl-CoA.', rz:false },
+      { text:'Acetyl-CoA enters the citric acid cycle for full oxidation.', rz:false },
+      { text:'NADH and FADH2 carry electrons to the electron transport chain.', rz:false },
+    ] },
+    { id:5, title:'Exam focus', slide:12, zone:'red', points:[
+      { text:'Know the regulated steps (especially PFK-1) and the final ATP tally.', rz:true },
+      { text:'Be able to trace the carbons from glucose all the way to pyruvate.', rz:false },
+    ] },
+  ];
+  notesSeed = [
+    { id:'n1', slide:7,  timeMs:1104000, text:'PFK-1 is THE rate-limiting step — prof flagged this as the #1 exam item.' },
+    { id:'n2', slide:8,  timeMs:1350000, text:'Net ATP = 2. Remember the 2 invested up front (gross 4 minus 2).' },
+    { id:'n3', slide:11, timeMs:2360000, text:'NADH vs FADH2 — which complex does each feed? Cross-check the ETC notes.' },
+  ];
+
+  filterItems(items, f){
+    if(f === 'red') return items.filter(i => i.zone === 'red');
+    if(f === 'likely') return items.filter(i => i.zone === 'likely');
+    if(f === 'needs') return items.filter(i => i.mastery < 2);
+    return items;
+  }
+  setStudyFilter(f){ const items = this.state.studyItems || this.studySeed; const filt = this.filterItems(items, f); this.setState({ studyFilter:f, flipped:false, studySelectedId: filt.length ? filt[0].id : null }); }
+  flipCard(){ this.setState(s => ({ flipped: !s.flipped })); }
+  selectStudy(id){ this.setState({ studySelectedId:id, flipped:false }); }
+  rateCard(lvl){ this.setState(s => { const base = s.studyItems || this.studySeed; const items = base.map(it => it.id === s.studySelectedId ? { ...it, mastery:lvl } : it); const filt = this.filterItems(base, s.studyFilter); const i = filt.findIndex(x => x.id === s.studySelectedId); const next = filt[i+1]; return { studyItems:items, studySelectedId: next ? next.id : s.studySelectedId, flipped:false }; }); }
+  deckNav(dir){ this.setState(s => { const base = s.studyItems || this.studySeed; const filt = this.filterItems(base, s.studyFilter); if(!filt.length) return {}; const i = filt.findIndex(x => x.id === s.studySelectedId); const ni = Math.max(0, Math.min(filt.length-1, i+dir)); return { studySelectedId: filt[ni].id, flipped:false }; }); }
+  jumpToSlideNum(n){ const i = this.slides.findIndex(s => s.n === n); if(i >= 0) this.setState({ tab:'lecture', currentMs:this.slides[i].startMs, flipped:false }); }
+
+  pinSlideNum(){ return this.state.notePinSlide || (this.idx() + 1); }
+  stepPin(dir){ const cur = this.pinSlideNum(); this.setState({ notePinSlide: Math.max(1, Math.min(this.slides.length, cur + dir)) }); }
+  setNoteDraft(e){ this.setState({ noteDraft: e.target.value }); }
+  addNote(){ const d = (this.state.noteDraft || '').trim(); if(!d) return; const slide = this.pinSlideNum(); const sl = this.slides.find(s => s.n === slide); const note = { id:'n'+Date.now(), slide, timeMs: sl ? sl.startMs : 0, text:d }; this.setState(s => ({ notesItems: [ ...(s.notesItems || this.notesSeed), note ], noteDraft:'', notePinSlide:null })); }
+  deleteNote(id){ this.setState(s => ({ notesItems: (s.notesItems || this.notesSeed).filter(n => n.id !== id) })); }
+  scrollToSection(i){ this.setState({ activeSec:i }); const el = document.querySelector('[data-guide-scroll]'); const sec = el && el.querySelector('[data-sec="'+i+'"]'); if(el && sec) el.scrollTop = sec.offsetTop - 14; }
+
+  ensureAskScroll(){ const el = document.querySelector('[data-ask-scroll]'); if(!el) return; const c = (this.state.askMessages||[]).length + (this.state.asking?1:0); if(c === this._lastAskCount) return; this._lastAskCount = c; el.scrollTop = el.scrollHeight; }
+  setAskDraft(e){ this.setState({ askDraft: e.target.value }); }
+  onAskKey(e){ if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); this.sendAsk(); } }
+  clearAsk(){ this.setState({ askMessages:[], asking:false }); }
+  answerFor(query){
+    const q = query.toLowerCase();
+    let best = null, bestScore = 0;
+    for(const item of this.askBank){ let sc = 0; for(const t of item.terms){ if(q.includes(t)) sc++; } if(sc > bestScore){ bestScore = sc; best = item; } }
+    if(best && bestScore > 0) return { text:best.a, cites:best.cites };
+    const words = q.split(/[^a-z0-9]+/).filter(w => w.length > 3);
+    const hits = this.slides.filter(s => { const hay = (s.title+' '+s.t+' '+(s.terms||[]).join(' ')).toLowerCase(); return words.some(w => hay.includes(w)); });
+    if(hits.length) return { text:'From the lecture: ' + hits[0].t, cites: hits.slice(0,2).map(s => s.n) };
+    return { text:"I could not find that in this lecture's transcript. Try asking about the glycolysis steps, the net ATP yield, PFK-1, or the Red Zone keywords.", cites:[] };
+  }
+  sendAsk(text){
+    const q = (text != null ? text : (this.state.askDraft || '')).trim();
+    if(!q || this.state.asking) return;
+    this.setState(s => ({ askMessages: [ ...(s.askMessages||[]), { role:'user', text:q } ], askDraft:'', asking:true }));
+    if(this._askTimer) clearTimeout(this._askTimer);
+    this._askTimer = setTimeout(() => { const ans = this.answerFor(q); this.setState(s => ({ askMessages: [ ...(s.askMessages||[]), { role:'assistant', text:ans.text, cites:ans.cites } ], asking:false })); }, 750);
+  }
+
+  ensureOutlineVisible(){
+    const el = document.querySelector('[data-outline-scroll]');
+    if(!el) return;
+    const item = el.children[this.idx()];
+    if(!item) return;
+    const top = item.offsetTop, bot = top + item.clientHeight;
+    if(top < el.scrollTop || bot > el.scrollTop + el.clientHeight){
+      el.scrollTop = top - el.clientHeight/2 + item.clientHeight/2;
+    }
+  }
+  componentDidUpdate(){ this.ensureOutlineVisible(); this.ensureAskScroll(); }
+
+  componentDidMount(){
+    this.ensureOutlineVisible();
+    this.kh = (e) => {
+      const tag = (e.target && e.target.tagName) || '';
+      if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if(this.state.tab === 'study'){
+        if(e.key === ' '){ e.preventDefault(); this.flipCard(); }
+        else if(e.key === 'ArrowLeft'){ e.preventDefault(); this.deckNav(-1); }
+        else if(e.key === 'ArrowRight'){ e.preventDefault(); this.deckNav(1); }
+        return;
+      }
+      if(this.state.tab !== 'lecture') return;
+      if(e.key === ' '){ e.preventDefault(); this.toggle(); }
+      else if(e.key === 'ArrowLeft'){ e.preventDefault(); this.seek(this.state.currentMs - 5000); }
+      else if(e.key === 'ArrowRight'){ e.preventDefault(); this.seek(this.state.currentMs + 5000); }
+      else if(e.key === '['){ e.preventDefault(); this.prev(); }
+      else if(e.key === ']'){ e.preventDefault(); this.next(); }
+    };
+    window.addEventListener('keydown', this.kh);
+  }
+  componentWillUnmount(){ this.pause(); if(this.kh) window.removeEventListener('keydown', this.kh); if(this._askTimer) clearTimeout(this._askTimer); }
+
+  fmt(ms){ const s = Math.max(0, Math.round(ms/1000)); const m = Math.floor(s/60); const ss = String(s%60).padStart(2,'0'); return m + ':' + ss; }
+  pad2(n){ return String(n).padStart(2,'0'); }
+  idx(){ let i = 0; for(let k=0;k<this.slides.length;k++){ if(this.slides[k].startMs <= this.state.currentMs) i = k; } return i; }
+  seek(ms){ this.setState({ currentMs: Math.max(0, Math.min(this.duration, ms)) }); }
+  gotoSlide(i){ this.seek(this.slides[i].startMs); }
+  prev(){ const i = this.idx(); if(i > 0) this.gotoSlide(i-1); }
+  next(){ const i = this.idx(); if(i < this.slides.length-1) this.gotoSlide(i+1); }
+
+  play(){ if(this.timer) return; this.setState({ playing:true }); this.timer = setInterval(() => { this.setState(st => { let n = st.currentMs + 500; if(n >= this.duration){ this.pause(); return { currentMs:this.duration }; } return { currentMs:n }; }); }, 250); }
+  pause(){ if(this.timer){ clearInterval(this.timer); this.timer = null; } this.setState({ playing:false }); }
+  toggle(){ if(this.timer) this.pause(); else this.play(); }
+
+  onTrackDown(e){
+    const r = e.currentTarget.getBoundingClientRect();
+    this._rect = r;
+    const apply = (x) => { let f = (x - r.left) / r.width; f = Math.max(0, Math.min(1, f)); this.setState({ currentMs: f * this.duration }); };
+    apply(e.clientX);
+    const mv = (ev) => apply(ev.clientX);
+    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+  }
+
+  tokenize(text, terms){
+    if(!terms || !terms.length) return [{ text, rz:false }];
+    const esc = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const re = new RegExp('(' + esc.join('|') + ')', 'gi');
+    return text.split(re).filter(p => p !== '').map(p => ({ text:p, rz: terms.some(t => t.toLowerCase() === p.toLowerCase()) }));
+  }
+
+  renderVals(){
+    const idx = this.idx();
+    const cur = this.slides[idx];
+    const dur = this.duration;
+    const phPct = (this.state.currentMs / dur) * 100;
+
+    // mode tabs
+    const tabDefs = [ ['lecture','Lecture'], ['study','Study'], ['notes','Notes'], ['ask','Ask'] ];
+    const tabs = tabDefs.map(([id,label]) => ({ label, onClick: () => this.setState({ tab:id }),
+      style: { padding:'6px 15px', borderRadius:'7px', fontSize:'12.5px', fontWeight: this.state.tab===id ? 600 : 400, color: this.state.tab===id ? '#E2E8F0' : '#7C8398', background: this.state.tab===id ? '#1C1B28' : 'transparent', border:'none' } }));
+
+    // outline
+    const dotColor = (z) => z === 'red' ? '#FB7185' : z === 'likely' ? '#FBBF24' : null;
+    const outline = this.slides.map((s,i) => {
+      const active = i === idx;
+      const dc = dotColor(s.zone);
+      return {
+        num: this.pad2(s.n), title: s.title, hasDot: !!dc,
+        onClick: () => this.gotoSlide(i),
+        btnStyle: { display:'flex', flexDirection:'column', gap:'6px', padding:'0', background:'none', border:'none', textAlign:'left', width:'100%' },
+        thumbStyle: { position:'relative', height:'42px', borderRadius:'7px', border: active ? '1.5px solid #6366F1' : '1px solid #1E1E2E', background: active ? 'repeating-linear-gradient(135deg,#14141f,#14141f 7px,#101019 7px,#101019 14px)' : 'repeating-linear-gradient(135deg,#0e0e16,#0e0e16 7px,#0c0c12 7px,#0c0c12 14px)', boxShadow: active ? '0 0 0 3px rgba(99,102,241,0.14)' : 'none' },
+        dotStyle: { position:'absolute', top:'5px', right:'5px', width:'7px', height:'7px', borderRadius:'50%', background: dc, boxShadow: s.zone==='red' ? '0 0 7px rgba(251,113,133,0.7)' : 'none' },
+        titleStyle: { fontSize:'11px', lineHeight:1.3, color: active ? '#CBD5E1' : '#5B6478', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', paddingLeft:'2px' },
+      };
+    });
+
+    // current slide zone chip
+    const zoneMeta = cur.zone === 'red'
+      ? { label:'Red Zone · high density', color:'#FDA4AF', bd:'rgba(251,113,133,0.34)', bg:'rgba(251,113,133,0.1)', dot:'#FB7185' }
+      : cur.zone === 'likely'
+      ? { label:'Likely Zone', color:'#FCD34D', bd:'rgba(251,191,36,0.3)', bg:'rgba(251,191,36,0.08)', dot:'#FBBF24' }
+      : null;
+
+    // ribbon transcript tokens
+    const tokens = this.tokenize(cur.t, cur.terms).map(p => ({ text:p.text,
+      style: p.rz ? { color:'#FDA4AF', background:'rgba(251,113,133,0.12)', padding:'1px 5px', borderRadius:'4px' } : { color:'#7C8398' } }));
+
+    // density bars + scrubber tint + ticks
+    const barColor = (d, active) => active ? 'rgba(251,113,133,' + (0.55 + 0.4*d).toFixed(2) + ')' : 'rgba(251,113,133,' + (0.14 + 0.45*d).toFixed(2) + ')';
+    const bars = this.slides.map((s,i) => {
+      const next = this.slides[i+1]; const segDur = (next ? next.startMs : dur) - s.startMs;
+      return { style: { flex: segDur, height: (12 + s.density*88) + '%', borderRadius:'2px 2px 0 0', background: barColor(s.density, i===idx), transition:'background .2s' } };
+    });
+    const tint = this.slides.map((s,i) => { const next = this.slides[i+1]; const segDur = (next ? next.startMs : dur) - s.startMs; return { style: { flex: segDur, height:'100%', background: 'rgba(251,113,133,' + (0.12 + 0.5*s.density).toFixed(2) + ')' } }; });
+    const ticks = this.slides.map(s => ({ style: { position:'absolute', left: (s.startMs/dur*100) + '%', top:'50%', transform:'translateY(-50%)', width:'1px', height:'12px', background:'#2D2B45', pointerEvents:'none' } }));
+
+    // ===== STUDY MODE =====
+    const sItems = this.state.studyItems || this.studySeed;
+    const total = sItems.length;
+    const masteredCount = sItems.filter(i => i.mastery >= 2).length;
+    const learningCount = sItems.filter(i => i.mastery === 1).length;
+    const newCount = sItems.filter(i => i.mastery === 0).length;
+    const redTotal = sItems.filter(i => i.zone === 'red').length;
+    const redMastered = sItems.filter(i => i.zone === 'red' && i.mastery >= 2).length;
+    const overallPct = total ? (masteredCount/total*100) : 0;
+
+    const filterDefs = [ ['all','All'], ['red','Red Zone'], ['likely','Likely'], ['needs','Needs work'] ];
+    const filterCount = { all: total, red: redTotal, likely: sItems.filter(i=>i.zone==='likely').length, needs: sItems.filter(i=>i.mastery<2).length };
+    const studyFilters = filterDefs.map(([id,label]) => { const on = this.state.studyFilter === id; return { label, count: String(filterCount[id]), onClick: () => this.setStudyFilter(id),
+      style: { display:'inline-flex', alignItems:'center', gap:'6px', padding:'5px 11px', borderRadius:'9999px', fontSize:'11.5px', cursor:'pointer', whiteSpace:'nowrap', border:'1px solid '+(on?'rgba(99,102,241,0.5)':'#23222F'), background:on?'rgba(99,102,241,0.14)':'#0D0D14', color:on?'#C7CCF8':'#7C8398' },
+      countStyle: { fontFamily:"'JetBrains Mono',monospace", fontSize:'10px', color:on?'#A5B4FC':'#475569' } }; });
+
+    const filtered = this.filterItems(sItems, this.state.studyFilter);
+    const curCard = filtered.find(i => i.id === this.state.studySelectedId) || filtered[0] || null;
+    const hasCards = !!curCard;
+    const mColorOf = (m) => m>=2 ? '#2DD4BF' : m===1 ? '#FBBF24' : '#3F485C';
+    const mLabelOf = (m) => m>=2 ? 'Mastered' : m===1 ? 'Learning' : 'New';
+    const studyList = filtered.map(k => { const active = curCard && k.id === curCard.id; return {
+      term: k.term, onClick: () => this.selectStudy(k.id),
+      rowStyle: { display:'flex', alignItems:'center', gap:'11px', padding:'10px 11px', borderRadius:'9px', border:'1px solid '+(active?'#34324d':'#1B1B25'), background: active?'#13121C':'#0D0D13', textAlign:'left', width:'100%', cursor:'pointer' },
+      zoneBarStyle: { width:'3px', alignSelf:'stretch', borderRadius:'9999px', background: k.zone==='red'?'#FB7185':'#FBBF24' },
+      masteryBarStyle: { height:'100%', width:(k.mastery/3*100)+'%', borderRadius:'9999px', background: mColorOf(k.mastery) },
+      masteryLabel: mLabelOf(k.mastery),
+    }; });
+
+    const cz = curCard && curCard.zone === 'red'
+      ? { label:'Red Zone', color:'#FDA4AF', bd:'rgba(251,113,133,0.34)', bg:'rgba(251,113,133,0.1)', dot:'#FB7185' }
+      : { label:'Likely Zone', color:'#FCD34D', bd:'rgba(251,191,36,0.3)', bg:'rgba(251,191,36,0.08)', dot:'#FBBF24' };
+    const ratingDefs = [ ['Again',0,'244,63,94','#FDA4AF'], ['Hard',1,'251,191,36','#FCD34D'], ['Good',2,'99,102,241','#A5B4FC'], ['Easy',3,'45,212,191','#5EEAD4'] ];
+    const ratings = ratingDefs.map(([label,lvl,rgb,fg]) => ({ label, onClick: () => this.rateCard(lvl),
+      style: { flex:1, height:'42px', borderRadius:'9px', border:'1px solid rgba('+rgb+',0.34)', background:'rgba('+rgb+',0.1)', color:fg, fontSize:'12.5px', fontWeight:500, cursor:'pointer' } }));
+
+    // ===== NOTES MODE =====
+    const guideToc = this.guideSections.map((g,i) => { const on = this.state.activeSec === i; return {
+      num: this.pad2(i+1), title: g.title, onClick: () => this.scrollToSection(i), hasZone: g.zone === 'red',
+      style: { display:'flex', alignItems:'center', gap:'8px', padding:'7px 9px', borderRadius:'7px', width:'100%', textAlign:'left', cursor:'pointer', border:'none', background: on ? '#16151F' : 'transparent', color: on ? '#CBD5E1' : '#7C8398', fontSize:'12px' },
+      numStyle: { fontFamily:"'JetBrains Mono',monospace", fontSize:'10px', color: on ? '#A5B4FC' : '#475569', width:'15px', flexShrink:0 },
+      dotStyle: { width:'5px', height:'5px', borderRadius:'50%', background:'#FB7185', flexShrink:0 },
+    }; });
+    const guideRender = this.guideSections.map((g,i) => ({
+      id: i, num: this.pad2(i+1), title: g.title, slideLabel: 'Slide '+this.pad2(g.slide), hasZone: g.zone === 'red',
+      onJump: () => this.jumpToSlideNum(g.slide),
+      points: g.points.map(p => ({ rz: p.rz, notRz: !p.rz, text: p.text,
+        calloutStyle: { display:'flex', gap:'10px', alignItems:'stretch', padding:'10px 12px', borderRadius:'9px', border:'1px solid rgba(251,113,133,0.22)', background:'rgba(251,113,133,0.06)' },
+        textStyle: { fontSize:'13.5px', lineHeight:1.6, color: p.rz ? '#E6C6CC' : '#94A3B8' } })),
+    }));
+    const notesArr = this.state.notesItems || this.notesSeed;
+    const notesList = notesArr.slice().sort((a,b) => a.slide - b.slide).map(n => ({
+      text: n.text, pinLabel: 'Slide '+this.pad2(n.slide)+' · '+this.fmt(n.timeMs),
+      onJump: () => this.jumpToSlideNum(n.slide), onDelete: () => this.deleteNote(n.id),
+    }));
+    const pinSlide = this.pinSlideNum();
+    const pinObj = this.slides.find(s => s.n === pinSlide);
+    const addDisabled = !(this.state.noteDraft || '').trim();
+
+    // ===== ASK MODE =====
+    const askMsgs = this.state.askMessages || [];
+    const askThread = askMsgs.map(m => { const isUser = m.role === 'user'; return {
+      isUser, isAssistant: !isUser, text: m.text,
+      rowStyle: { display:'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' },
+      bubbleStyle: { maxWidth: isUser ? '78%' : '88%', padding:'12px 15px', borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: isUser ? '#1A1A2C' : '#0D0D13', border: isUser ? '1px solid #2A2942' : '1px solid #1B1B25' },
+      textStyle: { fontSize:'13.5px', lineHeight:1.65, color: isUser ? '#E2E6FB' : '#CBD5E1' },
+      hasCites: !!(m.cites && m.cites.length),
+      cites: (m.cites||[]).map(n => { const sl = this.slides.find(s => s.n === n); return { label:'Slide '+this.pad2(n)+' · '+this.fmt(sl?sl.startMs:0), onJump:()=>this.jumpToSlideNum(n) }; }),
+    }; });
+    const askSuggestions = this.askSuggestions.map(qq => ({ label:qq, onClick:()=>this.sendAsk(qq) }));
+    const askEmpty = askMsgs.length === 0 && !this.state.asking;
+    const askSendDisabled = !(this.state.askDraft||'').trim();
+
+    return {
+      sessionTitle: 'Glycolysis & the Citric Acid Cycle',
+      tabs,
+      isLecture: this.state.tab === 'lecture',
+      isStudy: this.state.tab === 'study',
+      isNotes: this.state.tab === 'notes',
+      isAsk: this.state.tab === 'ask',
+
+      // outline
+      slideTotal: this.slides.length + ' slides',
+      outline,
+
+      // slide hero
+      slideCountLabel: 'Slide ' + this.pad2(cur.n) + ' / ' + this.slides.length,
+      curTitleText: cur.title,
+      curNum: this.pad2(cur.n) + ' / ' + this.slides.length,
+      curHasZone: !!zoneMeta,
+      curZoneLabel: zoneMeta ? zoneMeta.label : '',
+      curZoneChipStyle: zoneMeta ? { position:'absolute', top:'14px', left:'14px', display:'inline-flex', alignItems:'center', gap:'7px', padding:'6px 11px', borderRadius:'9px', border:'1px solid ' + zoneMeta.bd, background:zoneMeta.bg, color:zoneMeta.color, backdropFilter:'blur(4px)' } : {},
+      curZoneDotStyle: zoneMeta ? { width:'6px', height:'6px', borderRadius:'50%', background:zoneMeta.dot } : {},
+      onPrev: () => this.prev(),
+      onNext: () => this.next(),
+
+      // ribbon
+      ribbonIsTranscript: this.state.ribbon === 'transcript',
+      ribbonIsDensity: this.state.ribbon === 'density',
+      onRibbonTranscript: () => this.setState({ ribbon:'transcript' }),
+      onRibbonDensity: () => this.setState({ ribbon:'density' }),
+      transToggleStyle: { padding:'5px 12px', borderRadius:'7px', fontSize:'12px', fontWeight: this.state.ribbon==='transcript'?600:400, color: this.state.ribbon==='transcript'?'#E2E8F0':'#7C8398', background: this.state.ribbon==='transcript'?'#1C1B28':'transparent', border:'none' },
+      densToggleStyle: { padding:'5px 12px', borderRadius:'7px', fontSize:'12px', fontWeight: this.state.ribbon==='density'?600:400, color: this.state.ribbon==='density'?'#E2E8F0':'#7C8398', background: this.state.ribbon==='density'?'#1C1B28':'transparent', border:'none' },
+      tokens,
+      onPlayFromHere: () => { this.gotoSlide(idx); this.play(); },
+      bars,
+
+      // scrubber
+      tint,
+      ticks,
+      fillStyle: { position:'absolute', left:'0', height:'5px', width: phPct + '%', borderRadius:'9999px', background:'linear-gradient(90deg,#6366F1,#818CF8)', pointerEvents:'none' },
+      playheadStyle: { position:'absolute', left: phPct + '%', top:'50%', transform:'translate(-50%,-50%)', width:'13px', height:'13px', borderRadius:'50%', background:'#A5B4FC', boxShadow:'0 0 0 4px rgba(99,102,241,0.22)', pointerEvents:'none' },
+      onTrackDown: (e) => this.onTrackDown(e),
+      playing: this.state.playing,
+      notPlaying: !this.state.playing,
+      onToggle: () => this.toggle(),
+      curTime: this.fmt(this.state.currentMs),
+      totalTime: this.fmt(dur),
+      clockLabel: this.fmt(this.state.currentMs) + ' / ' + this.fmt(dur),
+
+      // study
+      redMastered: String(redMastered), redTotal: String(redTotal),
+      masteredCount: String(masteredCount), learningCount: String(learningCount), newCount: String(newCount), totalCount: String(total),
+      overallBarStyle: { height:'100%', width: overallPct + '%', borderRadius:'9999px', background:'linear-gradient(90deg,#2DD4BF,#5EEAD4)' },
+      studyFilters, studyList,
+      hasCards, noCards: !hasCards,
+      deckPos: String(hasCards ? filtered.indexOf(curCard)+1 : 0), deckLen: String(filtered.length),
+      cardFront: curCard ? curCard.front : '', cardBack: curCard ? curCard.back : '', cardTerm: curCard ? curCard.term : '', cardSlide: curCard ? String(curCard.slides[0]) : '',
+      cardZoneLabel: cz.label,
+      cardZoneChipStyle: { display:'inline-flex', alignItems:'center', gap:'7px', padding:'4px 10px', borderRadius:'9999px', whiteSpace:'nowrap', border:'1px solid '+cz.bd, background:cz.bg, color:cz.color, fontSize:'11px', fontWeight:500 },
+      cardZoneDotStyle: { width:'5px', height:'5px', borderRadius:'50%', background:cz.dot },
+      flippedTrue: this.state.flipped, flippedFalse: !this.state.flipped,
+      cardFaceStyle: { position:'relative', width:'100%', height:'100%', borderRadius:'16px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'34px', boxSizing:'border-box', transition:'background .3s, border-color .3s', border: this.state.flipped ? '1px solid rgba(99,102,241,0.3)' : '1px solid #23222F', background: this.state.flipped ? '#0C0C16' : 'repeating-linear-gradient(135deg,#0e0e16,#0e0e16 14px,#0b0b12 14px,#0b0b12 28px)' },
+      onFlip: () => this.flipCard(),
+      onJumpSlide: (e) => { e.stopPropagation(); if(curCard) this.jumpToSlideNum(curCard.slides[0]); },
+      ratings,
+      onDeckPrev: () => this.deckNav(-1),
+      onDeckNext: () => this.deckNav(1),
+      ringStyle: { position:'relative', width:'104px', height:'104px', borderRadius:'50%', background:'conic-gradient(#2DD4BF 0deg '+(overallPct*3.6).toFixed(1)+'deg, #16151F '+(overallPct*3.6).toFixed(1)+'deg 360deg)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
+
+      // notes
+      guideCount: String(this.guideSections.length),
+      guideToc, guideRender,
+      notesList, notesCount: String(notesArr.length),
+      noteDraft: this.state.noteDraft,
+      onDraft: (e) => this.setNoteDraft(e),
+      composerPinLabel: 'Slide '+this.pad2(pinSlide)+' · '+this.fmt(pinObj ? pinObj.startMs : 0),
+      onPinPrev: () => this.stepPin(-1),
+      onPinNext: () => this.stepPin(1),
+      onAddNote: () => this.addNote(),
+      addBtnStyle: addDisabled
+        ? { height:'30px', padding:'0 15px', borderRadius:'8px', border:'1px solid #1E1E2E', background:'#0D0D14', color:'#475569', fontSize:'12.5px', cursor:'default' }
+        : { height:'30px', padding:'0 15px', borderRadius:'8px', border:'none', background:'#6366F1', color:'#09090F', fontSize:'12.5px', fontWeight:500, cursor:'pointer' },
+
+      // ask
+      askThread, asking: this.state.asking,
+      askEmpty, askNotEmpty: !askEmpty,
+      askSuggestions, askHasMessages: askMsgs.length > 0,
+      askDraft: this.state.askDraft,
+      onAskDraft: (e) => this.setAskDraft(e),
+      onAskKey: (e) => this.onAskKey(e),
+      onAskSend: () => this.sendAsk(),
+      onClearAsk: () => this.clearAsk(),
+      askSendStyle: askSendDisabled
+        ? { width:'34px', height:'34px', flexShrink:0, borderRadius:'9px', border:'none', background:'#16151F', color:'#475569', cursor:'default', display:'flex', alignItems:'center', justifyContent:'center' }
+        : { width:'34px', height:'34px', flexShrink:0, borderRadius:'9px', border:'none', background:'#6366F1', color:'#09090F', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' },
+    };
+  }
+}
+</script>
+</body>
+</html>

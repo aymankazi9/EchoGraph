@@ -17,6 +17,7 @@ type Speed = (typeof SPEEDS)[number]
 
 interface Props {
   audioStoragePath: string
+  headless?: boolean
 }
 
 function formatTime(ms: number): string {
@@ -24,7 +25,7 @@ function formatTime(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-export function AudioPlayer({ audioStoragePath }: Props) {
+export function AudioPlayer({ audioStoragePath, headless = false }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -116,6 +117,21 @@ export function AudioPlayer({ audioStoragePath }: Props) {
   }, [playbackSpeed, setSpeed])
 
   // ── Render ──────────────────────────────────────────────────────────────
+
+  if (headless) {
+    return (
+      <audio
+        ref={audioRef}
+        src={objectUrl ?? undefined}
+        onTimeUpdate={handleTimeUpdate}
+        onDurationChange={handleDurationChange}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onEnded={handleEnded}
+        preload="metadata"
+      />
+    )
+  }
 
   if (loadError) {
     return (

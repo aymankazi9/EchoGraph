@@ -69,6 +69,8 @@ interface State {
   slideZoneMap: Record<number, 'likely' | 'red' | null>
   /** Consent granted for this session only (never persisted). */
   youtubeConsentGranted: boolean
+  /** Ask tab: user has opted-in to sending lecture content to the RAG endpoint this session. */
+  askConsentGranted: boolean
   /** YouTube search results for the active keyword query. */
   youtubeResults: VideoResult[]
   /** Whether the YouTube panel is open. */
@@ -120,6 +122,8 @@ interface Actions {
   loadSlideZones(map: Record<number, 'likely' | 'red' | null>): void
   /** Sets YouTube per-session consent (never persisted — clears on refresh). */
   grantYoutubeConsent(): void
+  /** Sets Ask per-session consent (never persisted — clears on refresh). */
+  grantAskConsent(): void
   setYoutubeResults(results: VideoResult[]): void
   setYoutubePanelOpen(open: boolean): void
   setIsDecrypting(v: boolean): void
@@ -162,6 +166,7 @@ const initialState: State = {
   slideDensityMap: {},
   slideZoneMap: {},
   youtubeConsentGranted: false,
+  askConsentGranted: false,
   youtubeResults: [],
   youtubePanelOpen: false,
   isDecrypting: false,
@@ -270,6 +275,8 @@ export const useSessionStore = create<State & Actions>()(
     loadSlideZones: (map) => set((s) => { s.slideZoneMap = map }),
 
     grantYoutubeConsent: () => set((s) => { s.youtubeConsentGranted = true }),
+
+    grantAskConsent: () => set((s) => { s.askConsentGranted = true }),
 
     setYoutubeResults: (results) => set((s) => { s.youtubeResults = results }),
 

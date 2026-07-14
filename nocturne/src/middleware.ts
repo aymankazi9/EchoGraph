@@ -122,7 +122,10 @@ export async function middleware(
 
 export const config = {
   matcher: [
-    '/vault/:path*', 
+    '/vault/:path*',
     '/session/:path*',
+    '/momentum/:path*',
+    '/community/:path*',
+    '/billing/:path*',
   ],
 }
