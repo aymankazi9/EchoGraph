@@ -11,8 +11,8 @@ import { NotificationStrip } from './notification-strip'
 
 const NAV_ITEMS = [
   { href: '/vault', icon: LayoutDashboard, label: 'Vault' },
-  { href: '/momentum', icon: Flame, label: 'Momentum' },
-  { href: '/community', icon: Users, label: 'Community' },
+  { href: '/momentum', icon: Flame, label: 'Momentum', beta: true },
+  { href: '/community', icon: Users, label: 'Community', beta: true },
   { href: '/session/new', icon: Plus, label: 'New session' },
   { href: '/help', icon: HelpCircle, label: 'Help' },
   { href: '/billing', icon: CreditCard, label: 'Billing' },
@@ -95,6 +95,7 @@ export function SideNav({ email, usedBytes }: Props) {
             icon={item.icon}
             label={item.label}
             collapsed={collapsed}
+            beta={item.beta}
           />
         ))}
       </div>

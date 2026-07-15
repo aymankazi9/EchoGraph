@@ -10,9 +10,10 @@ interface Props {
   icon: LucideIcon
   label: string
   collapsed: boolean
+  beta?: boolean
 }
 
-export function NavItem({ href, icon: Icon, label, collapsed }: Props) {
+export function NavItem({ href, icon: Icon, label, collapsed, beta }: Props) {
   const pathname = usePathname()
   const isActive = pathname === href || (href !== '/vault' && pathname.startsWith(href))
 
@@ -28,7 +29,21 @@ export function NavItem({ href, icon: Icon, label, collapsed }: Props) {
       ].join(' ')}
     >
       <Icon size={16} strokeWidth={1.5} className="shrink-0" />
-      {!collapsed && <span className="text-body">{label}</span>}
+      {!collapsed && (
+        <>
+          <span className="text-body flex-1">{label}</span>
+          {beta && (
+            <span style={{
+              fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+              color: '#818CF8', background: 'rgba(99,102,241,0.12)',
+              border: '1px solid rgba(99,102,241,0.25)',
+              borderRadius: 4, padding: '1px 5px', lineHeight: 1, flexShrink: 0,
+            }}>
+              beta
+            </span>
+          )}
+        </>
+      )}
     </Link>
   )
 
