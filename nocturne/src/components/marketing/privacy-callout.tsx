@@ -55,7 +55,7 @@ export function PrivacyCallout() {
           </p>
 
           {/* Key hierarchy — text only */}
-          <div className="mt-2 rounded-card border border-border-default bg-bg-elevated p-4 font-mono text-mono-sm text-text-secondary space-y-1 leading-relaxed">
+          <div className="mt-2 rounded-card border border-border-default bg-bg-elevated p-4 font-mono text-mono-sm text-text-secondary space-y-1 leading-relaxed overflow-x-auto">
             <p className="text-text-tertiary text-caption uppercase tracking-[0.07em] mb-2 font-sans">3-Tier key hierarchy</p>
             <p>Passphrase <span className="text-text-tertiary">(your memory only)</span></p>
             <p className="pl-4 text-text-tertiary">↓ PBKDF2 · 310,000 iterations · SHA-256</p>

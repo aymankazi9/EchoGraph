@@ -55,7 +55,7 @@ export function Hero() {
           variants={fadeUp}
           initial="hidden"
           animate="visible"
-          className="text-display font-medium text-text-primary leading-[1.25]"
+          className="text-[22px] sm:text-display font-medium text-text-primary leading-[1.25]"
         >
           A study intelligence system.
         </motion.h1>
@@ -88,7 +88,7 @@ export function Hero() {
         variants={fadeUp}
         initial="hidden"
         animate="visible"
-        className="flex items-center gap-3 mb-6"
+        className="flex flex-wrap items-center justify-center gap-3 mb-6"
       >
         <Link
           href="/login"
