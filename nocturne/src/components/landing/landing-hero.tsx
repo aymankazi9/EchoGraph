@@ -96,6 +96,7 @@ export function LandingHero() {
             fontWeight: 600,
             margin: 0,
             color: '#E2E8F0',
+            textWrap: 'balance',
           }}
         >
           Stop studying everything.
