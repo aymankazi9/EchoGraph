@@ -364,6 +364,7 @@
 @keyframes noct-marquee { from { transform:translateX(0); } to { transform:translateX(-50%); } }
 @keyframes noct-barpulse { 0%,100%{ box-shadow:0 0 9px rgba(244,63,94,0.4);} 50%{ box-shadow:0 0 20px rgba(244,63,94,0.85);} }
 @keyframes noct-scanfield { 0%{ left:-13%;} 100%{ left:100%;} }
+@keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 880px) { [data-desktop="nav"] { display: none !important; } [data-desktop="signin"] { display: none !important; } }
 @media (max-width: 760px) {
   [data-cards-3] { grid-template-columns: 1fr !important; }

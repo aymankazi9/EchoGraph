@@ -11,15 +11,17 @@ env.allowLocalModels = false
 
 // ─── Message types ────────────────────────────────────────────────────────────
 
-type InMsg = {
-  type: 'TRANSCRIBE'
-  audio: Float32Array  // 16kHz mono PCM, transferred from main thread
-}
+type InMsg =
+  | { type: 'TRANSCRIBE'; audio: Float32Array }
+  // Live mode: one pre-chunked buffer at a time. chunkStartMs is the wall-clock
+  // offset of this chunk within the ongoing recording so timestamps come out right.
+  | { type: 'TRANSCRIBE_CHUNK'; audio: Float32Array; chunkStartMs: number }
 
 type ProgressMsg =
   | { type: 'MODEL_LOADING'; progress: number; file: string }
   | { type: 'MODEL_READY' }
   | { type: 'SEGMENT'; words: { word: string; startMs: number; endMs: number }[]; segmentIndex: number; totalSegments: number }
+  | { type: 'CHUNK_DONE' }
   | { type: 'DONE' }
   | { type: 'ERROR'; message: string }
 
@@ -30,6 +32,7 @@ const post = (msg: ProgressMsg) =>
 
 // Cached after first load — subsequent calls return immediately from CacheStorage.
 let transcriber: Awaited<ReturnType<typeof pipeline>> | null = null
+let modelReady = false
 
 async function getTranscriber() {
   if (transcriber) return transcriber
@@ -50,50 +53,76 @@ async function getTranscriber() {
   return transcriber
 }
 
+// ─── Shared inference helper ──────────────────────────────────────────────────
+
+type InferFn = (input: Float32Array, opts: Record<string, unknown>) => Promise<{
+  text: string
+  chunks?: { text: string; timestamp: [number | null, number | null] }[]
+}>
+
+function extractWords(
+  chunks: { text: string; timestamp: [number | null, number | null] }[],
+  offsetMs: number,
+): { word: string; startMs: number; endMs: number }[] {
+  return chunks
+    .map((c) => ({
+      word: c.text.trim(),
+      startMs: Math.round((c.timestamp[0] ?? 0) * 1000) + offsetMs,
+      endMs: Math.round((c.timestamp[1] ?? c.timestamp[0] ?? 0) * 1000) + offsetMs,
+    }))
+    .filter((w) => w.word.length > 0)
+}
+
 // ─── Inference ────────────────────────────────────────────────────────────────
 
 // 30 seconds × 16 000 Hz = 480 000 samples per chunk.
 const CHUNK_SAMPLES = 30 * 16_000
 
 self.addEventListener('message', async (event: MessageEvent<InMsg>) => {
-  if (event.data.type !== 'TRANSCRIBE') return
+  const { type } = event.data
 
-  try {
-    const t = await getTranscriber()
-    post({ type: 'MODEL_READY' })
+  // ── Batch transcription (pre-recorded file) ────────────────────────────────
+  if (type === 'TRANSCRIBE') {
+    try {
+      const t = await getTranscriber()
+      if (!modelReady) { post({ type: 'MODEL_READY' }); modelReady = true }
 
-    const { audio } = event.data
-    const totalSegments = Math.max(1, Math.ceil(audio.length / CHUNK_SAMPLES))
+      const { audio } = event.data
+      const totalSegments = Math.max(1, Math.ceil(audio.length / CHUNK_SAMPLES))
 
-    // Process each 30-second slice sequentially — yields a stream of SEGMENT
-    // messages so the UI can render words progressively as inference runs.
-    // CONTEXT.md §10 rule 10: Whisper and BERT must never run simultaneously.
-    for (let i = 0; i < totalSegments; i++) {
-      const start = i * CHUNK_SAMPLES
-      const chunk = audio.slice(start, start + CHUNK_SAMPLES)
+      // Process each 30-second slice sequentially — yields a stream of SEGMENT
+      // messages so the UI can render words progressively as inference runs.
+      // CONTEXT.md §10 rule 10: Whisper and BERT must never run simultaneously.
+      for (let i = 0; i < totalSegments; i++) {
+        const start = i * CHUNK_SAMPLES
+        const chunk = audio.slice(start, start + CHUNK_SAMPLES)
 
-      // Whisper expects Float32Array at 16kHz. Default sampling_rate is 16000.
-      const result = await (t as (input: Float32Array, options: Record<string, unknown>) => Promise<{
-        text: string
-        chunks?: { text: string; timestamp: [number | null, number | null] }[]
-      }>)(chunk, { return_timestamps: 'word' })
+        const result = await (t as InferFn)(chunk, { return_timestamps: 'word' })
+        const words = extractWords(result.chunks ?? [], i * 30 * 1000)
+        post({ type: 'SEGMENT', words, segmentIndex: i, totalSegments })
+      }
 
-      // Offset timestamps by the chunk's start position in the full audio.
-      const chunkOffsetMs = i * 30 * 1000
-
-      const words = (result.chunks ?? [])
-        .map((c) => ({
-          word: c.text.trim(),
-          startMs: Math.round((c.timestamp[0] ?? 0) * 1000) + chunkOffsetMs,
-          endMs: Math.round((c.timestamp[1] ?? c.timestamp[0] ?? 0) * 1000) + chunkOffsetMs,
-        }))
-        .filter((w) => w.word.length > 0)
-
-      post({ type: 'SEGMENT', words, segmentIndex: i, totalSegments })
+      post({ type: 'DONE' })
+    } catch (e) {
+      post({ type: 'ERROR', message: String(e) })
     }
+    return
+  }
 
-    post({ type: 'DONE' })
-  } catch (e) {
-    post({ type: 'ERROR', message: String(e) })
+  // ── Live chunk (caller controls chunking from mic) ─────────────────────────
+  if (type === 'TRANSCRIBE_CHUNK') {
+    try {
+      const t = await getTranscriber()
+      if (!modelReady) { post({ type: 'MODEL_READY' }); modelReady = true }
+
+      const { audio, chunkStartMs } = event.data
+      const result = await (t as InferFn)(audio, { return_timestamps: 'word' })
+      const words = extractWords(result.chunks ?? [], chunkStartMs)
+
+      post({ type: 'SEGMENT', words, segmentIndex: 0, totalSegments: 1 })
+      post({ type: 'CHUNK_DONE' })
+    } catch (e) {
+      post({ type: 'ERROR', message: String(e) })
+    }
   }
 })

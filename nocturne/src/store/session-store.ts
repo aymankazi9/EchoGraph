@@ -36,7 +36,7 @@ export interface TranscriptWordEntry {
 export interface StoredKeyword {
   id: string
   term: string
-  source: 'real_guide' | 'synthetic' | 'anki'
+  source: 'real_guide' | 'synthetic' | 'anki' | 'both'
   zone: 'red' | 'likely'
   confidenceScore: number
   mentionCount: number

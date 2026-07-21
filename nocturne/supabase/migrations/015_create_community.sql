@@ -158,7 +158,7 @@ CREATE POLICY "room_presence: read all" ON public.room_presence FOR SELECT TO au
 -- Must match client: SHA-256(userId + ':' + roomId), UTF-8, hex output.
 
 CREATE OR REPLACE FUNCTION public.compute_member_hash(p_room_id uuid)
-RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions AS $$
   SELECT encode(digest(auth.uid()::text || ':' || p_room_id::text, 'sha256'), 'hex')
 $$;
 

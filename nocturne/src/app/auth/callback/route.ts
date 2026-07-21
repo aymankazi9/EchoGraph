@@ -1,22 +1,16 @@
-import { NextRequest, NextResponse } 
-  from 'next/server'
-import { createServerClient } 
-  from '@supabase/ssr'
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function GET(
-  request: NextRequest
-) {
-  const code = 
-    request.nextUrl.searchParams
-      .get('code')
+// Force dynamic rendering — cookie reads must run at request time, never from cache
+export const dynamic = 'force-dynamic'
+
+export async function GET(request: NextRequest) {
+  const code = request.nextUrl.searchParams.get('code')
   const origin = request.nextUrl.origin
 
   if (!code) {
-    return NextResponse.redirect(
-      new URL('/login?error=missing_code', 
-        origin)
-    )
+    return NextResponse.redirect(new URL('/login?error=missing_code', origin))
   }
 
   const cookieStore = await cookies()
@@ -31,67 +25,37 @@ export async function GET(
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(
-              ({ name, value, options }) =>
-                cookieStore.set(
-                  name, 
-                  value, 
-                  options
-                )
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
             )
           } catch {
-            /* Route Handler can set 
-               cookies — this catch is 
-               a safety net for edge 
-               cases only */
+            // setAll may throw in certain Next.js rendering contexts — safe to ignore here
           }
         },
       },
     }
   )
 
-  const { error: exchangeError } = 
-    await supabase.auth
-      .exchangeCodeForSession(code)
+  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
   if (exchangeError) {
-    console.error(
-      'Auth exchange error:', 
-      exchangeError.message
-    )
-    return NextResponse.redirect(
-      new URL(
-        '/login?error=auth_failed', 
-        origin
-      )
-    )
+    console.error('Auth exchange error:', exchangeError.message)
+    return NextResponse.redirect(new URL('/login?error=auth_failed', origin))
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.redirect(
-      new URL('/login', origin)
-    )
+    return NextResponse.redirect(new URL('/login', origin))
   }
 
-  /* Check if first-time or 
-     returning user */
-  const { data: profile } = 
-    await supabase
-      .from('users')
-      .select('pbkdf2_salt')
-      .eq('id', user.id)
-      .single()
+  const { data: profile } = await supabase
+    .from('users')
+    .select('pbkdf2_salt')
+    .eq('id', user.id)
+    .single()
 
-  const destination =
-    profile?.pbkdf2_salt
-      ? '/unlock'
-      : '/setup'
+  const destination = profile?.pbkdf2_salt ? '/unlock' : '/setup'
 
-  return NextResponse.redirect(
-    new URL(destination, origin)
-  )
+  return NextResponse.redirect(new URL(destination, origin))
 }

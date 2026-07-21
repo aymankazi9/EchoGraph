@@ -2,14 +2,21 @@
 
 // Study guide upload section for the left pane.
 // Accepts PDF upload, plain text paste, or Anki .apkg import.
+//
+// For PDF/text: passes raw text to the parent so the LLM extractor can see
+// the full guide content. No client-side phrase parsing.
+// For Anki: card fronts are already structured terms — passed directly.
 
 import { useRef, useState, useCallback } from 'react'
 import { BookOpen, Upload } from 'lucide-react'
 
-export type GuideSource = 'pdf' | 'text' | 'anki'
+// Discriminated union so SessionClient can route each case correctly.
+export type GuidePayload =
+  | { type: 'text'; rawText: string }   // PDF or pasted text — LLM will extract terms
+  | { type: 'anki'; terms: string[] }   // Anki .apkg — terms already extracted
 
 interface Props {
-  onGuide(terms: string[], source: GuideSource): void
+  onGuide(payload: GuidePayload): void
   isScoring: boolean
 }
 
@@ -22,22 +29,16 @@ export function GuideUpload({ onGuide, isScoring }: Props) {
     async (file: File) => {
       if (isScoring) return
 
-      const source: GuideSource = file.name.endsWith('.apkg') ? 'anki' : 'pdf'
-
-      if (source === 'anki') {
+      // ── Anki .apkg ─────────────────────────────────────────────────────────
+      if (file.name.endsWith('.apkg')) {
         const { extractApkg } = await import('@/lib/study-guide/anki-import')
         const buf = await file.arrayBuffer()
         const terms = await extractApkg(buf)
-        onGuide(terms, 'anki')
+        onGuide({ type: 'anki', terms })
         return
       }
 
-      // PDF guide
-      const { getMasterKey } = await import('@/lib/crypto/vault')
-      const mk = getMasterKey()
-      if (!mk) return
-
-      // Load PDF.js lazily
+      // ── PDF guide — extract raw text, let LLM do the term extraction ───────
       const lib = await import('pdfjs-dist')
       lib.GlobalWorkerOptions.workerSrc =
         `https://cdn.jsdelivr.net/npm/pdfjs-dist@${lib.version}/build/pdf.worker.min.mjs`
@@ -47,21 +48,24 @@ export function GuideUpload({ onGuide, isScoring }: Props) {
       const pdfDoc = await lib.getDocument(url).promise
       URL.revokeObjectURL(url)
 
-      const { parsePDFGuide } = await import('@/lib/study-guide/parser')
-      const terms = await parsePDFGuide(pdfDoc)
+      const pages: string[] = []
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i)
+        const content = await page.getTextContent()
+        pages.push(content.items.map((item) => ('str' in item ? item.str : '')).join(' '))
+        page.cleanup()
+      }
       pdfDoc.destroy()
-      onGuide(terms, 'pdf')
+
+      onGuide({ type: 'text', rawText: pages.join('\n') })
     },
     [isScoring, onGuide],
   )
 
   const handlePaste = useCallback(() => {
     if (!pasteText.trim() || isScoring) return
-    import('@/lib/study-guide/parser').then(({ parseTextGuide }) => {
-      const terms = parseTextGuide(pasteText)
-      onGuide(terms, 'pdf')
-      setPasteText('')
-    })
+    onGuide({ type: 'text', rawText: pasteText })
+    setPasteText('')
   }, [pasteText, isScoring, onGuide])
 
   return (
@@ -125,7 +129,7 @@ export function GuideUpload({ onGuide, isScoring }: Props) {
           <textarea
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
-            placeholder="Paste keywords, one per line…"
+            placeholder="Paste study guide text…"
             rows={4}
             className={[
               'w-full resize-none rounded-input border border-border-default',

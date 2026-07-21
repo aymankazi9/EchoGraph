@@ -159,6 +159,7 @@ export function VaultDashboardClient({
       const { data } = await supabase
         .from('sessions')
         .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, created_at')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
       if (data) {
         const existing = useDashboardStore.getState().sessions

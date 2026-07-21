@@ -7,7 +7,8 @@ import type { SyncSegment } from '@/lib/sync/playhead-tracker'
 
 export interface InputKeyword {
   term: string
-  source: 'real_guide' | 'synthetic' | 'anki'
+  // 'both' = appeared in user's study guide AND independently identified from lecture content
+  source: 'real_guide' | 'synthetic' | 'anki' | 'both'
 }
 
 export interface ScoredKeyword extends InputKeyword {
@@ -206,10 +207,14 @@ export function scoreKeywords(
     )
 
     // Overall confidence: weighted average
-    const confidenceScore =
+    let confidenceScore =
       emphasisScore * 0.5 +
       lectureConfidence * 0.3 +
       normalize(mentionCount, maxMentions) * 0.2
+
+    // 'both' bonus: term is in study guide AND independently supported by lecture.
+    // Lifts ranking within Red Zone only — does not affect zone assignment.
+    if (kw.source === 'both') confidenceScore = Math.min(1.0, confidenceScore + 0.1)
 
     // Zone assignment
     const isSynthetic = kw.source === 'synthetic'

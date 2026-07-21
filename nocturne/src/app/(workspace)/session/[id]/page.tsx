@@ -15,14 +15,21 @@ export default async function SessionPage({
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: session } = await supabase
+  const { data: session, error: sessionError } = await supabase
     .from('sessions')
     .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, course_tag')
     .eq('id', sessionId)
     .eq('user_id', user.id)
     .single()
 
-  if (!session) notFound()
+  // PGRST116 = no rows returned — genuine "not found"
+  // Other errors (e.g. missing column) should surface as 500, not a misleading 404
+  if (!session) {
+    if (sessionError && sessionError.code !== 'PGRST116') {
+      throw new Error(`Failed to load session: ${sessionError.message}`)
+    }
+    notFound()
+  }
 
   // Fetch PDF, audio, and user profile in parallel.
   const [{ data: pdfFile }, { data: audioFile }, { data: userProfile }] = await Promise.all([

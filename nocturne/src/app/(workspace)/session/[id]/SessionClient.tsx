@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Play, Pause } from 'lucide-react'
+import { Play, Pause, Mic, Square } from 'lucide-react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { isVaultUnlocked, getMasterKey } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
@@ -10,7 +10,10 @@ import { encryptText } from '@/lib/crypto/encrypt'
 import { createClient } from '@/lib/supabase'
 import { scoreKeywords, computeSlideDensity } from '@/lib/scoring/keyword-scorer'
 import { generateFlashcards } from '@/lib/scoring/flashcard-generator'
-import { generateSyntheticGuide, type SyntheticKeyword } from '@/lib/study-guide/synthetic'
+import { enhanceFlashcards } from '@/lib/scoring/flashcard-enhancer'
+import { GuideUpload, type GuidePayload } from '@/components/study-guide/guide-upload'
+import { startLiveTranscription, type LiveStatus } from '@/lib/live-transcription'
+import { addFilesToExistingSession } from '@/lib/upload'
 import { useSessionStore, getAudioEl } from '@/store/session-store'
 import { useNotificationStore } from '@/store/notification-store'
 import { SessionTitle } from '@/components/session/session-title'
@@ -63,6 +66,9 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('lecture')
   const [isScoring, setIsScoring] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>({ phase: 'idle' })
+  const stopLiveRef = useRef<(() => Promise<Blob | null>) | null>(null)
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
   const [totalPages, setTotalPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
@@ -342,8 +348,10 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
   }, [seekTo, jumpToSlide])
 
   // ── Scoring handler ──────────────────────────────────────────────────────
+  // payload.type === 'extract': call LLM to extract terms (guide text or null for auto)
+  // payload.type === 'anki':    use pre-extracted card fronts directly
   const handleScore = useCallback(
-    async (inputTerms: string[], source: 'real_guide' | 'synthetic' | 'anki') => {
+    async (payload: GuidePayload | { type: 'extract'; guideText: string | null }) => {
       const mk = getMasterKey()
       if (!mk || isScoring) return
 
@@ -369,107 +377,45 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
         const currentWords = useSessionStore.getState().transcriptWords
         const transcriptText = currentWords.map((w) => w.word).join(' ')
 
-        let terms: string[] = inputTerms
-        let syntheticKeywords: SyntheticKeyword[] | null = null
-        if (terms.length === 0) {
-          syntheticKeywords = generateSyntheticGuide(
-            slides.map((s) => s.text),
-            currentWords.map((w) => w.word),
-            initialUserField ?? 'other',
-          )
-          terms = syntheticKeywords.map((kw) => kw.term)
-          source = 'synthetic'
+        // ── Build InputKeyword list ────────────────────────────────────────────
+        let inputKws: InputKeyword[]
+        let guideType: string
+
+        if (payload.type === 'anki') {
+          inputKws = payload.terms.map((t) => ({ term: t, source: 'anki' as const }))
+          guideType = 'anki'
+        } else {
+          // LLM extraction path (guide text provided, or null = infer from lecture only)
+          const guideText = payload.type === 'extract' ? payload.guideText : payload.rawText
+          const hasGuide = !!guideText?.trim()
+          guideType = hasGuide ? 'real_guide' : 'synthetic'
+
+          const resp = await fetch('/api/extract/keywords', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ sessionId: session.id, guideText: guideText ?? null, transcriptText, slides }),
+          })
+
+          if (!resp.ok) {
+            console.error('[SessionClient] extraction failed:', resp.status)
+            return
+          }
+
+          const { keywords: extracted } = await resp.json() as {
+            keywords: { term: string; source: 'guide' | 'inferred' | 'both' }[]
+          }
+
+          if (!extracted?.length) return
+
+          // Map LLM source tags to InputKeyword source values
+          inputKws = extracted.map((kw) => ({
+            term: kw.term,
+            source: (kw.source === 'guide' ? 'real_guide'
+              : kw.source === 'both' ? 'both'
+              : 'synthetic') as InputKeyword['source'],
+          }))
         }
 
-        if (source === 'synthetic' && syntheticKeywords !== null) {
-          if (syntheticKeywords.length === 0) return
-
-          const { data: userData } = await supabase.auth.getUser()
-          const uid = userData.user?.id
-          if (!uid) return
-
-          await supabase.from('keywords').delete().eq('session_id', session.id).eq('source', 'synthetic')
-
-          const rows = await Promise.all(
-            syntheticKeywords.map(async (kw) => ({
-              session_id: session.id,
-              user_id: uid,
-              term_encrypted: await encryptText(mk, kw.term),
-              source: 'synthetic' as const,
-              zone: 'likely' as const,
-              confidence_score: kw.tfidfScore,
-              mention_count: kw.slideIndices.length,
-              dwell_time_ms: 0,
-            })),
-          )
-
-          const { data: inserted, error: kwError } = await supabase
-            .from('keywords')
-            .insert(rows)
-            .select('id')
-
-          if (!kwError && inserted) {
-            loadKeywords(
-              syntheticKeywords.map((kw, i) => ({
-                id: inserted[i].id as string,
-                term: kw.term,
-                source: 'synthetic' as StoredKeyword['source'],
-                zone: 'likely' as StoredKeyword['zone'],
-                confidenceScore: kw.tfidfScore,
-                mentionCount: kw.slideIndices.length,
-                dwellTimeMs: 0,
-                emphasisScore: 0,
-                lectureConfidence: 0,
-                slideIndices: kw.slideIndices,
-              })),
-            )
-          }
-
-          if (session.id) {
-            const { error: sessionError } = await supabase
-              .from('sessions')
-              .update({ has_study_guide: true, guide_type: 'synthetic' })
-              .eq('id', session.id)
-              .eq('user_id', uid)
-            if (sessionError) console.error('[synthetic] Session update error:', sessionError)
-          }
-
-          if (slides.length > 0 && syntheticKeywords.length > 0) {
-            const densityMap: Record<number, number> = {}
-            const densityUpdates: { pageNumber: number; densityScore: number; isLikely: boolean }[] = []
-
-            for (const slide of slides) {
-              const slideIdx0 = slide.pageNumber - 1
-              const matchCount = syntheticKeywords.filter((kw) => kw.slideIndices.includes(slideIdx0)).length
-              const densityScore = Math.round((matchCount / syntheticKeywords.length) * 100)
-              const isLikely = densityScore >= 15
-              densityMap[slide.pageNumber] = densityScore
-              densityUpdates.push({ pageNumber: slide.pageNumber, densityScore, isLikely })
-            }
-
-            loadSlideDensity(densityMap)
-
-            const zoneMap: Record<number, 'likely' | 'red' | null> = {}
-            densityUpdates.forEach(({ pageNumber, isLikely }) => {
-              zoneMap[pageNumber] = isLikely ? 'likely' : null
-            })
-            loadSlideZones(zoneMap)
-
-            await Promise.all(
-              densityUpdates.map(({ pageNumber, densityScore, isLikely }) =>
-                supabase.from('slides')
-                  .update({ density_score: densityScore, is_likely_zone: isLikely })
-                  .eq('session_id', session.id)
-                  .eq('page_number', pageNumber),
-              ),
-            )
-          }
-
-          useNotificationStore.getState().notify({ type: 'success', message: 'Slide keywords scored', duration: 3000 })
-          return
-        }
-
-        const inputKws: InputKeyword[] = terms.map((t) => ({ term: t, source }))
         const currentSyncMap = useSessionStore.getState().syncMap
         const scored = scoreKeywords(inputKws, transcriptText, slides, currentSyncMap)
         const density = computeSlideDensity(inputKws, slides)
@@ -556,19 +502,33 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
                 })),
               )
               await supabase.from('flashcards').insert(fcRows)
+
+              // Enhance flashcard backs with Claude (non-blocking — falls back to originals on error)
+              void enhanceFlashcards({
+                sessionId: session.id,
+                scored,
+                cards,
+                slides,
+                words: currentWords,
+                mk,
+                supabase,
+                loadFlashcards,
+              })
             }
           }
         }
 
-        if (source !== 'synthetic') {
+        if (guideType !== 'synthetic') {
           if (scored.length > 0) {
             useNotificationStore.getState().notify({
               type: 'success',
               message: 'Red Zone keywords identified',
               duration: 3000,
             })
-            await supabase.from('sessions').update({ has_study_guide: true, guide_type: source }).eq('id', session.id)
+            await supabase.from('sessions').update({ has_study_guide: true, guide_type: guideType }).eq('id', session.id)
           }
+        } else if (scored.length > 0) {
+          await supabase.from('sessions').update({ has_study_guide: true, guide_type: 'synthetic' }).eq('id', session.id)
         }
       } catch (e) {
         console.error('[SessionClient] scoring error:', e)
@@ -579,12 +539,64 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
     [isScoring, session.id, supabase, loadKeywords, loadFlashcards, loadSlideDensity, loadSlideZones, initialUserField],
   )
 
+  // ── Live recording ────────────────────────────────────────────────────────
+  const handleStartRecording = useCallback(() => {
+    const mk = getMasterKey()
+    if (!mk || isRecording) return
+    setIsRecording(true)
+    setLiveStatus({ phase: 'requesting_mic' })
+    stopLiveRef.current = startLiveTranscription(
+      supabase,
+      session.id,
+      mk,
+      (words) => {
+        // Filter out the model-warmup chunk (chunkStartMs = -99999, so startMs < 0)
+        const valid = words.filter((w) => w.startMs >= 0)
+        if (valid.length > 0) addTranscriptWords(valid.map((w) => ({ ...w, slideIndex: null })))
+      },
+      setLiveStatus,
+    )
+  }, [isRecording, supabase, session.id, addTranscriptWords])
+
+  const handleStopRecording = useCallback(async () => {
+    if (!stopLiveRef.current) return
+    const stopFn = stopLiveRef.current
+    stopLiveRef.current = null
+    setLiveStatus({ phase: 'saving' })
+
+    try {
+      const blob = await stopFn()
+      if (blob) {
+        const mk = getMasterKey()
+        if (!mk) throw new Error('Vault locked')
+        const buf = await blob.arrayBuffer()
+        await addFilesToExistingSession(
+          supabase,
+          [{ data: buf, name: 'live-recording.webm', mimeType: blob.type || 'audio/webm', type: 'audio', sizeBytes: buf.byteLength }],
+          userId,
+          session.id,
+          () => {},
+        )
+        // Words already in DB from live transcription — mark directly as transcribed
+        await supabase.from('sessions').update({ has_audio: true, status: 'transcribed' }).eq('id', session.id)
+        useSessionStore.getState().setHasAudio(true)
+        useNotificationStore.getState().notify({ type: 'success', message: 'Recording saved', duration: 3000 })
+      }
+    } catch (e) {
+      console.error('[SessionClient] live save error:', e)
+      useNotificationStore.getState().notify({ type: 'error', message: 'Failed to save recording', duration: 4000 })
+    } finally {
+      setIsRecording(false)
+      setLiveStatus({ phase: 'idle' })
+    }
+  }, [supabase, session.id, userId])
+
   // ── Callback from PdfViewer after fresh slide extraction ─────────────────
   const handleSlidesExtracted = useCallback(() => {
     if (session.has_study_guide && session.guide_type !== 'synthetic' && session.guide_type !== null) return
     const hasKws = useSessionStore.getState().keywords.length > 0
     if (!hasKws && !isScoring) {
-      handleScore([], 'synthetic')
+      handleScore({ type: 'extract', guideText: null })
     }
   }, [isScoring, handleScore, session.has_study_guide, session.guide_type])
 
@@ -594,7 +606,7 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
     if (session.has_study_guide && session.guide_type !== 'synthetic' && session.guide_type !== null) return
     const hasKws = useSessionStore.getState().keywords.length > 0
     if (!hasKws && ['ready', 'synced'].includes(session.status) && !isScoring) {
-      handleScore([], 'synthetic')
+      handleScore({ type: 'extract', guideText: null })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.status, session.has_slides])
@@ -658,6 +670,12 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
     }
     return map
   }, [keywords])
+
+  // ── Live transcript — last 80 words from store ───────────────────────────
+  const recentLiveWords = useMemo(
+    () => (isRecording ? transcriptWords.slice(-80) : []),
+    [isRecording, transcriptWords],
+  )
 
   // ── Derived values ───────────────────────────────────────────────────────
   const pct = durationMs > 0 ? (currentTimeMs / durationMs) * 100 : 0
@@ -792,6 +810,11 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
                 <div style={{ flex: 1 }} />
               )}
 
+              {/* Study guide upload */}
+              <div style={{ borderTop: '1px solid #16151E', flexShrink: 0 }}>
+                <GuideUpload onGuide={handleScore} isScoring={isScoring} />
+              </div>
+
               {/* Legend */}
               <div style={{ padding: '9px 14px', borderTop: '1px solid #16151E', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -814,7 +837,26 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
                     Slide {String(currentPage).padStart(2, '0')} / {totalPages || '—'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                  {/* Record live button */}
+                  <button
+                    type="button"
+                    onClick={isRecording ? handleStopRecording : handleStartRecording}
+                    disabled={liveStatus.phase === 'saving'}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      height: 32, padding: '0 11px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
+                      border: isRecording ? '1px solid rgba(251,113,133,0.4)' : '1px solid #23222F',
+                      background: isRecording ? 'rgba(251,113,133,0.1)' : '#0D0D14',
+                      color: isRecording ? '#FB7185' : '#5B6478',
+                      opacity: liveStatus.phase === 'saving' ? 0.5 : 1,
+                    }}
+                  >
+                    {isRecording
+                      ? <><Square size={10} strokeWidth={0} style={{ fill: '#FB7185', flexShrink: 0 }} /> Stop</>
+                      : <><Mic size={11} strokeWidth={1.5} style={{ flexShrink: 0 }} /> Record live</>
+                    }
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1025,6 +1067,57 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
               {/* Caption */}
               <div style={{ marginTop: 9, fontSize: 11, color: '#3F485C', textAlign: 'center' }}>
                 Scrub the timeline or pick a slide — audio, transcript and slides stay locked together.
+              </div>
+            </div>
+          )}
+
+          {/* ── Live recording pane ─────────────────────────────────────────── */}
+          {tab === 'lecture' && isRecording && (
+            <div style={{ flexShrink: 0, borderTop: '1px solid #16151E', background: '#0A0A0F', display: 'flex', flexDirection: 'column', maxHeight: 140 }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 22px 6px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#FB7185', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                  <span style={{ fontSize: 11.5, color: '#94A3B8' }}>
+                    {liveStatus.phase === 'requesting_mic' && 'Requesting microphone…'}
+                    {liveStatus.phase === 'model_loading' && `Loading Whisper model… ${liveStatus.progress}%`}
+                    {liveStatus.phase === 'recording' && `Recording · ${formatTime(liveStatus.elapsedSec * 1000)}`}
+                    {liveStatus.phase === 'saving' && 'Saving recording…'}
+                    {liveStatus.phase === 'error' && `Error: ${liveStatus.message}`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleStopRecording}
+                  disabled={liveStatus.phase === 'saving'}
+                  style={{ height: 26, padding: '0 10px', borderRadius: 7, border: '1px solid rgba(251,113,133,0.35)', background: 'rgba(251,113,133,0.08)', color: '#FB7185', fontSize: 11.5, cursor: liveStatus.phase === 'saving' ? 'not-allowed' : 'pointer', opacity: liveStatus.phase === 'saving' ? 0.5 : 1 }}
+                >
+                  Stop & save
+                </button>
+              </div>
+
+              {/* Streaming words */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '2px 22px 10px', fontSize: 13, color: '#5B6478', lineHeight: 1.65 }}>
+                {recentLiveWords.length > 0
+                  ? recentLiveWords.map((w) => {
+                      const clean = w.word.toLowerCase().replace(/[^a-z0-9]/g, '')
+                      const zone = keywordZoneMap.get(clean)
+                      return (
+                        <span
+                          key={w.id}
+                          style={zone ? {
+                            color: zone === 'red' ? '#FDA4AF' : '#FDE68A',
+                            background: zone === 'red' ? 'rgba(251,113,133,0.1)' : 'rgba(251,191,36,0.08)',
+                            borderRadius: 3,
+                            padding: '0 2px',
+                          } : undefined}
+                        >
+                          {w.word}{' '}
+                        </span>
+                      )
+                    })
+                  : <span style={{ color: '#3F485C', fontStyle: 'italic' }}>Words will appear here as you speak…</span>
+                }
               </div>
             </div>
           )}
