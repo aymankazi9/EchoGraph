@@ -31,7 +31,7 @@ export function MobileNav({ onClose }: Props) {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
         transition={{ duration: 0.2, ease: [0.0, 0.0, 0.2, 1.0] }}
-        className="fixed top-14 left-0 right-0 z-30 bg-bg-base border-b border-border-subtle px-4 pb-4"
+        className="fixed top-[60px] left-0 right-0 z-30 bg-bg-base border-b border-border-subtle px-4 pb-4"
       >
         <nav className="flex flex-col gap-0.5 pt-2" aria-label="Mobile navigation">
           {navLinks.map(({ label, href, soon }) => (

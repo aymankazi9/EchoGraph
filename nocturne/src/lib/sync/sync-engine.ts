@@ -7,6 +7,10 @@ import { fetchAndDecryptFile, decryptText } from '@/lib/crypto/decrypt'
 import { encryptText } from '@/lib/crypto/encrypt'
 import { detectSilenceGaps } from './silence-detector'
 import { getSilenceThreshold, scoreSegmentsAgainstSlides } from './bert-scorer'
+import type { SyncSegment } from './playhead-tracker'
+
+// Re-export so callers that only import from sync-engine don't need a second import.
+export type { SyncSegment }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,12 +31,6 @@ export interface SyncProgress {
 }
 
 export type OnSyncProgress = (p: SyncProgress) => void
-
-interface SyncSegment {
-  startMs: number
-  endMs: number
-  slideIndex: number  // page_number (1-based)
-}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -60,12 +58,24 @@ async function decodeToFloat32(audioBuffer: ArrayBuffer): Promise<Float32Array> 
 /**
  * Runs the full slide-sync pipeline: silence detection → BERT scoring → DB writes.
  * Returns a cancel function. Requires session.status = 'transcribed' and has_slides = true.
+ *
+ * @param fileId  The files.id of the audio take being synced. Used to scope the
+ *                sync_map row and the transcript_words.slide_index backfill to this
+ *                specific take. Pass null (or omit) for legacy sessions whose
+ *                transcript_words predate the file_id column.
  */
 export function startSync(
   supabase: SupabaseClient,
   sessionId: string,
   audioStoragePath: string,
   onProgress: OnSyncProgress,
+  fileId?: string | null,
+  /**
+   * Called with the computed segments immediately after they are written to DB,
+   * before the phase transitions to 'done'. Use this to populate the in-memory
+   * sync map without a round-trip DB read (e.g. auto-sync after live recording).
+   */
+  onComplete?: (segments: SyncSegment[]) => void,
 ): () => void {
   let cancelled = false
 
@@ -100,12 +110,12 @@ export function startSync(
     )
     if (cancelled) return
 
-    // ── Phase 2: Fetch + decrypt slide texts ─────────────────────────────────
+    // ── Phase 2: Fetch + decrypt slide texts (ordered by global_slide_index) ──
     const { data: slideRows, error: slideErr } = await supabase
       .from('slides')
-      .select('page_number, text_encrypted')
+      .select('global_slide_index, text_encrypted')
       .eq('session_id', sessionId)
-      .order('page_number')
+      .order('global_slide_index')
 
     if (slideErr) throw new Error(slideErr.message)
     if (cancelled) return
@@ -113,7 +123,7 @@ export function startSync(
 
     const slides = await Promise.all(
       slideRows.map(async (s) => ({
-        pageNumber: s.page_number as number,
+        globalSlideIndex: s.global_slide_index as number,
         text: s.text_encrypted
           ? await decryptText(mk, s.text_encrypted as string).catch(() => '')
           : '',
@@ -193,41 +203,58 @@ export function startSync(
       if (slideIdx === -1) slideIdx = lastSlideIdx
       lastSlideIdx = slideIdx
 
-      return { ...bounds, slideIndex: slides[slideIdx]?.pageNumber ?? slideIdx + 1 }
+      return { ...bounds, slideIndex: slides[slideIdx]?.globalSlideIndex ?? slideIdx + 1 }
     })
 
     // ── Phase 7: Encrypt + upsert sync_map ──────────────────────────────────
+    // Upsert is keyed on (session_id, file_id) — the composite unique index
+    // introduced in migration 028. Passing file_id: null (legacy) still works
+    // because the index is NULLS NOT DISTINCT.
     const mapEncrypted = await encryptText(mk, JSON.stringify({ segments: syncSegments }))
     const { error: upsertErr } = await supabase
       .from('sync_map')
-      .upsert({ session_id: sessionId, map_encrypted: mapEncrypted }, { onConflict: 'session_id' })
+      .upsert(
+        { session_id: sessionId, file_id: fileId ?? null, map_encrypted: mapEncrypted },
+        { onConflict: 'session_id,file_id' },
+      )
 
     if (upsertErr) throw new Error(upsertErr.message)
     if (cancelled) return
 
     // ── Phase 8: Backfill transcript_words.slide_index (one UPDATE per segment)
+    // Scope updates to this take's words when fileId is known; otherwise fall
+    // back to matching by session_id + time range (legacy/batch-Whisper path).
+    const lastSeg = syncSegments.at(-1)!
     await Promise.all([
       // All segments except last: filter by [startMs, endMs)
-      ...syncSegments.slice(0, -1).map(({ startMs, endMs, slideIndex }) =>
-        supabase
+      ...syncSegments.slice(0, -1).map(({ startMs, endMs, slideIndex }) => {
+        const q = supabase
           .from('transcript_words')
           .update({ slide_index: slideIndex })
           .eq('session_id', sessionId)
           .gte('start_time_ms', startMs)
-          .lt('start_time_ms', endMs),
-      ),
+          .lt('start_time_ms', endMs)
+        return fileId ? q.eq('file_id', fileId) : q
+      }),
       // Last segment: everything from startMs onward
-      supabase
-        .from('transcript_words')
-        .update({ slide_index: syncSegments.at(-1)!.slideIndex })
-        .eq('session_id', sessionId)
-        .gte('start_time_ms', syncSegments.at(-1)!.startMs),
+      (() => {
+        const q = supabase
+          .from('transcript_words')
+          .update({ slide_index: lastSeg.slideIndex })
+          .eq('session_id', sessionId)
+          .gte('start_time_ms', lastSeg.startMs)
+        return fileId ? q.eq('file_id', fileId) : q
+      })(),
     ])
 
     if (cancelled) return
 
     // ── Phase 9: Update session status ───────────────────────────────────────
     await supabase.from('sessions').update({ status: 'synced' }).eq('id', sessionId)
+
+    // Notify the caller with the computed segments so they can populate the
+    // in-memory store immediately, without a separate DB read.
+    onComplete?.(syncSegments)
 
     state.phase = 'done'
     emit()

@@ -7,6 +7,11 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code')
+  // Optional post-auth destination, threaded through from the login page.
+  // Only accepted as a relative path (must start with '/') to prevent open-redirect.
+  const nextParam = request.nextUrl.searchParams.get('next') ?? ''
+  const safeNext = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : ''
+
   const origin = request.nextUrl.origin
 
   if (!code) {
@@ -40,7 +45,15 @@ export async function GET(request: NextRequest) {
 
   if (exchangeError) {
     console.error('Auth exchange error:', exchangeError.message)
-    return NextResponse.redirect(new URL('/login?error=auth_failed', origin))
+    // pkce_code_verifier_not_found means the verifier cookie was gone by the
+    // time the callback ran (tab refreshed, second OAuth attempt overwrote it,
+    // etc.).  It's fully recoverable — surface a distinct code so the login
+    // page can show a more actionable message instead of a generic failure.
+    const errorCode =
+      exchangeError.code === 'pkce_code_verifier_not_found'
+        ? 'session_expired'
+        : 'auth_failed'
+    return NextResponse.redirect(new URL(`/login?error=${errorCode}`, origin))
   }
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -55,7 +68,11 @@ export async function GET(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  const destination = profile?.pbkdf2_salt ? '/unlock' : '/setup'
+  // If a post-auth destination was requested (e.g. /checkout?tier=midnight),
+  // go there directly.  Checkout doesn't require vault access, so we can skip
+  // the unlock/setup step; those pages will redirect back if the vault is
+  // needed later.  For all other destinations, preserve the normal flow.
+  const destination = safeNext || (profile?.pbkdf2_salt ? '/unlock' : '/setup')
 
   return NextResponse.redirect(new URL(destination, origin))
 }

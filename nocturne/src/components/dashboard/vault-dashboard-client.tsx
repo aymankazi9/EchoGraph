@@ -9,6 +9,7 @@ import { getMasterKey, isVaultUnlocked } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
 import { encryptText } from '@/lib/crypto/encrypt'
 import { createClient } from '@/lib/supabase'
+import { formatBytes } from '@/lib/format'
 import { useDashboardStore, type SessionRow } from '@/store/dashboard-store'
 import { SessionCard } from './session-card'
 import { SessionCardSkeleton } from './session-card-skeleton'
@@ -19,6 +20,8 @@ import { SortControl } from './sort-control'
 import { EmptyFilteredState } from './empty-filtered-state'
 import { GettingStarted } from './getting-started'
 import { MomentumRibbon } from './momentum-ribbon'
+import { ContinueCard, type ContinueSessionData } from './continue-card'
+import { StatTiles, type VaultStats } from './stat-tiles'
 
 interface RawSession {
   id: string
@@ -37,11 +40,13 @@ interface Props {
   redZoneCounts: Record<string, number>
   slideCounts: Record<string, number>
   fileSizeBytes: Record<string, number>
-  storageMB: number
+  storageBytes: number
   sessionCount: number
   checklistDismissed: boolean
   checklistCompleted: boolean
   checklistExported: boolean
+  continueSession: ContinueSessionData | null
+  stats: VaultStats
 }
 
 export function VaultDashboardClient({
@@ -50,11 +55,13 @@ export function VaultDashboardClient({
   redZoneCounts,
   slideCounts,
   fileSizeBytes,
-  storageMB,
+  storageBytes,
   sessionCount,
   checklistDismissed,
   checklistCompleted,
   checklistExported,
+  continueSession,
+  stats,
 }: Props) {
   const router = useRouter()
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -267,11 +274,25 @@ export function VaultDashboardClient({
         </div>
       </div>
       <p className="text-body-sm text-text-secondary mb-3">
-        {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'} · {storageMB.toFixed(1)} MB used
+        {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'} · {formatBytes(storageBytes)} used
       </p>
 
       {/* Ambient momentum ribbon */}
-      <MomentumRibbon />
+      <div className="mb-3">
+        <MomentumRibbon />
+      </div>
+
+      {/* Continue studying */}
+      {continueSession && (
+        <div className="mb-3">
+          <ContinueCard session={continueSession} />
+        </div>
+      )}
+
+      {/* Stat tiles */}
+      <div className="mb-3">
+        <StatTiles {...stats} />
+      </div>
 
       {/* Search bar */}
       <div className="mb-3">

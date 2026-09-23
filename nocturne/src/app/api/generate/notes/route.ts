@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { hasAccess, type Tier } from '@/lib/tiers/features'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -29,6 +30,12 @@ export async function POST(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: subRow } = await supabase.from('subscriptions').select('tier').eq('user_id', user.id).maybeSingle()
+  const userTier = (subRow?.tier ?? 'dusk') as Tier
+  if (!hasAccess(userTier, 'eclipse')) {
+    return NextResponse.json({ error: 'Requires Eclipse plan', code: 'tier_required' }, { status: 403 })
+  }
 
   if (!ANTHROPIC_API_KEY) return NextResponse.json({ error: 'Not configured' }, { status: 503 })
 
@@ -59,6 +66,12 @@ export async function POST(request: NextRequest) {
   const parts: string[] = [
     'Generate structured study notes in markdown. Use ## headers per topic, bullet points for key ideas, and **bold** for important terms.',
     'Prioritize the high-emphasis terms — the professor spent the most time on these.',
+    '',
+    'SLIDE CITATIONS: When a point comes directly from a specific slide, append a citation',
+    'immediately after the sentence using exactly this format: [[slide:N]] where N is the',
+    'slide number from the SLIDE CONTENT section headers (e.g. "Slide 3" → [[slide:3]]).',
+    'Only cite slides that directly support the point. Do not cite every bullet — only where',
+    'the slide content is the direct source. Do not invent slide numbers.',
     '',
   ]
   if (redTerms.length > 0) parts.push(`**High-emphasis (most likely on exam):** ${redTerms.join(', ')}`)

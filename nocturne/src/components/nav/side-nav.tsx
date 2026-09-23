@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { LayoutDashboard, Plus, Settings, ChevronLeft, ChevronRight, Flame, Users, HelpCircle, CreditCard } from 'lucide-react'
+import { STORAGE_CAPS_BYTES, type Tier } from '@/lib/tiers/features'
 import { NavItem } from './nav-item'
 import { PrivacyBadge } from './privacy-badge'
 import { StorageIndicator } from './storage-indicator'
@@ -19,15 +20,13 @@ const NAV_ITEMS = [
   { href: '/vault/settings', icon: Settings, label: 'Settings' },
 ]
 
-// Free tier: 500 MB
-const FREE_MAX_BYTES = 500 * 1024 * 1024
-
 interface Props {
   email: string
   usedBytes: number
+  tier: Tier
 }
 
-export function SideNav({ email, usedBytes }: Props) {
+export function SideNav({ email, usedBytes, tier }: Props) {
   const [collapsed, setCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [animationReady, setAnimationReady] = useState(false)
@@ -57,24 +56,47 @@ export function SideNav({ email, usedBytes }: Props) {
       }
       className="flex flex-col h-screen sticky top-0 bg-bg-rail border-r border-border-default shrink-0 overflow-hidden"
     >
-      {/* Top: wordmark/monogram + collapse toggle */}
+      {/* Top: brand icon + wordmark + collapse toggle.
+          Single layout in both states so the icon never shifts vertically —
+          items-center + h-14 keeps it locked to the same vertical band.
+          Collapsed: icon is centered and acts as the expand button.
+          Expanded: icon + wordmark on the left, chevron on the right. */}
       {collapsed ? (
-        <div className="flex flex-col items-center justify-center h-14 border-b border-border-subtle shrink-0 gap-1">
-          <span className="text-subheading font-medium text-text-primary select-none">N</span>
+        <div className="flex items-center justify-center h-14 border-b border-border-subtle shrink-0">
           <button
             type="button"
             onClick={toggleCollapse}
             aria-label="Expand navigation"
-            className="w-7 h-7 flex items-center justify-center rounded-btn text-text-tertiary hover:text-text-secondary hover:bg-bg-subtle transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-md hover:bg-bg-subtle transition-colors"
           >
-            <ChevronRight size={14} strokeWidth={1.5} />
+            <span style={{
+              width: 24, height: 24, borderRadius: 7,
+              background: 'linear-gradient(145deg,#6366F1,#8B5CF6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#09090F', fontWeight: 700, fontSize: 13, flexShrink: 0,
+              boxShadow: '0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.35)',
+              pointerEvents: 'none',
+            }}>
+              N
+            </span>
           </button>
         </div>
       ) : (
         <div className="flex items-center justify-between h-14 px-3 border-b border-border-subtle shrink-0">
-          <span className="text-subheading font-medium text-text-primary select-none truncate">
-            Nocturne
-          </span>
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <span style={{
+              width: 24, height: 24, borderRadius: 7,
+              background: 'linear-gradient(145deg,#6366F1,#8B5CF6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#09090F', fontWeight: 700, fontSize: 13, flexShrink: 0,
+              boxShadow: '0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.35)',
+            }}>
+              N
+            </span>
+            <span className="text-subheading font-medium text-text-primary select-none truncate">
+              Nocturne
+            </span>
+          </div>
           <button
             type="button"
             onClick={toggleCollapse}
@@ -112,7 +134,7 @@ export function SideNav({ email, usedBytes }: Props) {
       ) : (
         <div className="flex flex-col gap-3 p-3 border-t border-border-subtle pb-4">
           <PrivacyBadge collapsed={false} />
-          <StorageIndicator usedBytes={usedBytes} maxBytes={FREE_MAX_BYTES} />
+          <StorageIndicator usedBytes={usedBytes} maxBytes={STORAGE_CAPS_BYTES[tier]} />
           <UserRow email={email} />
         </div>
       )}

@@ -5,6 +5,7 @@ import { PageFade } from '@/components/marketing/page-fade'
 export const metadata: Metadata = {
   title: 'Changelog — Nocturne',
   description: 'What\'s new in Nocturne.',
+  alternates: { canonical: '/changelog' },
 }
 
 const entries = [
@@ -37,7 +38,7 @@ export default function ChangelogPage() {
     <div className="px-6 py-16 md:py-24">
       <div className="max-w-2xl mx-auto">
         <div className="mb-12">
-          <p className="text-caption uppercase tracking-[0.07em] text-indigo-400 mb-3">
+          <p className="text-caption uppercase tracking-[0.1em] text-indigo-400 mb-3">
             Changelog
           </p>
           <h1 className="text-heading font-medium text-text-primary mb-3">
@@ -53,7 +54,7 @@ export default function ChangelogPage() {
             <div key={entry.version}>
               <div className="flex items-center gap-3 mb-5">
                 <span className="text-body-sm font-medium text-text-primary">{entry.version}</span>
-                <span className="text-caption uppercase tracking-[0.07em] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                <span className="text-caption uppercase tracking-[0.1em] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
                   {entry.label}
                 </span>
                 <span className="text-caption text-text-tertiary ml-auto">{entry.date}</span>

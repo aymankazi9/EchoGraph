@@ -6,8 +6,7 @@ const FOOTER_COLS = [
   {
     heading: 'Product',
     links: [
-      { label: 'Pricing', href: '/pricing' },
-      { label: 'Security', href: '/security' },
+      { label: 'Pricing', href: '#pricing' },
       { label: 'Roadmap', href: '/roadmap' },
       { label: 'Newsletter', href: '#newsletter' },
     ],
@@ -21,11 +20,20 @@ const FOOTER_COLS = [
     ],
   },
   {
+    heading: 'Use Cases',
+    links: [
+      { label: 'For Pre-Med', href: '/for/pre-med' },
+      { label: 'For Engineering', href: '/for/engineering' },
+      { label: 'For Law', href: '/for/law' },
+    ],
+  },
+  {
     heading: 'Legal',
     links: [
       { label: 'Privacy', href: '/privacy' },
       { label: 'Terms', href: '/terms' },
       { label: 'Cookies', href: '/cookies' },
+      { label: 'Security', href: '/security' },
     ],
   },
   {
@@ -47,7 +55,7 @@ export function LandingFooter() {
           data-footer-grid=""
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(4,1fr)',
+            gridTemplateColumns: 'repeat(5,1fr)',
             gap: 32,
             marginBottom: 48,
           }}

@@ -1,12 +1,19 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AuthBrandCanvas } from '@/components/auth/auth-brand-canvas'
 import { vaultSetup, getPendingRecoveryBlob, clearPendingRecoveryBlob } from '@/lib/crypto/vault'
 import { downloadRecoveryKit, formatRecoveryKit } from '@/lib/crypto/recovery'
 import { createClient } from '@/lib/supabase'
+import { validateInviteCode } from '@/app/actions/validate-invite'
+
+// When BETA_MODE is on, new users must supply a valid invite code before
+// proceeding with vault setup.  The validated flag is stored in localStorage
+// so it survives the Google OAuth redirect.
+const BETA_MODE = process.env.NEXT_PUBLIC_BETA_MODE === 'true'
+const INVITE_LS_KEY = 'nocturne-invite-ok'
 
 interface Props {
   userId: string
@@ -44,7 +51,43 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
   const heroRef = useRef<HTMLElement>(null)
   const router = useRouter()
 
-  // Step state
+  // ── Beta invite code gate ─────────────────────────────────────────────────
+  // inviteValidated starts as true when beta mode is off, or when localStorage
+  // already has the flag set (persists across the Google OAuth redirect).
+  const [inviteValidated, setInviteValidated] = useState(() => {
+    if (!BETA_MODE) return true
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(INVITE_LS_KEY) === '1'
+  })
+  const [inviteCode, setInviteCode] = useState('')
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteChecking, setInviteChecking] = useState(false)
+
+  // Re-check localStorage after hydration (handles SSR mismatch).
+  useEffect(() => {
+    if (!BETA_MODE) return
+    if (localStorage.getItem(INVITE_LS_KEY) === '1') setInviteValidated(true)
+  }, [])
+
+  async function handleValidateInvite() {
+    setInviteChecking(true)
+    setInviteError(null)
+    try {
+      const result = await validateInviteCode(inviteCode)
+      if (result.ok) {
+        localStorage.setItem(INVITE_LS_KEY, '1')
+        setInviteValidated(true)
+      } else {
+        setInviteError(result.error)
+      }
+    } catch {
+      setInviteError('Could not validate code. Please try again.')
+    } finally {
+      setInviteChecking(false)
+    }
+  }
+
+  // ── Step state ────────────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>(initialStep)
 
   // Step 0 — account
@@ -129,6 +172,69 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
 
   // Progress bars (steps 0–2)
   const progressBars = step < 3 ? [0, 1, 2].map(i => ({ active: i === step, done: i < step })) : []
+
+  // ── Beta invite code wall ─────────────────────────────────────────────────
+  // Shown before the rest of the setup flow when BETA_MODE=true and the invite
+  // code hasn't been validated yet.
+  if (BETA_MODE && !inviteValidated) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#09090F', padding: '48px 24px' }}>
+        <div style={{ width: '100%', maxWidth: 380 }}>
+          {/* Wordmark */}
+          <a href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 36, textDecoration: 'none' }}>
+            <span style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(145deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#09090F', fontWeight: 700, fontSize: 15 }}>N</span>
+            <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', color: '#E2E8F0' }}>Nocturne</span>
+          </a>
+
+          <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', color: '#E2E8F0', margin: '0 0 8px' }}>
+            Invite code required
+          </h2>
+          <p style={{ fontSize: 14, color: '#94A3B8', margin: '0 0 28px', lineHeight: 1.6 }}>
+            Nocturne is in closed beta. Enter your invite code to create an account.
+            Don&apos;t have one?{' '}
+            <a href="/#beta-request" style={{ color: '#818CF8', textDecoration: 'none' }}>Request access →</a>
+          </p>
+
+          <label style={{ display: 'block', fontSize: 12.5, color: '#94A3B8', marginBottom: 8 }}>
+            Invite code
+          </label>
+          <input
+            type="text"
+            placeholder="nocturne-beta-xxxx"
+            value={inviteCode}
+            onChange={(e) => { setInviteCode(e.target.value); setInviteError(null) }}
+            onKeyDown={(e) => e.key === 'Enter' && handleValidateInvite()}
+            autoFocus
+            style={{
+              width: '100%', height: 46, borderRadius: 9,
+              background: '#13121C', border: '1px solid #2D2B45',
+              color: '#E2E8F0', padding: '0 14px', fontSize: 15,
+              outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+          {inviteError && (
+            <p style={{ fontSize: 12.5, color: '#FB7185', margin: '8px 0 0' }}>{inviteError}</p>
+          )}
+          <button
+            type="button"
+            onClick={handleValidateInvite}
+            disabled={inviteChecking || !inviteCode.trim()}
+            style={{
+              width: '100%', height: 46, marginTop: 14,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+              borderRadius: 9, fontSize: 15, fontWeight: 500,
+              background: '#6366F1', color: '#09090F',
+              border: 'none', cursor: inviteChecking ? 'not-allowed' : 'pointer',
+              boxShadow: '0 8px 26px rgba(99,102,241,0.32)',
+              opacity: (inviteChecking || !inviteCode.trim()) ? 0.65 : 1,
+            }}
+          >
+            {inviteChecking ? 'Checking…' : 'Continue →'}
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: '#09090F' }}>

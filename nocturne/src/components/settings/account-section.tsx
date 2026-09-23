@@ -1,34 +1,36 @@
 import Link from 'next/link'
+import type { Tier } from '@/lib/tiers/features'
+
+const IS_BETA = process.env.NEXT_PUBLIC_BETA_MODE === 'true'
 
 interface Props {
   email: string
   createdAt: string
-  tier: string | null
+  tier: Tier
 }
 
 function formatMemberSince(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
 
-function TierBadge({ tier }: { tier: string | null }) {
-  const t = tier ?? 'free'
-  if (t === 'scholar') {
+function TierBadge({ tier }: { tier: Tier }) {
+  if (tier === 'midnight') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-caption bg-indigo-500/20 text-indigo-300">
-        Scholar
+        Midnight
       </span>
     )
   }
-  if (t === 'pro') {
+  if (tier === 'eclipse') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-caption bg-violet-500/20 text-violet-300">
-        Pro
+        Eclipse
       </span>
     )
   }
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-caption bg-bg-subtle text-text-secondary">
-      Free
+      Dusk
     </span>
   )
 }
@@ -54,9 +56,9 @@ export function AccountSection({ email, createdAt, tier }: Props) {
       </Row>
       <Row label="Plan">
         <TierBadge tier={tier} />
-        {(!tier || tier === 'free') && (
+        {tier === 'dusk' && !IS_BETA && (
           <Link
-            href="#pricing"
+            href="/billing"
             className="text-caption text-text-tertiary hover:text-text-secondary transition-colors"
           >
             Upgrade

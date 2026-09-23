@@ -4,6 +4,7 @@ import { LegalClient } from '../LegalClient'
 export const metadata: Metadata = {
   title: 'Privacy Policy — Nocturne',
   description: 'How Nocturne collects, uses, and protects your information with zero-knowledge architecture.',
+  alternates: { canonical: '/privacy' },
 }
 
 export default function PrivacyPage() {

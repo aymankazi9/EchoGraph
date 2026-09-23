@@ -4,6 +4,7 @@ import { LegalClient } from '../LegalClient'
 export const metadata: Metadata = {
   title: 'Terms of Service — Nocturne',
   description: 'The agreement that governs your use of Nocturne.',
+  alternates: { canonical: '/terms' },
 }
 
 export default function TermsPage() {

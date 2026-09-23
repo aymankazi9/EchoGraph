@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { hasAccess, type Tier } from '@/lib/tiers/features'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -78,6 +79,12 @@ export async function POST(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: subRow } = await supabase.from('subscriptions').select('tier').eq('user_id', user.id).maybeSingle()
+  const userTier = (subRow?.tier ?? 'dusk') as Tier
+  if (!hasAccess(userTier, 'midnight')) {
+    return NextResponse.json({ error: 'Requires Midnight plan', code: 'tier_required' }, { status: 403 })
+  }
 
   if (!ANTHROPIC_API_KEY) return NextResponse.json({ error: 'Not configured' }, { status: 503 })
 

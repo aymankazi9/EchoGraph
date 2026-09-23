@@ -3,6 +3,7 @@ import { StubPage } from '@/components/marketing/stub-page'
 
 export const metadata: Metadata = {
   title: 'Accessibility — Nocturne',
+  alternates: { canonical: '/accessibility' },
 }
 
 export default function AccessibilityPage() {

@@ -1,13 +1,37 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
 import { TopoBackground } from '@/components/marketing/topo-background'
 
+// Beta mode: primary CTA scrolls to the beta-request form instead of /setup.
+const IS_BETA = process.env.NEXT_PUBLIC_BETA_MODE === 'true'
+
+const BADGE_PHRASES = [
+  'Measuring professor emphasis, live',
+  'AI lecture and slide analysis',
+  'AI-powered exam keyword ranking',
+  'Find what your professor emphasized',
+]
+
 export function LandingHero() {
   const taglineRef = useRef<HTMLSpanElement>(null)
   const reduced = useReducedMotion()
+  const [phraseIdx, setPhraseIdx] = useState(0)
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    if (reduced) return
+    const interval = setInterval(() => {
+      setVisible(false)
+      setTimeout(() => {
+        setPhraseIdx((i) => (i + 1) % BADGE_PHRASES.length)
+        setVisible(true)
+      }, 400)
+    }, 3600)
+    return () => clearInterval(interval)
+  }, [reduced])
 
   useEffect(() => {
     if (reduced) return
@@ -79,9 +103,11 @@ export function LandingHero() {
               fontSize: 12,
               letterSpacing: '0.04em',
               color: '#94A3B8',
+              opacity: visible ? 1 : 0,
+              transition: 'opacity 0.35s ease',
             }}
           >
-            Measuring professor emphasis, live
+            {BADGE_PHRASES[phraseIdx]}
           </span>
         </div>
 
@@ -142,27 +168,56 @@ export function LandingHero() {
             marginTop: 36,
           }}
         >
-          <Link
-            href="/setup"
-            data-btn=""
-            data-shine=""
-            style={{
-              height: 46,
-              padding: '0 26px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 9,
-              borderRadius: 8,
-              fontSize: 15,
-              fontWeight: 500,
-              background: '#6366F1',
-              color: '#09090F',
-              boxShadow: '0 8px 28px rgba(99,102,241,0.35)',
-              textDecoration: 'none',
-            }}
-          >
-            Start for free <span data-arrow="" style={{ color: '#09090F' }}>→</span>
-          </Link>
+          {IS_BETA ? (
+            <a
+              href="#beta-request"
+              data-btn=""
+              data-shine=""
+              onClick={(e) => {
+                e.preventDefault()
+                document.getElementById('beta-request')?.scrollIntoView({ behavior: 'smooth' })
+              }}
+              style={{
+                height: 46,
+                padding: '0 26px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 9,
+                borderRadius: 8,
+                fontSize: 15,
+                fontWeight: 500,
+                background: '#6366F1',
+                color: '#09090F',
+                boxShadow: '0 8px 28px rgba(99,102,241,0.35)',
+                textDecoration: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Request beta access <span data-arrow="" style={{ color: '#09090F' }}>→</span>
+            </a>
+          ) : (
+            <Link
+              href="/setup"
+              data-btn=""
+              data-shine=""
+              style={{
+                height: 46,
+                padding: '0 26px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 9,
+                borderRadius: 8,
+                fontSize: 15,
+                fontWeight: 500,
+                background: '#6366F1',
+                color: '#09090F',
+                boxShadow: '0 8px 28px rgba(99,102,241,0.35)',
+                textDecoration: 'none',
+              }}
+            >
+              Start for free <span data-arrow="" style={{ color: '#09090F' }}>→</span>
+            </Link>
+          )}
           <a
             href="#how"
             data-btn=""

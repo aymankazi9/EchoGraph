@@ -35,11 +35,23 @@ function buildPrompt(
   transcriptBlock: string,
 ): string {
   const parts: string[] = [
-    'Extract 60–80 key study terms and concepts from the lecture materials below.',
+    'You are an experienced TA preparing a study list for a college-level exam.',
+    'Your job is to identify the specific terms a student must know to pass — not to summarise the lecture.',
+    'Extract 60–80 terms from the materials below.',
+    '',
+    'Prioritise (in order):',
+    '  • Named laws, theorems, principles, and equations (e.g. "fick\'s law", "nernst equation", "law of mass action")',
+    '  • Field-specific technical vocabulary that would appear in a textbook glossary (e.g. "depolarisation", "allosteric inhibition", "covalent bond")',
+    '  • Named processes, mechanisms, pathways, and structures (e.g. "krebs cycle", "sodium-potassium pump", "nodes of ranvier")',
+    '  • Multi-word technical phrases where the combination carries specific meaning (e.g. "action potential", "resting membrane potential", "oxidative phosphorylation")',
     '',
     'Rules:',
-    '1. Preserve multi-word technical phrases (e.g. "action potential", "sodium-potassium pump").',
-    '2. Tag each term with exactly one of these source values:',
+    '1. Prefer the most complete, specific form of a phrase — "ideal gas law" over "gas", "sliding filament theory" over "contraction".',
+    '2. Omit generic standalone common nouns that have no specific technical meaning in isolation:',
+    '   BAD: "gas", "energy", "system", "process", "factor", "structure", "function", "level", "type"',
+    '   GOOD: "gas exchange", "activation energy", "transport system", "second messenger"',
+    '   If a word would not appear as a bolded term in a college textbook on its own, drop it.',
+    '3. Tag each term with exactly one source value:',
     guideText
       ? '   - "guide": explicitly listed as a key term/concept in the study guide'
       : '',
@@ -49,9 +61,9 @@ function buildPrompt(
     guideText
       ? '   - "both": present in the study guide AND independently emphasized in the lecture'
       : '',
-    '3. Consolidate near-duplicates into the more complete/specific form.',
-    '4. Omit single-letter abbreviations, generic filler phrases, and slide headers.',
-    '5. Use lowercase for all terms.',
+    '4. Consolidate near-duplicates and abbreviation/expansion pairs into the more complete/specific form.',
+    '5. Omit single-letter abbreviations, acronyms without expansion, and slide headers.',
+    '6. Use lowercase for all terms.',
     '',
     'Return exactly this JSON and nothing else:',
     '{ "keywords": [{ "term": "...", "source": "guide" | "inferred" | "both" }] }',

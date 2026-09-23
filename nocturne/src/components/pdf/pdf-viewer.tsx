@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { getMasterKey } from '@/lib/crypto/vault'
 import { fetchAndDecryptFile } from '@/lib/crypto/decrypt'
 import { extractSlideText } from '@/lib/pdf/extractor'
+import type { SlideSource } from '@/lib/pdf/extractor'
 import { createClient } from '@/lib/supabase'
 import { useSessionStore } from '@/store/session-store'
 
@@ -33,7 +34,23 @@ const fadeUp = {
   },
 }
 
-// ─── Public handle ────────────────────────────────────────────────────────────
+// ─── Public types ─────────────────────────────────────────────────────────────
+
+/**
+ * One entry in the merged global slide list, covering all files in the session.
+ * globalIndex is the authoritative key for all per-slide lookups (slideZoneMap, etc.).
+ */
+export interface SlideEntry {
+  /** 1-based cumulative index across all slide files in the session. */
+  globalIndex: number
+  fileId: string
+  /** 0-based index into slideFiles — used for "Slides N" boundary labels. */
+  fileIndex: number
+  /** 1-based page number within this file's own PDF. */
+  localPage: number
+  /** Kept alive for the component's lifetime — safe to pass to ThumbnailCanvas. */
+  pdfDoc: PDFDocumentProxy
+}
 
 export interface PdfViewerHandle {
   goToPage: (page: number) => void
@@ -41,34 +58,52 @@ export interface PdfViewerHandle {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+interface SlideFile {
+  id: string
+  storage_path: string
+}
+
 interface Props {
   storagePath: string
+  /** UUID of the primary (displayed) PDF file. */
+  fileId: string
+  /**
+   * All slide source files for this session, ordered by session_files.order_index.
+   * Defaults to [{ id: fileId, storage_path: storagePath }] for single-source sessions.
+   * All files are loaded eagerly and kept alive — thumbnails and navigation
+   * work across every file, not just the primary one.
+   */
+  slideFiles?: SlideFile[]
   sessionId: string
   onSlidesExtracted?: () => void
-  onPdfDocReady?: (doc: PDFDocumentProxy, totalPages: number) => void
+  /** Called once all slide files are fully loaded. entries covers every slide across every file. */
+  onPdfDocReady?: (entries: SlideEntry[], totalPages: number) => void
   onPageChange?: (page: number) => void
 }
 
 export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
-  { storagePath, sessionId, onSlidesExtracted, onPdfDocReady, onPageChange },
+  { storagePath, fileId, slideFiles, sessionId, onSlidesExtracted, onPdfDocReady, onPageChange },
   ref,
 ) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadLabel, setLoadLabel] = useState('Fetching slides…')
   const [loadPct, setLoadPct] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
+  // currentPage is a global index (1-based, cumulative across all files)
   const [currentPage, setCurrentPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
+  const [canvasAreaVersion, setCanvasAreaVersion] = useState(0)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
   const canvasWrapRef = useRef<HTMLDivElement>(null)
   const canvasAreaRef = useRef<HTMLDivElement>(null)
-  const pdfRef = useRef<PDFDocumentProxy | null>(null)
-  const objectUrlRef = useRef<string | null>(null)
+  // All loaded documents, kept alive for the session lifetime
+  const docsRef = useRef<{ fileId: string; doc: PDFDocumentProxy; url: string }[]>([])
+  // globalIndex → SlideEntry for O(1) render lookup
+  const entryMapRef = useRef<Map<number, SlideEntry>>(new Map())
   const renderTaskRef = useRef<{ cancel(): void } | null>(null)
   const pageJumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const currentPageRef = useRef(0)
 
   const supabase = createClient()
 
@@ -99,56 +134,99 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
     onPageChangeRef.current?.(currentPage)
   }, [currentPage])
 
-  // ── Load PDF on mount ────────────────────────────────────────────────────
+  // ── Load all slide files on mount ────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
+    // Track everything created in this run so cleanup is complete regardless
+    // of whether the load committed before cancellation.
+    const pendingDocs: PDFDocumentProxy[] = []
+    const allUrls: string[] = []
 
-    async function load() {
+    async function loadAll() {
       const mk = getMasterKey()
       if (!mk) { setStatus('error'); setError('Vault is locked.'); return }
 
-      try {
-        const pdfArrayBuffer = await fetchAndDecryptFile(
+      const allFiles: SlideFile[] =
+        slideFiles && slideFiles.length > 0
+          ? slideFiles
+          : [{ id: fileId, storage_path: storagePath }]
+
+      const lib = await loadPdfjs()
+      const loaded: { fileId: string; doc: PDFDocumentProxy; url: string }[] = []
+      const multiFile = allFiles.length > 1
+
+      for (let fi = 0; fi < allFiles.length; fi++) {
+        const sf = allFiles[fi]
+
+        const buf = await fetchAndDecryptFile(
           supabase,
-          storagePath,
+          sf.storage_path,
           mk,
           (phase, pct) => {
             if (cancelled) return
-            setLoadLabel(phase === 'fetch' ? 'Fetching slides…' : 'Decrypting slides…')
-            setLoadPct(phase === 'fetch' ? pct * 0.5 : 50 + pct * 0.5)
+            // For multi-file, aggregate: each file contributes 1/N of total progress.
+            const withinFile = phase === 'fetch' ? pct * 0.5 : 50 + pct * 0.5
+            const overall = ((fi + withinFile / 100) / allFiles.length) * 100
+            setLoadLabel(
+              multiFile
+                ? `Loading slides… (${fi + 1} of ${allFiles.length})`
+                : phase === 'fetch' ? 'Fetching slides…' : 'Decrypting slides…',
+            )
+            setLoadPct(overall)
           },
         )
 
         if (cancelled) return
 
-        const lib = await loadPdfjs()
-        const blob = new Blob([pdfArrayBuffer], { type: 'application/pdf' })
+        const blob = new Blob([buf], { type: 'application/pdf' })
         const url = URL.createObjectURL(blob)
-        objectUrlRef.current = url
+        allUrls.push(url)
 
-        const pdf = await lib.getDocument(url).promise
-        if (cancelled) { pdf.destroy(); return }
+        const doc = await lib.getDocument(url).promise
+        if (cancelled) { doc.destroy(); return }
 
-        pdfRef.current = pdf
-        setTotalPages(pdf.numPages)
-        setStatus('ready')
-        onPdfDocReadyRef.current?.(pdf, pdf.numPages)
-      } catch (e) {
-        if (!cancelled) {
-          setStatus('error')
-          setError(e instanceof Error ? e.message : 'Failed to load PDF.')
+        pendingDocs.push(doc)
+        loaded.push({ fileId: sf.id, doc, url })
+      }
+
+      // Build the global slide entry list
+      const entries: SlideEntry[] = []
+      let globalIdx = 0
+      for (let fi = 0; fi < loaded.length; fi++) {
+        const { fileId: fid, doc } = loaded[fi]
+        for (let localPage = 1; localPage <= doc.numPages; localPage++) {
+          globalIdx++
+          entries.push({ globalIndex: globalIdx, fileId: fid, fileIndex: fi, localPage, pdfDoc: doc })
         }
       }
+
+      // Commit — docs are now owned by docsRef for the component's lifetime
+      docsRef.current = loaded
+      pendingDocs.length = 0  // committed; cleanup will use docsRef instead
+      entryMapRef.current = new Map(entries.map((e) => [e.globalIndex, e]))
+      setTotalPages(globalIdx)
+      setStatus('ready')
+      onPdfDocReadyRef.current?.(entries, globalIdx)
     }
 
-    load()
+    loadAll().catch((e) => {
+      if (!cancelled) {
+        setStatus('error')
+        setError(e instanceof Error ? e.message : 'Failed to load PDF.')
+      }
+    })
 
     return () => {
       cancelled = true
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current)
-        objectUrlRef.current = null
-      }
+      // Destroy uncommitted docs (cancelled mid-load before docsRef was set)
+      for (const doc of pendingDocs) doc.destroy()
+      // Destroy committed docs (deps changed or unmount)
+      const committed = docsRef.current
+      docsRef.current = []
+      entryMapRef.current.clear()
+      for (const { doc } of committed) doc.destroy()
+      // Revoke all object URLs created in this run
+      for (const url of allUrls) URL.revokeObjectURL(url)
     }
   }, [storagePath]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -169,15 +247,14 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
   // ── Render page ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (status !== 'ready') return
-    if (currentPage === currentPageRef.current && currentPageRef.current !== 0) return
-    currentPageRef.current = currentPage
 
-    const pdf = pdfRef.current
+    // Resolve the correct PDF document and local page from the global index
+    const entry = entryMapRef.current.get(currentPage)
     const canvas = canvasRef.current
     const textLayerDiv = textLayerRef.current
     const canvasWrap = canvasWrapRef.current
     const canvasArea = canvasAreaRef.current
-    if (!pdf || !canvas || !textLayerDiv || !canvasWrap || !canvasArea) return
+    if (!entry || !canvas || !textLayerDiv || !canvasWrap || !canvasArea) return
 
     if (renderTaskRef.current) {
       try { renderTaskRef.current.cancel() } catch { /* ignore */ }
@@ -187,12 +264,13 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
     let cancelled = false
 
     async function render() {
-      const page = await pdf!.getPage(currentPage)
+      const page = await entry!.pdfDoc.getPage(entry!.localPage)
       if (cancelled) { page.cleanup(); return }
 
-      const containerWidth = Math.max(canvasArea!.clientWidth - 4, 200)
       const baseViewport = page.getViewport({ scale: 1.0 })
-      const scale = containerWidth / baseViewport.width
+      const widthScale = (canvasArea!.clientWidth * 0.75) / baseViewport.width
+      const heightScale = (canvasArea!.clientHeight * 0.9) / baseViewport.height
+      const scale = Math.max(Math.min(widthScale, heightScale), 0.2)
       const viewport = page.getViewport({ scale })
 
       canvas!.width = viewport.width
@@ -234,11 +312,26 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
     })
 
     return () => { cancelled = true }
-  }, [currentPage, status])
+  }, [currentPage, status, canvasAreaVersion])
+
+  // ── Re-render when canvas area resizes ───────────────────────────────────
+  useEffect(() => {
+    if (status !== 'ready') return
+    const el = canvasAreaRef.current
+    if (!el) return
+    let initial = true
+    const ro = new ResizeObserver(() => {
+      if (initial) { initial = false; return }
+      setCanvasAreaVersion((v) => v + 1)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [status])
 
   // ── Extract slide text once after load ───────────────────────────────────
+  // All files are already loaded and kept alive in docsRef — no need to re-fetch.
   useEffect(() => {
-    if (status !== 'ready' || !pdfRef.current) return
+    if (status !== 'ready') return
     const mk = getMasterKey()
     if (!mk) return
 
@@ -249,7 +342,11 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
         .eq('session_id', sessionId)
 
       if ((count ?? 0) > 0) return
-      await extractSlideText(pdfRef.current!, sessionId, mk!, supabase)
+
+      const sources: SlideSource[] = docsRef.current.map((d) => ({ fileId: d.fileId, pdf: d.doc }))
+      if (sources.length === 0) return
+
+      await extractSlideText(sources, sessionId, mk!, supabase)
       onSlidesExtractedRef.current?.()
     }
 
@@ -285,7 +382,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
           animate="visible"
           className="flex flex-1 min-h-0 overflow-hidden"
         >
-          <div ref={canvasAreaRef} className="flex-1 min-w-0 overflow-auto p-2">
+          <div ref={canvasAreaRef} className="flex-1 min-w-0 overflow-auto flex items-center justify-center">
             <div ref={canvasWrapRef} className="relative inline-block">
               <canvas ref={canvasRef} className="block" />
               <div ref={textLayerRef} className="textLayer absolute inset-0" />

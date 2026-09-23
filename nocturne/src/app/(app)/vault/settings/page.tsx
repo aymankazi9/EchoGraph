@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase-server'
+import { getUserTier } from '@/lib/tiers/server'
 import { Separator } from '@/components/ui/separator'
 import { AccountSection } from '@/components/settings/account-section'
 import { PreferencesSection } from '@/components/settings/preferences-section'
@@ -15,12 +16,14 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch user profile + session storage breakdown in parallel
-  const [{ data: profile }, { data: fileRows }] = await Promise.all([
+  // Fetch user profile, file sizes, total storage, and subscription tier in parallel.
+  // users.tier is deprecated — tier authority is now subscriptions.tier via getUserTier().
+  // users.storage_used_bytes is never written; use get_user_storage_bytes() instead.
+  const [{ data: profile }, { data: fileRows }, { data: usedBytesRaw }, userTier] = await Promise.all([
     supabase
       .from('users')
       .select(
-        'pbkdf2_salt, encrypted_master_key, recovery_salt, field, tier, storage_used_bytes, silence_threshold_ms, created_at',
+        'pbkdf2_salt, encrypted_master_key, recovery_salt, field, silence_threshold_ms, created_at',
       )
       .eq('id', user.id)
       .single(),
@@ -30,6 +33,11 @@ export default async function SettingsPage() {
       .from('files')
       .select('session_id, size_bytes')
       .eq('user_id', user.id),
+
+    // Accurate byte total across all encrypted content columns
+    supabase.rpc('get_user_storage_bytes', { p_user_id: user.id }),
+
+    getUserTier(supabase, user.id),
   ])
 
   if (!profile?.pbkdf2_salt) redirect('/setup')
@@ -70,7 +78,7 @@ export default async function SettingsPage() {
         <AccountSection
           email={user.email ?? ''}
           createdAt={profile.created_at ?? user.created_at}
-          tier={profile.tier}
+          tier={userTier}
         />
 
         <Separator className="bg-border-subtle" />
@@ -79,14 +87,14 @@ export default async function SettingsPage() {
           userId={user.id}
           initialField={profile.field}
           initialSilenceMs={profile.silence_threshold_ms ?? 1500}
-          tier={profile.tier}
+          tier={userTier}
         />
 
         <Separator className="bg-border-subtle" />
 
         <StorageSection
-          usedBytes={profile.storage_used_bytes ?? 0}
-          tier={profile.tier}
+          usedBytes={(usedBytesRaw as number | null) ?? 0}
+          tier={userTier}
           sessionBreakdown={sessionBreakdown}
         />
 

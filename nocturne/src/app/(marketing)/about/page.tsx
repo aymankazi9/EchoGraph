@@ -6,6 +6,7 @@ import { PageFade } from '@/components/marketing/page-fade'
 export const metadata: Metadata = {
   title: 'About — Nocturne',
   description: 'Why we built Nocturne — a study intelligence system for students in high-stakes fields.',
+  alternates: { canonical: '/about' },
 }
 
 const features = [
@@ -35,8 +36,8 @@ export default function AboutPage() {
     <div className="px-6 py-16 md:py-24">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div className="mb-14">
-          <p className="text-caption uppercase tracking-[0.07em] text-indigo-400 mb-3">
+        <div data-reveal="" className="mb-14">
+          <p className="text-caption uppercase tracking-[0.1em] text-indigo-400 mb-3">
             About
           </p>
           <h1 className="text-heading font-medium text-text-primary mb-4">
@@ -49,8 +50,8 @@ export default function AboutPage() {
         </div>
 
         {/* Problem section */}
-        <section className="mb-14 p-6 rounded-card border border-border-default bg-bg-elevated">
-          <p className="text-caption uppercase tracking-[0.07em] text-text-tertiary mb-4">
+        <section data-reveal="" className="mb-14 p-6 rounded-card border border-border-default bg-bg-elevated">
+          <p className="text-caption uppercase tracking-[0.1em] text-text-tertiary mb-4">
             The problem
           </p>
           <div className="flex flex-col gap-4">
@@ -72,8 +73,8 @@ export default function AboutPage() {
         </section>
 
         {/* Feature highlights */}
-        <section className="mb-14">
-          <p className="text-caption uppercase tracking-[0.07em] text-text-tertiary mb-6">
+        <section data-reveal="" className="mb-14">
+          <p className="text-caption uppercase tracking-[0.1em] text-text-tertiary mb-6">
             How it works
           </p>
           <div className="flex flex-col gap-4">
@@ -93,7 +94,7 @@ export default function AboutPage() {
 
         {/* Positioning */}
         <section className="mb-14 p-6 rounded-card border border-border-default bg-bg-elevated">
-          <p className="text-caption uppercase tracking-[0.07em] text-text-tertiary mb-4">
+          <p className="text-caption uppercase tracking-[0.1em] text-text-tertiary mb-4">
             Who it&apos;s for
           </p>
           <p className="text-body text-text-secondary leading-relaxed mb-3">
@@ -108,7 +109,7 @@ export default function AboutPage() {
 
         {/* Contact */}
         <section className="pt-8 border-t border-border-subtle">
-          <p className="text-caption uppercase tracking-[0.07em] text-text-tertiary mb-3">
+          <p className="text-caption uppercase tracking-[0.1em] text-text-tertiary mb-3">
             Get in touch
           </p>
           <h2 className="text-subheading font-medium text-text-primary mb-3">
@@ -121,14 +122,40 @@ export default function AboutPage() {
             {/* TODO: confirm final domain before launch */}
             <a
               href="mailto:hello@nocturne.app"
-              className="inline-flex items-center gap-2 h-9 px-4 rounded-btn text-body text-text-secondary border border-border-default hover:bg-bg-subtle transition-colors"
+              data-btn=""
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                height: 38,
+                padding: '0 16px',
+                borderRadius: 6,
+                fontSize: 14,
+                color: '#94A3B8',
+                border: '1px solid #1E1E2E',
+                textDecoration: 'none',
+              }}
             >
               <Mail size={14} strokeWidth={1.5} />
               hello@nocturne.app
             </a>
             <Link
               href="/login"
-              className="inline-flex h-9 px-4 items-center rounded-btn text-body font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
+              data-btn=""
+              data-shine=""
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                height: 46,
+                padding: '0 26px',
+                borderRadius: 8,
+                fontSize: 15,
+                fontWeight: 500,
+                background: '#6366F1',
+                color: '#09090F',
+                textDecoration: 'none',
+                boxShadow: '0 8px 28px rgba(99,102,241,0.35)',
+              }}
             >
               Start for free
             </Link>

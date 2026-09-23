@@ -4,6 +4,7 @@ import { LegalClient } from '../LegalClient'
 export const metadata: Metadata = {
   title: 'Security — Nocturne',
   description: "A technical account of Nocturne's zero-knowledge architecture — what protects your data and what we can never see.",
+  alternates: { canonical: '/security' },
 }
 
 export default function SecurityPage() {

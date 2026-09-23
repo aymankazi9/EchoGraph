@@ -37,6 +37,7 @@ export function StubPage({ badge, title, description }: Props) {
       </p>
       <Link
         href="/"
+        data-btn=""
         className="inline-flex items-center gap-2 h-9 px-4 rounded-btn text-body text-text-secondary border border-border-default hover:bg-bg-subtle transition-colors"
       >
         <ArrowLeft size={14} strokeWidth={1.5} />

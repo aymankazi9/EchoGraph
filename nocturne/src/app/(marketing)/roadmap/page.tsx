@@ -3,6 +3,7 @@ import { StubPage } from '@/components/marketing/stub-page'
 
 export const metadata: Metadata = {
   title: 'Roadmap — Nocturne',
+  alternates: { canonical: '/roadmap' },
 }
 
 export default function RoadmapPage() {

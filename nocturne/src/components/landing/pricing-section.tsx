@@ -1,9 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+// Beta mode: checkout is not yet open. All CTAs scroll to the beta request form.
+const IS_BETA = process.env.NEXT_PUBLIC_BETA_MODE === 'true'
+
 type Billing = 'monthly' | 'yearly'
+type CheckoutTier = 'midnight' | 'eclipse'
 
 const PLAN_SRC = [
   {
@@ -15,7 +20,7 @@ const PLAN_SRC = [
     coming: false,
     cta: 'Start for free',
     primary: false,
-    href: '/login' as string,
+    tier: null as CheckoutTier | null,
     features: [
       'PDF viewer + slide extraction',
       'Whisper browser transcription',
@@ -36,7 +41,7 @@ const PLAN_SRC = [
     coming: false,
     cta: 'Get Midnight',
     primary: true,
-    href: '/login' as string,
+    tier: 'midnight' as CheckoutTier | null,
     features: [
       'Everything in Dusk',
       'Server-side ASR + diarization',
@@ -57,7 +62,7 @@ const PLAN_SRC = [
     coming: true,
     cta: 'Join the waitlist',
     primary: false,
-    href: '#newsletter' as string,
+    tier: null as CheckoutTier | null,
     features: [
       'Everything in Midnight',
       'AI summarization (opt-in)',
@@ -73,6 +78,32 @@ const PLAN_SRC = [
 
 export function PricingSection() {
   const [billing, setBilling] = useState<Billing>('yearly')
+  const [loadingTier, setLoadingTier] = useState<CheckoutTier | null>(null)
+  const router = useRouter()
+
+  async function handleCheckout(tier: CheckoutTier) {
+    setLoadingTier(tier)
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      })
+      if (res.status === 401) {
+        // Not logged in — go to login, then return here for checkout
+        router.push(`/login?next=/checkout?tier=${tier}`)
+        return
+      }
+      if (!res.ok) {
+        console.error('[checkout] unexpected error', res.status)
+        return
+      }
+      const { url } = await res.json() as { url: string }
+      window.location.href = url
+    } finally {
+      setLoadingTier(null)
+    }
+  }
   const yearly = billing === 'yearly'
 
   const segBase: React.CSSProperties = {
@@ -364,30 +395,107 @@ export function PricingSection() {
                 </p>
 
                 {/* CTA */}
-                <Link
-                  href={p.href}
-                  data-btn=""
-                  data-shine=""
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '100%',
-                    height: 40,
-                    borderRadius: 7,
-                    fontSize: 14,
-                    fontWeight: p.primary ? 600 : 500,
-                    background: p.primary ? '#6366F1' : 'transparent',
-                    color: p.primary ? '#09090F' : '#E2E8F0',
-                    border: p.primary ? 'none' : '1px solid #2D2B45',
-                    boxShadow: p.primary
-                      ? '0 8px 26px rgba(99,102,241,0.32)'
-                      : 'none',
-                    textDecoration: 'none',
-                  }}
-                >
-                  {p.cta}
-                </Link>
+                {IS_BETA ? (
+                  // Beta mode: all plan CTAs scroll to the beta-request form.
+                  <a
+                    href="#beta-request"
+                    data-btn=""
+                    data-shine={p.primary ? '' : undefined}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      document.getElementById('beta-request')?.scrollIntoView({ behavior: 'smooth' })
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      height: 40,
+                      borderRadius: 7,
+                      fontSize: 14,
+                      fontWeight: p.primary ? 600 : 500,
+                      background: p.primary ? '#6366F1' : 'transparent',
+                      color: p.primary ? '#09090F' : '#E2E8F0',
+                      border: p.primary ? 'none' : '1px solid #2D2B45',
+                      boxShadow: p.primary ? '0 8px 26px rgba(99,102,241,0.32)' : 'none',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Request beta access
+                  </a>
+                ) : p.tier ? (
+                  <button
+                    type="button"
+                    data-btn=""
+                    data-shine=""
+                    onClick={() => handleCheckout(p.tier!)}
+                    disabled={loadingTier === p.tier}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      height: 40,
+                      borderRadius: 7,
+                      fontSize: 14,
+                      fontWeight: p.primary ? 600 : 500,
+                      background: p.primary ? '#6366F1' : 'transparent',
+                      color: p.primary ? '#09090F' : '#E2E8F0',
+                      border: p.primary ? 'none' : '1px solid #2D2B45',
+                      boxShadow: p.primary
+                        ? '0 8px 26px rgba(99,102,241,0.32)'
+                        : 'none',
+                      cursor: loadingTier === p.tier ? 'not-allowed' : 'pointer',
+                      opacity: loadingTier === p.tier ? 0.7 : 1,
+                    }}
+                  >
+                    {loadingTier === p.tier ? 'Redirecting…' : p.cta}
+                  </button>
+                ) : p.coming ? (
+                  <Link
+                    href="#newsletter"
+                    data-btn=""
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      height: 40,
+                      borderRadius: 7,
+                      fontSize: 14,
+                      fontWeight: 500,
+                      background: 'transparent',
+                      color: '#E2E8F0',
+                      border: '1px solid #2D2B45',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {p.cta}
+                  </Link>
+                ) : (
+                  <Link
+                    href="/login"
+                    data-btn=""
+                    data-shine=""
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      height: 40,
+                      borderRadius: 7,
+                      fontSize: 14,
+                      fontWeight: 500,
+                      background: 'transparent',
+                      color: '#E2E8F0',
+                      border: '1px solid #2D2B45',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {p.cta}
+                  </Link>
+                )}
 
                 {/* Features */}
                 <ul

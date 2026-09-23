@@ -5,12 +5,8 @@ import { useRouter } from 'next/navigation'
 import { getMasterKey } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
 import Link from 'next/link'
-
-const TIER_LIMITS: Record<string, number> = {
-  free: 500,
-  scholar: 5120,
-  pro: 20480,
-}
+import { STORAGE_CAPS_BYTES, type Tier } from '@/lib/tiers/features'
+import { formatBytes } from '@/lib/format'
 
 interface SessionBreakdown {
   id: string
@@ -20,7 +16,7 @@ interface SessionBreakdown {
 
 interface Props {
   usedBytes: number
-  tier: string | null
+  tier: Tier
   sessionBreakdown: SessionBreakdown[]
 }
 
@@ -32,9 +28,8 @@ function storageBarColor(pct: number): string {
 
 export function StorageSection({ usedBytes, tier, sessionBreakdown }: Props) {
   const router = useRouter()
-  const limitMB = TIER_LIMITS[tier ?? 'free'] ?? 500
-  const usedMB = usedBytes / (1024 * 1024)
-  const pct = Math.min((usedMB / limitMB) * 100, 100)
+  const capBytes = STORAGE_CAPS_BYTES[tier]
+  const pct = Math.min((usedBytes / capBytes) * 100, 100)
 
   const [titles, setTitles] = useState<Record<string, string>>({})
 
@@ -67,7 +62,7 @@ export function StorageSection({ usedBytes, tier, sessionBreakdown }: Props) {
         <div className="flex items-center justify-between">
           <span className="text-body-sm text-text-secondary">Storage used</span>
           <span className="text-body-sm text-text-primary tabular-nums">
-            {usedMB.toFixed(1)} MB of {limitMB} MB
+            {formatBytes(usedBytes)} of {formatBytes(capBytes)}
           </span>
         </div>
         <div className="h-2 w-full rounded-full bg-bg-subtle overflow-hidden">

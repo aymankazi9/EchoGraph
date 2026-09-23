@@ -9,15 +9,16 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  // TODO: confirm final domain before launch
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? 'https://nocturne.app',
-  ),
+  metadataBase: new URL('https://appnocturne.com'),
+  alternates: {
+    canonical: '/',
+  },
   title: {
-    default: 'Nocturne',
+    default: "Nocturne — AI Study App That Predicts What's On Your Exam",
     template: '%s · Nocturne',
   },
-  description: 'Privacy-first study intelligence for STEM students.',
+  description:
+    'Nocturne analyzes your lecture recordings, slides, and study guide with AI to surface the Red Zone — the exact terms your professor emphasized, ranked by exam likelihood. Zero-knowledge encrypted, free forever.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -30,9 +31,16 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    title: 'Nocturne',
-    description: 'Not a note-taker. A study intelligence system.',
+    title: "Nocturne — AI Study App That Predicts What's On Your Exam",
+    description:
+      'Not a note-taker. Nocturne ranks lecture content by exam likelihood using AI emphasis detection — encrypted client-side, free to start.',
     siteName: 'Nocturne',
+  },
+  twitter: {
+    card: 'summary',
+    title: "Nocturne — AI Study App That Predicts What's On Your Exam",
+    description:
+      'AI-powered Red Zone scoring finds what your professor actually emphasized. Zero-knowledge encrypted. Free forever.',
   },
   icons: {
     icon: '/icon.svg',

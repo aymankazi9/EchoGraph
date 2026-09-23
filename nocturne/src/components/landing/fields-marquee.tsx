@@ -1,17 +1,46 @@
-const FIELDS = [
-  'Pre-med',
-  'Medical school',
-  'Nursing',
-  'Pharmacology',
-  'Engineering',
-  'Computer Science',
-  'Organic Chemistry',
-  'Physics',
-  'Biochemistry',
-  'Law',
-  'Graduate STEM',
-  'PhD programs',
+import Link from 'next/link'
+
+type Field = { label: string; href?: string }
+
+const FIELDS: Field[] = [
+  { label: 'Pre-med', href: '/for/pre-med' },
+  { label: 'Medical school' },
+  { label: 'Nursing' },
+  { label: 'Pharmacology' },
+  { label: 'Engineering', href: '/for/engineering' },
+  { label: 'Built for all STEM programs — anywhere a single lecture can carry the exam' },
+  { label: 'Computer Science' },
+  { label: 'Organic Chemistry' },
+  { label: 'Physics' },
+  { label: 'Biochemistry' },
+  { label: 'Law', href: '/for/law' },
+  { label: 'Graduate STEM' },
+  { label: 'PhD programs' },
 ]
+
+const pillStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '6px 16px',
+  borderRadius: 9999,
+  border: '1px solid #1E1E2E',
+  whiteSpace: 'nowrap' as const,
+  fontSize: 14,
+  color: '#94A3B8',
+  textDecoration: 'none',
+  transition: 'color .3s, border-color .3s',
+}
+
+function Pill({ field }: { field: Field }) {
+  if (field.href) {
+    return (
+      <Link href={field.href} style={{ ...pillStyle, color: '#A5B4FC', borderColor: '#2D2B45' }}>
+        {field.label}
+      </Link>
+    )
+  }
+  return <span style={pillStyle}>{field.label}</span>
+}
 
 export function FieldsMarquee() {
   return (
@@ -30,7 +59,7 @@ export function FieldsMarquee() {
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
           color: '#5B6478',
-          margin: '0 0 16px',
+          margin: '0 0 14px',
           textAlign: 'center',
         }}
       >
@@ -79,43 +108,13 @@ export function FieldsMarquee() {
           {/* First copy */}
           <div style={{ display: 'flex', gap: 10, paddingRight: 10 }}>
             {FIELDS.map((field) => (
-              <span
-                key={field}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '6px 16px',
-                  borderRadius: 9999,
-                  border: '1px solid #1E1E2E',
-                  whiteSpace: 'nowrap',
-                  fontSize: 14,
-                  color: '#94A3B8',
-                  transition: 'color .3s, border-color .3s',
-                }}
-              >
-                {field}
-              </span>
+              <Pill key={field.label} field={field} />
             ))}
           </div>
           {/* Duplicate for seamless loop */}
           <div aria-hidden="true" style={{ display: 'flex', gap: 10, paddingRight: 10 }}>
             {FIELDS.map((field) => (
-              <span
-                key={field + '-dup'}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '6px 16px',
-                  borderRadius: 9999,
-                  border: '1px solid #1E1E2E',
-                  whiteSpace: 'nowrap',
-                  fontSize: 14,
-                  color: '#94A3B8',
-                  transition: 'color .3s, border-color .3s',
-                }}
-              >
-                {field}
-              </span>
+              <Pill key={field.label + '-dup'} field={field} />
             ))}
           </div>
         </div>

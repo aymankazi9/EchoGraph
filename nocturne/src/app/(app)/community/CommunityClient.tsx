@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase'
 import { getMasterKey } from '@/lib/crypto/vault'
 import { encryptText } from '@/lib/crypto/encrypt'
 import { hashMemberId, hashPoolTerm } from '@/lib/crypto/community-hash'
+import { hasAccess, type Tier } from '@/lib/tiers/features'
+import { LockedFeature } from '@/components/paywall/locked-feature'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -117,7 +119,7 @@ function timeAgo(iso: string): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function CommunityClient({ userId }: { userId: string }) {
+export function CommunityClient({ userId, userTier }: { userId: string; userTier: Tier }) {
   const [supabase] = useState(() => createClient())
 
   const [allRooms, setAllRooms] = useState<Room[]>([])
@@ -403,6 +405,18 @@ export function CommunityClient({ userId }: { userId: string }) {
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (!hasAccess(userTier, 'midnight')) {
+    return (
+      <div style={{ display: 'flex', flex: 1, minHeight: 400 }}>
+        <LockedFeature
+          requiredTier="midnight"
+          feature="Community"
+          description="Join anonymous course rooms, pool Red Zone keywords with classmates, and browse shared flashcard decks — available on Midnight."
+        />
+      </div>
+    )
+  }
 
   return (
     <div style={{ position: 'relative' }}>

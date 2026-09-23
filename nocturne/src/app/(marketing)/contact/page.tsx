@@ -5,6 +5,7 @@ import { PageFade } from '@/components/marketing/page-fade'
 export const metadata: Metadata = {
   title: 'Contact — Nocturne',
   description: 'Get in touch with the Nocturne team.',
+  alternates: { canonical: '/contact' },
 }
 
 // TODO: confirm final domain before launch — all @nocturne.app addresses below
@@ -35,7 +36,7 @@ export default function ContactPage() {
     <div className="px-6 py-16 md:py-24">
       <div className="max-w-2xl mx-auto">
         <div className="mb-12">
-          <p className="text-caption uppercase tracking-[0.07em] text-indigo-400 mb-3">
+          <p className="text-caption uppercase tracking-[0.1em] text-indigo-400 mb-3">
             Contact
           </p>
           <h1 className="text-heading font-medium text-text-primary mb-3">

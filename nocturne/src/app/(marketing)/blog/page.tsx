@@ -3,6 +3,7 @@ import { StubPage } from '@/components/marketing/stub-page'
 
 export const metadata: Metadata = {
   title: 'Blog — Nocturne',
+  alternates: { canonical: '/blog' },
 }
 
 export default function BlogPage() {

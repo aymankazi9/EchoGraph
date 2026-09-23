@@ -19,7 +19,7 @@ export interface PendingUpload {
   id: string // fileId (uuid)
   sessionId: string
   fileType: 'pdf' | 'audio' | 'guide'
-  storagePath: string // /{userId}/{sessionId}/{fileId}.bin
+  storagePath: string // legacy: /{userId}/{sessionId}/{fileId}.bin  |  new: /{userId}/sources/{fileId}.bin
   sizeBytes: number // original plaintext byte count
   mimeHint: string // original MIME type
   ivB64: string // base64 base IV — duplicated in .bin header, stored for fast DB lookup

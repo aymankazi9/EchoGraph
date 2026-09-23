@@ -52,6 +52,12 @@ export function startLiveTranscription(
   supabase: SupabaseClient,
   sessionId: string,
   mk: CryptoKey,
+  /**
+   * Pre-assigned file UUID for this recording take.
+   * Must match the `id` field passed to addFilesToExistingSession on stop,
+   * so that transcript_words rows are linkable to their source audio file.
+   */
+  fileId: string,
   onWords: (words: LiveWord[]) => void,
   onStatus: (s: LiveStatus) => void,
 ): () => Promise<Blob | null> {
@@ -219,12 +225,15 @@ export function startLiveTranscription(
           const words: LiveWord[] = msg.words.map((w) => ({ ...w, id: crypto.randomUUID() }))
           onWords(words)
 
-          // Persist to DB — same as batch transcription flow
+          // Persist to DB — same as batch transcription flow.
+          // file_id links each word to its source audio take so sync and
+          // transcript queries can scope to a single recording.
           if (words.length > 0) {
             const rows = await Promise.all(
               words.map(async (w) => ({
                 id: w.id,
                 session_id: sessionId,
+                file_id: fileId,
                 word_encrypted: await encryptText(mk, w.word),
                 start_time_ms: w.startMs,
                 end_time_ms: w.endMs,

@@ -3,10 +3,11 @@ import type { MetadataRoute } from 'next'
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = 'https://appnocturne.com'
 
-  const marketing = ['', '/pricing', '/about', '/blog', '/changelog', '/roadmap', '/contact', '/accessibility']
+  const marketing = ['', '/about', '/blog', '/changelog', '/roadmap', '/contact', '/accessibility']
   const legal = ['/privacy', '/terms', '/cookies', '/security', '/help']
+  const disciplines = ['/for/pre-med', '/for/engineering', '/for/law']
 
-  return [...marketing, ...legal].map((route) => ({
+  return [...marketing, ...legal, ...disciplines].map((route) => ({
     url: `${base}${route}`,
     lastModified: new Date(),
     changeFrequency: route === '/blog' ? 'weekly' : 'monthly',

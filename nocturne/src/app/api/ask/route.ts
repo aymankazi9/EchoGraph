@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { hasAccess, type Tier } from '@/lib/tiers/features'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -17,6 +18,8 @@ interface AskRequestBody {
   transcriptText: string
   slides: { pageNumber: number; text: string }[]
   sessionId: string
+  /** Prior conversation turns, oldest first, already decrypted client-side. */
+  history?: { role: 'user' | 'assistant'; content: string }[]
 }
 
 interface AnthropicMessage {
@@ -25,6 +28,45 @@ interface AnthropicMessage {
 }
 
 // ── Retrieval helpers ─────────────────────────────────────────────────────────
+
+// Tokenize text into scoreable terms.
+//
+// length > 2  — keeps 3-letter technical terms (DNA, ATP, …) that the old
+//               length > 3 threshold dropped.
+// number exemption — pure-digit tokens ("11", "5") survive regardless of length
+//               so slide numbers and numeric figures in questions are matchable.
+// TF-IDF then handles the common 3-letter tokens (the, and, not, …) that the
+// looser threshold admits — they appear in nearly every chunk and receive a
+// very low IDF weight, effectively neutralising them without a hard filter.
+function tokenize(text: string): string[] {
+  return text.toLowerCase().split(/\W+/).filter((w) => w.length > 2 || /^\d+$/.test(w))
+}
+
+// Smooth TF-IDF (sklearn-style):
+//   idf(t) = ln((N+1) / (df+1)) + 1   always ≥ 1; ubiquitous terms approach 1
+//   score(doc, query) = Σ tf(t, doc) · idf(t)
+function buildIdf(
+  queryTerms: string[],
+  docTokenSets: Set<string>[],
+  N: number,
+): Map<string, number> {
+  const idf = new Map<string, number>()
+  for (const term of queryTerms) {
+    const df = docTokenSets.reduce((n, s) => n + (s.has(term) ? 1 : 0), 0)
+    idf.set(term, Math.log((N + 1) / (df + 1)) + 1)
+  }
+  return idf
+}
+
+function tfidfScore(
+  docTokens: string[],
+  queryTerms: string[],
+  idf: Map<string, number>,
+): number {
+  const tf = new Map<string, number>()
+  for (const t of docTokens) tf.set(t, (tf.get(t) ?? 0) + 1)
+  return queryTerms.reduce((acc, term) => acc + (tf.get(term) ?? 0) * (idf.get(term) ?? 0), 0)
+}
 
 function getRelevantChunks(text: string, question: string, topK = 5): string[] {
   if (!text.trim()) return []
@@ -38,15 +80,19 @@ function getRelevantChunks(text: string, question: string, topK = 5): string[] {
     if (chunk.trim()) chunks.push(chunk)
   }
 
-  const qWords = new Set(
-    question.toLowerCase().split(/\W+/).filter((w) => w.length > 3),
-  )
+  const queryTerms = [...new Set(tokenize(question))]
+  if (queryTerms.length === 0) return chunks.slice(0, topK)
+
+  const chunkTokens    = chunks.map((c) => tokenize(c))
+  const chunkTokenSets = chunkTokens.map((t) => new Set(t))
+  const idf            = buildIdf(queryTerms, chunkTokenSets, chunks.length)
 
   return chunks
-    .map((chunk, idx) => {
-      const score = chunk.toLowerCase().split(/\W+/).filter((w) => qWords.has(w)).length
-      return { chunk, score, idx }
-    })
+    .map((chunk, idx) => ({
+      chunk,
+      score: tfidfScore(chunkTokens[idx]!, queryTerms, idf),
+      idx,
+    }))
     .sort((a, b) => b.score - a.score)
     .slice(0, topK)
     .sort((a, b) => a.idx - b.idx)
@@ -60,18 +106,35 @@ function getRelevantSlides(
 ): { pageNumber: number; text: string }[] {
   if (slides.length === 0) return []
 
-  const qWords = new Set(
-    question.toLowerCase().split(/\W+/).filter((w) => w.length > 3),
+  // ── Step 1: pin explicitly referenced slide numbers ───────────────────────
+  // Extract every "slide N" or "slide 11" reference from the question before
+  // scoring so direct references are guaranteed to be in context regardless of
+  // keyword overlap.  Multiple references in one question are all pinned.
+  // The number "11" would be dropped by the length-4 filter below, so this
+  // must happen before qWords is built.
+  const pinnedNumbers = new Set(
+    [...question.matchAll(/\bslide\s+(\d+)\b/gi)].map((m) => parseInt(m[1]!, 10)),
   )
+  const pinned   = slides.filter((s) =>  pinnedNumbers.has(s.pageNumber))
+  const unpinned = slides.filter((s) => !pinnedNumbers.has(s.pageNumber))
 
-  return slides
-    .map((s) => {
-      const score = s.text.toLowerCase().split(/\W+/).filter((w) => qWords.has(w)).length
-      return { ...s, score }
-    })
+  // ── Step 2: TF-IDF score the remaining slides ─────────────────────────────
+  // IDF is computed across ALL slides (pinned + unpinned) so corpus statistics
+  // are accurate regardless of which slides the pin step selected.  Pinned
+  // slides do not consume scored slots — topK additional slides are still
+  // selected from the unpinned pool for broader context.
+  const queryTerms   = [...new Set(tokenize(question))]
+  const allTokenSets = slides.map((s) => new Set(tokenize(s.text)))
+  const idf          = buildIdf(queryTerms, allTokenSets, slides.length)
+
+  const scored = unpinned
+    .map((s) => ({ ...s, score: tfidfScore(tokenize(s.text), queryTerms, idf) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, topK)
     .sort((a, b) => a.pageNumber - b.pageNumber)
+
+  // ── Step 3: merge, restore document order ─────────────────────────────────
+  return [...pinned, ...scored].sort((a, b) => a.pageNumber - b.pageNumber)
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -91,6 +154,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { data: subRow } = await supabase.from('subscriptions').select('tier').eq('user_id', user.id).maybeSingle()
+  const userTier = (subRow?.tier ?? 'dusk') as Tier
+  if (!hasAccess(userTier, 'eclipse')) {
+    return NextResponse.json({ error: 'Requires Eclipse plan', code: 'tier_required' }, { status: 403 })
+  }
+
   // ── Parse + validate body ───────────────────────────────────────────────────
   let body: AskRequestBody
   try {
@@ -99,7 +168,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const { question, transcriptText, slides, sessionId } = body
+  const { question, transcriptText, slides, sessionId, history } = body
 
   if (!question?.trim()) {
     return NextResponse.json({ error: 'question is required' }, { status: 400 })
@@ -151,6 +220,19 @@ export async function POST(request: NextRequest) {
     ? `Context:\n${context}\n\nQuestion: ${question}`
     : `Question: ${question}`
 
+  // ── Build conversation history ───────────────────────────────────────────────
+  // Prior turns are decrypted and sent from the client — plaintext is
+  // request-scoped only and never persisted here.  We budget to the last 10
+  // messages (≈5 turns) to keep prompt size bounded; the client sends no more
+  // than that, so this is a belt-and-suspenders guard.
+  //
+  // RAG context is injected into the CURRENT user turn only.  Re-injecting it
+  // into every history turn would balloon the prompt and confuse the model about
+  // which context is authoritative for the new question.
+  const historyMessages = (history ?? [])
+    .slice(-10)
+    .map((m) => ({ role: m.role, content: m.content }))
+
   // ── Call Anthropic Messages API ─────────────────────────────────────────────
   const llmResponse = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -163,7 +245,7 @@ export async function POST(request: NextRequest) {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: systemPrompt,
-      messages: [{ role: 'user', content: userContent }],
+      messages: [...historyMessages, { role: 'user', content: userContent }],
     }),
   })
 

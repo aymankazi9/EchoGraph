@@ -8,11 +8,26 @@ import { db } from '@/lib/db/dexie'
 export type FileType = 'pdf' | 'audio' | 'guide'
 
 export interface IngestionFile {
+  /**
+   * Optional pre-assigned file UUID.
+   * Pass this when the caller needs to know the file_id before the upload
+   * completes (e.g. live recording, where transcript_words are written with
+   * this id during recording and the matching files row must use the same id).
+   * Defaults to a fresh crypto.randomUUID() if omitted.
+   */
+  id?: string
   data: ArrayBuffer
   name: string
   mimeType: string
   type: FileType
   sizeBytes: number
+  /**
+   * How the file was produced. Defaults to 'upload'.
+   * Pass 'recording' for audio captured via Record Live so the DB-level RLS
+   * on transcript_words can gate live-recording rows by tier independently
+   * of uploaded-audio transcription.
+   */
+  source?: 'upload' | 'recording'
 }
 
 export type StepStatus = 'pending' | 'active' | 'done' | 'error'
@@ -142,7 +157,7 @@ export async function ingestFiles(
 
   // Build initial progress state
   const progress: FileProgress[] = files.map((f) => ({
-    fileId: crypto.randomUUID(),
+    fileId: f.id ?? crypto.randomUUID(),
     name: f.name,
     type: f.type,
     steps: makeSteps(f.type === 'audio'),
@@ -188,6 +203,8 @@ export async function ingestFiles(
 
   // ── Per-file pipeline ─────────────────────────────────────────────────────
 
+  const roleCounters: Record<string, number> = {}
+
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
     const fp = progress[i]
@@ -227,7 +244,9 @@ export async function ingestFiles(
 
     // Encrypt filename — never store in plaintext
     const filenameEncrypted = await encryptText(mk, file.name)
-    const storagePath = `${userId}/${sessionId}/${fileId}.bin`
+    // New uploads use a session-independent path so the same blob can be
+    // attached to multiple sessions via the session_files junction table.
+    const storagePath = `${userId}/sources/${fileId}.bin`
 
     // Write-ahead buffer — persisted before upload begins
     await db.pendingUploads.add({
@@ -260,18 +279,30 @@ export async function ingestFiles(
       throw err
     }
 
-    // Metadata row in Supabase
+    // Metadata row in Supabase — session_id intentionally omitted; the
+    // session_files junction table is the canonical session↔file link.
     await supabase.from('files').insert({
       id: fileId,
-      session_id: sessionId,
       user_id: userId,
       file_type: file.type,
+      source: file.source ?? 'upload',
       storage_path: storagePath,
       size_bytes: file.sizeBytes,
       mime_hint: file.mimeType.split('/')[0] ?? file.mimeType,
       iv: baseIVB64,
       filename_encrypted: filenameEncrypted,
       uploaded_at: new Date().toISOString(),
+    })
+
+    // Link file to the session with an explicit role + insertion order
+    const role = file.type === 'pdf' ? 'slide' : file.type
+    const orderIndex = roleCounters[role] ?? 0
+    roleCounters[role] = orderIndex + 1
+    await supabase.from('session_files').insert({
+      session_id: sessionId,
+      file_id: fileId,
+      role,
+      order_index: orderIndex,
     })
   }
 
@@ -294,7 +325,7 @@ export async function addFilesToExistingSession(
   if (!mk) throw new Error('Vault is locked. Please unlock before uploading files.')
 
   const progress: FileProgress[] = files.map((f) => ({
-    fileId: crypto.randomUUID(),
+    fileId: f.id ?? crypto.randomUUID(),
     name: f.name,
     type: f.type,
     steps: makeSteps(f.type === 'audio'),
@@ -307,6 +338,8 @@ export async function addFilesToExistingSession(
     Object.assign(progress[fileIdx].steps[stepIdx], patch)
     update()
   }
+
+  const roleCounters: Record<string, number> = {}
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
@@ -344,7 +377,12 @@ export async function addFilesToExistingSession(
     }
 
     const filenameEncrypted = await encryptText(mk, file.name)
-    const storagePath = `${userId}/${sessionId}/${fileId}.bin`
+    // Audio from addFilesToExistingSession (e.g. Record Live) lands under the
+    // dedicated recordings/ prefix so storage-level RLS can gate it separately
+    // from initial-ingest files at sources/.
+    const storagePath = file.type === 'audio'
+      ? `${userId}/recordings/${fileId}.bin`
+      : `${userId}/sources/${fileId}.bin`
 
     await db.pendingUploads.add({
       id: fileId,
@@ -375,11 +413,14 @@ export async function addFilesToExistingSession(
       throw err
     }
 
-    await supabase.from('files').insert({
+    // ── Metadata row ───────────────────────────────────────────────────────────
+    // If this insert fails we have an uploaded storage blob with no DB record —
+    // delete the blob immediately so it doesn't orphan in the user's quota.
+    const { error: filesErr } = await supabase.from('files').insert({
       id: fileId,
-      session_id: sessionId,
       user_id: userId,
       file_type: file.type,
+      source: file.source ?? 'upload',
       storage_path: storagePath,
       size_bytes: file.sizeBytes,
       mime_hint: file.mimeType.split('/')[0] ?? file.mimeType,
@@ -387,6 +428,33 @@ export async function addFilesToExistingSession(
       filename_encrypted: filenameEncrypted,
       uploaded_at: new Date().toISOString(),
     })
+    if (filesErr) {
+      await db.pendingUploads.update(fileId, { status: 'error', errorMessage: filesErr.message })
+      // Best-effort cleanup — storage blob has no DB record yet
+      await supabase.storage.from('nocturne-files').remove([storagePath])
+      throw new Error(`Failed to record file metadata: ${filesErr.message}`)
+    }
+
+    // ── Session link row ───────────────────────────────────────────────────────
+    // If this insert fails we have both a storage blob and a files row with no
+    // session linkage — delete both so nothing accumulates silently.
+    const role = file.type === 'pdf' ? 'slide' : file.type
+    const orderIndex = roleCounters[role] ?? 0
+    roleCounters[role] = orderIndex + 1
+
+    const { error: sfErr } = await supabase.from('session_files').insert({
+      session_id: sessionId,
+      file_id: fileId,
+      role,
+      order_index: orderIndex,
+    })
+    if (sfErr) {
+      await db.pendingUploads.update(fileId, { status: 'error', errorMessage: sfErr.message })
+      // Best-effort cleanup — delete both the files row and the storage blob
+      await supabase.from('files').delete().eq('id', fileId)
+      await supabase.storage.from('nocturne-files').remove([storagePath])
+      throw new Error(`Failed to link file to session: ${sfErr.message}`)
+    }
   }
 
   // Update session flags — only set to true, never overwrite an existing true with false

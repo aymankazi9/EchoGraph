@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Send, BookOpen } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useSessionStore } from '@/store/session-store'
 import { getMasterKey } from '@/lib/crypto/vault'
 import { encryptText } from '@/lib/crypto/encrypt'
@@ -17,6 +19,62 @@ interface AskMessage {
   createdAt: string
 }
 
+// ── Markdown renderer for assistant messages ──────────────────────────────────
+//
+// react-markdown + remark-gfm gives us bold, italic, headers, bullet/ordered
+// lists, tables, and strikethrough out of the box.  Custom component overrides
+// apply inline styles so the rendered output matches the chat bubble's existing
+// typography instead of the browser's unstyled defaults.
+//
+// [Slide N] citation tokens are left in the markdown text — the model emits
+// them as literal text so they render as plain inline text, which is correct.
+// The coloured badge row below each bubble is driven by citedSlideIndices (a
+// separate array extracted by the server), not by parsing the rendered HTML.
+
+function MarkdownMessage({ content }: { content: string }) {
+  return (
+    <>
+      <style>{`
+        .ask-md p          { margin: 0 0 0.55em; line-height: 1.65; }
+        .ask-md p:last-child { margin-bottom: 0; }
+        .ask-md h1,
+        .ask-md h2,
+        .ask-md h3         { color: #E2E8F0; font-weight: 600; margin: 0.8em 0 0.3em; line-height: 1.35; }
+        .ask-md h1         { font-size: 15px; }
+        .ask-md h2         { font-size: 14px; }
+        .ask-md h3         { font-size: 13.5px; }
+        .ask-md ul,
+        .ask-md ol         { margin: 0.35em 0 0.55em 1.25em; padding: 0; display: flex; flex-direction: column; gap: 0.2em; }
+        .ask-md li         { line-height: 1.65; }
+        .ask-md li > ul,
+        .ask-md li > ol    { margin-top: 0.2em; margin-bottom: 0; }
+        .ask-md strong     { color: #E2E8F0; font-weight: 600; }
+        .ask-md em         { font-style: italic; }
+        .ask-md del        { opacity: 0.55; }
+        .ask-md code       { font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                             background: rgba(255,255,255,0.06); border-radius: 3px; padding: 1px 5px; }
+        .ask-md pre        { background: #0A0A12; border: 1px solid #1E1E2E; border-radius: 6px;
+                             padding: 10px 12px; overflow-x: auto; margin: 0.5em 0; }
+        .ask-md pre code   { background: none; padding: 0; font-size: 12px; }
+        .ask-md blockquote { border-left: 2px solid #2D2B45; margin: 0.4em 0; padding-left: 10px;
+                             color: #5B6478; }
+        .ask-md table      { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 0.5em 0; }
+        .ask-md th         { background: #12121A; color: #A5B4FC; font-weight: 600;
+                             border: 1px solid #1E1E2E; padding: 5px 10px; text-align: left; }
+        .ask-md td         { border: 1px solid #1E1E2E; padding: 5px 10px; color: #CBD5E1; }
+        .ask-md tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+        .ask-md a          { color: #818CF8; text-decoration: underline; }
+        .ask-md hr         { border: none; border-top: 1px solid #1E1E2E; margin: 0.6em 0; }
+      `}</style>
+      <div className="ask-md">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {content}
+        </ReactMarkdown>
+      </div>
+    </>
+  )
+}
+
 interface Props {
   sessionId: string
   userId: string
@@ -29,62 +87,93 @@ export function AskPanel({ sessionId, userId }: Props) {
 
   const supabase = useMemo(() => createClient(), [])
 
-  const [showModal,       setShowModal]       = useState(false)
-  const [messages,        setMessages]        = useState<AskMessage[]>([])
-  const [conversationId,  setConversationId]  = useState<string | null>(null)
-  const [input,           setInput]           = useState('')
-  const [submitting,      setSubmitting]      = useState(false)
-  const [loadingHistory,  setLoadingHistory]  = useState(false)
-  const [error,           setError]           = useState<string | null>(null)
+  const [showModal,      setShowModal]      = useState(false)
+  const [messages,       setMessages]       = useState<AskMessage[]>([])
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [input,          setInput]          = useState('')
+  const [submitting,     setSubmitting]     = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(true)
+  const [error,          setError]          = useState<string | null>(null)
 
-  // Slide texts fetched once after consent — cached here for the session
+  // Slide texts fetched once after consent — pageNumber carries global_slide_index
   const slideCacheRef = useRef<{ pageNumber: number; text: string }[] | null>(null)
   const bottomRef     = useRef<HTMLDivElement | null>(null)
 
-  // ── Load conversation history when consent is granted ───────────────────
+  // ── Single mount effect: check for an existing conversation, then load ───
+  //
+  // A row in ask_conversations can only exist if the user previously completed
+  // the full consent → send flow, so its presence is a reliable proxy for
+  // "consent was already granted".  We handle both outcomes in one async pass:
+  //
+  //   row found  → grant consent in store + load history (no modal shown)
+  //   no row     → grant nothing; consent gate renders and waits for the user
+  //
+  // This replaces the previous two-effect waterfall (one gated on askConsentGranted
+  // firing the other) so there is exactly one code path that queries the DB and
+  // resolves all state.
   useEffect(() => {
-    if (!askConsentGranted) return
-    setLoadingHistory(true)
+    let cancelled = false
 
-    supabase
-      .from('ask_conversations')
-      .select('id')
-      .eq('session_id', sessionId)
-      .maybeSingle()
-      .then(async ({ data: convo }) => {
-        if (!convo) { setLoadingHistory(false); return }
+    void (async () => {
+      const { data: convo } = await supabase
+        .from('ask_conversations')
+        .select('id')
+        .eq('session_id', sessionId)
+        .maybeSingle()
 
-        setConversationId(convo.id as string)
-        const mk = getMasterKey()
-        if (!mk) { setLoadingHistory(false); return }
+      if (cancelled) return
 
-        const { data: rows } = await supabase
-          .from('ask_messages')
-          .select('id, role, content_encrypted, cited_slide_indices, created_at')
-          .eq('conversation_id', convo.id)
-          .order('created_at')
-
-        if (rows && rows.length > 0) {
-          const decrypted: AskMessage[] = await Promise.all(
-            rows.map(async (r) => ({
-              id: r.id as string,
-              role: r.role as 'user' | 'assistant',
-              content: await decryptText(mk, r.content_encrypted as string).catch(() => '[decryption failed]'),
-              citedSlideIndices: (r.cited_slide_indices as number[]) ?? [],
-              createdAt: r.created_at as string,
-            })),
-          )
-          setMessages(decrypted)
-        }
+      if (!convo) {
+        // No prior conversation — show the consent gate, nothing else to load.
         setLoadingHistory(false)
-      })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [askConsentGranted])
+        return
+      }
 
-  // Auto-scroll to bottom on new messages
+      // Conversation exists → user already consented.  Grant consent in the
+      // store so the chat UI renders, then immediately load the message history
+      // — both resolved in this same async function, not via a second effect.
+      grantAskConsent()
+      setConversationId(convo.id as string)
+
+      const mk = getMasterKey()
+      if (!mk) { setLoadingHistory(false); return }
+
+      const { data: rows } = await supabase
+        .from('ask_messages')
+        .select('id, role, content_encrypted, cited_slide_indices, created_at')
+        .eq('conversation_id', convo.id)
+        .order('created_at')
+
+      if (cancelled) return
+
+      if (rows && rows.length > 0) {
+        const decrypted: AskMessage[] = await Promise.all(
+          rows.map(async (r) => ({
+            id:                r.id as string,
+            role:              r.role as 'user' | 'assistant',
+            content:           await decryptText(mk, r.content_encrypted as string).catch(() => '[decryption failed]'),
+            citedSlideIndices: (r.cited_slide_indices as number[]) ?? [],
+            createdAt:         r.created_at as string,
+          })),
+        )
+        if (!cancelled) setMessages(decrypted)
+      }
+
+      setLoadingHistory(false)
+    })()
+
+    return () => { cancelled = true }
+  // sessionId is stable for the lifetime of this panel; supabase client is
+  // memo-stable.  grantAskConsent is a store action reference that never changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId])
+
+  // Auto-scroll to bottom on new messages and when the typing indicator appears.
+  // submitting is included so the indicator scrolls into view even if React
+  // doesn't batch the setMessages + setSubmitting renders (React 18 normally does).
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, submitting])
 
   // ── Fetch + decrypt slide texts (lazy, cached) ───────────────────────────
   const getSlideTexts = useCallback(async (): Promise<{ pageNumber: number; text: string }[]> => {
@@ -95,14 +184,14 @@ export function AskPanel({ sessionId, userId }: Props) {
 
     const { data: rows } = await supabase
       .from('slides')
-      .select('page_number, text_encrypted')
+      .select('global_slide_index, text_encrypted')
       .eq('session_id', sessionId)
-      .order('page_number')
+      .order('global_slide_index')
 
     const slides = rows
       ? await Promise.all(
           rows.map(async (r) => ({
-            pageNumber: r.page_number as number,
+            pageNumber: r.global_slide_index as number,
             text: r.text_encrypted
               ? await decryptText(mk, r.text_encrypted as string).catch(() => '')
               : '',
@@ -126,6 +215,13 @@ export function AskPanel({ sessionId, userId }: Props) {
     setSubmitting(true)
     setError(null)
 
+    // Capture history BEFORE the optimistic add so the current question is not
+    // included.  Budget: last 10 messages (≈5 user/assistant pairs), oldest first.
+    // Decrypted content is already in memory — no extra DB round-trip needed.
+    const historyTurns = messages
+      .slice(-10)
+      .map((m) => ({ role: m.role, content: m.content }))
+
     // Optimistically add the user message to the UI
     const tempId = `temp-${Date.now()}`
     const userMsg: AskMessage = {
@@ -146,7 +242,7 @@ export function AskPanel({ sessionId, userId }: Props) {
       const res = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ question, transcriptText, slides, sessionId }),
+        body: JSON.stringify({ question, transcriptText, slides, sessionId, history: historyTurns }),
       })
 
       if (!res.ok) {
@@ -206,7 +302,7 @@ export function AskPanel({ sessionId, userId }: Props) {
     } finally {
       setSubmitting(false)
     }
-  }, [input, submitting, transcriptWords, getSlideTexts, sessionId, conversationId, userId, supabase])
+  }, [input, submitting, messages, transcriptWords, getSlideTexts, sessionId, conversationId, userId, supabase])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -215,7 +311,18 @@ export function AskPanel({ sessionId, userId }: Props) {
     }
   }, [handleSubmit])
 
-  // ── Consent not yet granted — show inline prompt (mirrors YouTube panel) ──
+  // ── Still resolving — don't flash the consent gate for returning users ──
+  // loadingHistory starts true and is cleared by the mount effect once it knows
+  // whether a prior conversation exists.  Show nothing meaningful until then.
+  if (loadingHistory) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <p style={{ fontSize: 13, color: '#3F485C' }}>Loading…</p>
+      </div>
+    )
+  }
+
+  // ── No prior conversation confirmed — show consent gate ──────────────────
   if (!askConsentGranted) {
     return (
       <>
@@ -254,13 +361,17 @@ export function AskPanel({ sessionId, userId }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxWidth: 720, width: '100%', margin: '0 auto' }}>
 
+      {/* Typing-indicator animation — scoped to this panel */}
+      <style>{`
+        @keyframes askDot {
+          0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
+          30%            { transform: translateY(-4px); opacity: 1;    }
+        }
+      `}</style>
+
       {/* Message list */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 8 }}>
-        {loadingHistory && (
-          <p style={{ fontSize: 13, color: '#3F485C', textAlign: 'center', paddingTop: 32 }}>Loading history…</p>
-        )}
-
-        {!loadingHistory && messages.length === 0 && (
+        {messages.length === 0 && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center', paddingTop: 48 }}>
             <p style={{ fontSize: 14, color: '#5B6478' }}>Ask anything about this lecture.</p>
             <p style={{ fontSize: 12, color: '#3F485C' }}>Answers are grounded in transcript and slides — citations included.</p>
@@ -287,11 +398,13 @@ export function AskPanel({ sessionId, userId }: Props) {
                 fontSize: 13.5,
                 color: msg.role === 'user' ? '#C7D2FE' : '#CBD5E1',
                 lineHeight: 1.65,
-                whiteSpace: 'pre-wrap',
+                // user messages keep pre-wrap for literal newlines; assistant
+                // messages are rendered via react-markdown so no pre-wrap needed
+                whiteSpace: msg.role === 'user' ? 'pre-wrap' : undefined,
                 wordBreak: 'break-word',
               }}
             >
-              {msg.content}
+              {msg.role === 'user' ? msg.content : <MarkdownMessage content={msg.content} />}
             </div>
 
             {/* Slide citation badges */}
@@ -316,6 +429,38 @@ export function AskPanel({ sessionId, userId }: Props) {
             )}
           </div>
         ))}
+
+        {/* Typing indicator — shown immediately on send, removed on response */}
+        {submitting && (
+          <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+            <div
+              style={{
+                padding: '11px 14px',
+                borderRadius: '14px 14px 14px 4px',
+                background: '#0F0F19',
+                border: '1px solid #1E1E2E',
+                display: 'flex',
+                gap: 5,
+                alignItems: 'center',
+              }}
+            >
+              {([0, 1, 2] as const).map((i) => (
+                <span
+                  key={i}
+                  style={{
+                    display: 'inline-block',
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: '#5B6478',
+                    animation: 'askDot 1.2s ease infinite',
+                    animationDelay: `${i * 0.2}s`,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Error */}
         {error && (

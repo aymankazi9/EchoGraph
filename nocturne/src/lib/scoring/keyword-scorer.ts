@@ -28,9 +28,15 @@ export interface SlideText {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Normalizes a value into 0-1 given the observed max. */
+/**
+ * Normalizes a value into 0–1 given the observed maximum.
+ * Returns 0 (not NaN) when max ≤ 0 or non-finite — covers the degenerate
+ * case where all inputs for a component are identical (commonly all-zero),
+ * which would otherwise propagate NaN through every downstream calculation.
+ */
 function normalize(value: number, max: number): number {
-  return max > 0 ? Math.min(value / max, 1) : 0
+  if (!(max > 0)) return 0   // catches 0, negative, NaN, and ±Infinity
+  return Math.min(value / max, 1)
 }
 
 /**
@@ -152,8 +158,47 @@ function computeLectureConfidence(
 
 // Real guide / anki keywords: Red Zone if confidence ≥ 0.1 (they're already curated)
 const RED_ZONE_CONFIDENCE = 0.1
-// Synthetic keywords: Likely Zone if confidence ≥ 0.15 (must have some signal)
-const LIKELY_ZONE_CONFIDENCE = 0.15
+// Synthetic/inferred keywords: Likely Zone if confidence ≥ 0.10.
+// Lowered from 0.15 — the prompt now filters generic terms at extraction time,
+// so borderline-but-real terms that survive extraction deserve to be retained.
+const LIKELY_ZONE_CONFIDENCE = 0.10
+
+// ─── Slides-only scoring ──────────────────────────────────────────────────────
+//
+// When the session has no transcript (tokens.length === 0), mention counts and
+// dwell times are all zero.  The normal formula's maximum achievable confidence
+// becomes (avgSlideDensity/100 * 0.5) * 0.3 = 0.15, i.e. exactly at the
+// synthetic drop threshold — so virtually every synthetic keyword gets dropped.
+//
+// In slides-only mode we bypass the weighted formula and score directly from
+// avgSlideDensity: how much a term clusters with other keywords on the same
+// slides it appears on.  Guide-sourced terms get a confidence floor so they
+// always survive even if they appear on sparse slides — the study guide
+// explicitly named them as important.
+
+/** Floor applied to guide-sourced terms when no transcript is present. */
+const GUIDE_SLIDES_ONLY_FLOOR = 0.5
+
+/**
+ * Slides-only confidence: avgSlideDensity (0–1) as the primary signal.
+ * Guide-backed terms (real_guide, anki, both) receive at least GUIDE_SLIDES_ONLY_FLOOR
+ * so they are never discarded for lacking transcript coverage that doesn't exist yet.
+ */
+function computeSlideOnlyConfidence(
+  kw: InputKeyword,
+  slideIndices: number[],
+  density: Map<number, number>,
+): number {
+  const avgDensity =
+    slideIndices.length > 0
+      ? slideIndices.reduce((sum, idx) => sum + (density.get(idx) ?? 0), 0) /
+        (slideIndices.length * 100)   // density is 0-100; normalise to 0-1
+      : 0
+
+  const isGuideBacked =
+    kw.source === 'real_guide' || kw.source === 'anki' || kw.source === 'both'
+  return isGuideBacked ? Math.max(GUIDE_SLIDES_ONLY_FLOOR, avgDensity) : avgDensity
+}
 
 // ─── Main scorer ──────────────────────────────────────────────────────────────
 
@@ -175,6 +220,11 @@ export function scoreKeywords(
     .split(/\s+/)
     .filter(Boolean)
 
+  // Slides-only mode: no transcript tokens means mention count and dwell time
+  // are both zero for every keyword, which starves the normal formula.
+  // Switch to the slides-only confidence path for this run.
+  const slidesOnlyMode = tokens.length === 0
+
   const density = computeSlideDensity(keywords, slides)
 
   // First pass: raw metrics
@@ -190,6 +240,12 @@ export function scoreKeywords(
 
   // Second pass: derived scores
   const scored: ScoredKeyword[] = []
+  // TEMP DIAG: collect full diagnostic entry for every dropped keyword
+  const dropped: {
+    term: string; source: string
+    confidenceScore: number; emphasisScore: number; lectureConfidence: number
+    dwellTimeMs: number; mentionCount: number
+  }[] = []
 
   for (const { kw, mentionCount, slideIndices, dwellTimeMs } of rawScores) {
     const emphasisScore = computeEmphasisScore(
@@ -206,21 +262,49 @@ export function scoreKeywords(
       maxMentions,
     )
 
-    // Overall confidence: weighted average
-    let confidenceScore =
-      emphasisScore * 0.5 +
-      lectureConfidence * 0.3 +
-      normalize(mentionCount, maxMentions) * 0.2
+    // Overall confidence
+    let confidenceScore: number
+    if (slidesOnlyMode) {
+      // No transcript — use slide-density-based formula so keywords aren't
+      // silently dropped for lacking coverage that doesn't exist yet.
+      // emphasisScore / lectureConfidence are still stored for transparency.
+      confidenceScore = computeSlideOnlyConfidence(kw, slideIndices, density)
+    } else {
+      // Normal formula: weighted average of emphasis, lecture confidence, mention rate.
+      confidenceScore =
+        emphasisScore * 0.5 +
+        lectureConfidence * 0.3 +
+        normalize(mentionCount, maxMentions) * 0.2
 
-    // 'both' bonus: term is in study guide AND independently supported by lecture.
-    // Lifts ranking within Red Zone only — does not affect zone assignment.
-    if (kw.source === 'both') confidenceScore = Math.min(1.0, confidenceScore + 0.1)
+      // 'both' bonus: term in study guide AND independently supported by lecture.
+      // Lifts ranking within Red Zone only — does not affect zone assignment.
+      if (kw.source === 'both') confidenceScore = Math.min(1.0, confidenceScore + 0.1)
+    }
 
-    // Zone assignment
+    // Zone assignment: keyed off source tag, not confidenceScore.
+    // Guide-sourced terms → Red Zone; synthetic/inferred → Likely Zone.
+    // This holds in both normal and slides-only mode — the formula change
+    // above only affects confidenceScore, not the source tag.
     const isSynthetic = kw.source === 'synthetic'
     const threshold = isSynthetic ? LIKELY_ZONE_CONFIDENCE : RED_ZONE_CONFIDENCE
 
-    if (confidenceScore < threshold && isSynthetic) continue  // drop low-signal synthetic
+    // In slides-only mode, skip the confidence drop gate for synthetic keywords.
+    // dwell-time and mention-count are structurally zero for everything when
+    // there is no transcript — the threshold is a meaningless signal in that
+    // context. Quality control belongs in LLM extraction, not scoring.
+    // confidenceScore is still computed and stored for within-zone ordering.
+    if (confidenceScore < threshold && isSynthetic && !slidesOnlyMode) {
+      dropped.push({
+        term: kw.term,
+        source: kw.source,
+        confidenceScore,   // raw, not rounded — lets caller see 0 vs NaN vs tiny float
+        emphasisScore,
+        lectureConfidence,
+        dwellTimeMs,
+        mentionCount,
+      })
+      continue  // drop low-signal synthetic
+    }
 
     const zone: 'red' | 'likely' = isSynthetic ? 'likely' : 'red'
 
@@ -234,6 +318,33 @@ export function scoreKeywords(
       confidenceScore: Math.round(confidenceScore * 1000) / 1000,
       slideIndices,
     })
+  }
+
+  // TEMP DIAG: entry vs. survival counts + dropped detail
+  // Only synthetic keywords can be dropped (threshold 0.15).
+  // Non-synthetic (guide/both/anki/real_guide) are never dropped regardless of score.
+  if (dropped.length > 0) {
+    const nanCount  = dropped.filter(d => isNaN(d.confidenceScore)).length
+    const zeroCount = dropped.filter(d => d.confidenceScore === 0).length
+    const sourceCounts = dropped.reduce<Record<string, number>>((acc, d) => {
+      acc[d.source] = (acc[d.source] ?? 0) + 1; return acc
+    }, {})
+    console.log(
+      '[diag:scorer] entered =', keywords.length,
+      '| survived =', scored.length,
+      '| dropped =', dropped.length,
+      '| NaN confidenceScore =', nanCount,
+      '| zero confidenceScore =', zeroCount,
+      '| dropped source breakdown =', sourceCounts,
+    )
+    console.log('[diag:scorer] dropped sample (first 10 of', dropped.length, '):',
+      dropped.slice(0, 10))
+  } else {
+    console.log(
+      '[diag:scorer] entered =', keywords.length,
+      '| survived =', scored.length,
+      '| dropped = 0',
+    )
   }
 
   // Sort: red zone first, then by confidence descending

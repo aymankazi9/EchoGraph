@@ -14,6 +14,10 @@ import { FaqSection } from '@/components/landing/faq-section'
 import { NewsletterSection } from '@/components/landing/newsletter-section'
 import { LandingFooter } from '@/components/landing/landing-footer'
 import { RevealSetup } from '@/components/landing/reveal-setup'
+import { BetaRequestSection } from '@/components/landing/beta-request-section'
+
+// Server component — reads env directly. Both flags must be kept in sync.
+const betaMode = process.env.BETA_MODE === 'true'
 
 export default function LandingPage() {
   return (
@@ -29,9 +33,15 @@ export default function LandingPage() {
       <FeaturesSection />
       <CompareSection />
       <PrivacySection />
-      <SocialProofSection />
+
+      {/* Social proof — hidden during beta (not deleted; returns when BETA_MODE=false) */}
+      {!betaMode && <SocialProofSection />}
+
       <PricingSection />
       <FaqSection />
+
+      {/* Beta request form — shown only in beta mode */}
+      {betaMode && <BetaRequestSection />}
 
       {/* CTA section — "Walk into the exam" */}
       <section
@@ -78,7 +88,9 @@ export default function LandingPage() {
               maxWidth: 480,
             }}
           >
-            No credit card, no trial limits — just the core pipeline, free forever, running entirely in your browser.
+            {betaMode
+              ? 'Apply for early access — we\'re onboarding a small cohort of students before the public launch.'
+              : 'No credit card, no trial limits — just the core pipeline, free forever, running entirely in your browser.'}
           </p>
           <div
             style={{
@@ -89,27 +101,53 @@ export default function LandingPage() {
               marginTop: 36,
             }}
           >
-            <Link
-              href="/setup"
-              data-btn=""
-              data-shine=""
-              style={{
-                height: 48,
-                padding: '0 28px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 9,
-                borderRadius: 8,
-                fontSize: 15,
-                fontWeight: 500,
-                background: '#6366F1',
-                color: '#09090F',
-                boxShadow: '0 10px 32px rgba(99,102,241,0.4)',
-                textDecoration: 'none',
-              }}
-            >
-              Start for free <span data-arrow="" style={{ color: '#09090F' }}>→</span>
-            </Link>
+            {betaMode ? (
+              // Beta: server component can't use onClick — use a plain anchor; JS
+              // in landing-hero.tsx handles smooth scroll for the equivalent hero CTA.
+              <a
+                href="#beta-request"
+                data-btn=""
+                data-shine=""
+                style={{
+                  height: 48,
+                  padding: '0 28px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 9,
+                  borderRadius: 8,
+                  fontSize: 15,
+                  fontWeight: 500,
+                  background: '#6366F1',
+                  color: '#09090F',
+                  boxShadow: '0 10px 32px rgba(99,102,241,0.4)',
+                  textDecoration: 'none',
+                }}
+              >
+                Request beta access <span data-arrow="" style={{ color: '#09090F' }}>→</span>
+              </a>
+            ) : (
+              <Link
+                href="/setup"
+                data-btn=""
+                data-shine=""
+                style={{
+                  height: 48,
+                  padding: '0 28px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 9,
+                  borderRadius: 8,
+                  fontSize: 15,
+                  fontWeight: 500,
+                  background: '#6366F1',
+                  color: '#09090F',
+                  boxShadow: '0 10px 32px rgba(99,102,241,0.4)',
+                  textDecoration: 'none',
+                }}
+              >
+                Start for free <span data-arrow="" style={{ color: '#09090F' }}>→</span>
+              </Link>
+            )}
             <a
               href="#pricing"
               data-btn=""
@@ -125,13 +163,15 @@ export default function LandingPage() {
                 textDecoration: 'none',
               }}
             >
-              Compare plans
+              {betaMode ? 'See what\'s included' : 'Compare plans'}
             </a>
           </div>
         </div>
       </section>
 
-      <NewsletterSection />
+      {/* Newsletter — hidden during beta (not deleted; returns when BETA_MODE=false) */}
+      {!betaMode && <NewsletterSection />}
+
       <LandingFooter />
     </div>
   )

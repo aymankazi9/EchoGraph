@@ -4,6 +4,9 @@ import { useCallback, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Slider } from '@/components/ui/slider'
 import { createClient } from '@/lib/supabase'
+import { hasAccess, type Tier } from '@/lib/tiers/features'
+
+const IS_BETA = process.env.NEXT_PUBLIC_BETA_MODE === 'true'
 
 const FIELDS = [
   { value: 'premed', label: 'Pre-med' },
@@ -16,7 +19,7 @@ interface Props {
   userId: string
   initialField: string | null
   initialSilenceMs: number
-  tier: string | null
+  tier: Tier
 }
 
 function SavedTag() {
@@ -40,7 +43,7 @@ export function PreferencesSection({ userId, initialField, initialSilenceMs, tie
   const [fieldSaved, setFieldSaved] = useState(false)
   const [silenceSaved, setSilenceSaved] = useState(false)
   const fieldDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isPro = tier === 'pro'
+  const canAdjustSilence = hasAccess(tier, 'midnight')
 
   const saveField = useCallback(
     (value: string) => {
@@ -119,7 +122,7 @@ export function PreferencesSection({ userId, initialField, initialSilenceMs, tie
           </div>
         </div>
 
-        <div className={isPro ? '' : 'opacity-40 pointer-events-none'}>
+        <div className={canAdjustSilence ? '' : 'opacity-40 pointer-events-none'}>
           <Slider
             min={500}
             max={3000}
@@ -131,12 +134,11 @@ export function PreferencesSection({ userId, initialField, initialSilenceMs, tie
           />
         </div>
 
-        {!isPro && (
+        {!canAdjustSilence && (
           <p className="text-caption text-text-tertiary">
-            Available on Pro ·{' '}
-            <a href="#pricing" className="text-text-secondary hover:text-text-primary transition-colors">
-              Upgrade
-            </a>
+            Available on Midnight{!IS_BETA && (
+              <>{' · '}<a href="/billing" className="text-text-secondary hover:text-text-primary transition-colors">Upgrade</a></>
+            )}
           </p>
         )}
       </div>

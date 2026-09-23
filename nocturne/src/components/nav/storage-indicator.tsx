@@ -1,10 +1,8 @@
+import { formatBytes } from '@/lib/format'
+
 interface Props {
   usedBytes: number
   maxBytes: number
-}
-
-function formatMB(bytes: number): string {
-  return (bytes / (1024 * 1024)).toFixed(0)
 }
 
 export function StorageIndicator({ usedBytes, maxBytes }: Props) {
@@ -24,7 +22,7 @@ export function StorageIndicator({ usedBytes, maxBytes }: Props) {
         />
       </div>
       <span className="text-caption text-text-tertiary">
-        {formatMB(usedBytes)} MB of {formatMB(maxBytes)} MB
+        {formatBytes(usedBytes)} of {formatBytes(maxBytes)}
       </span>
     </div>
   )

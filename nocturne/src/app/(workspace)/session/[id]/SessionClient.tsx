@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Play, Pause, Mic, Square } from 'lucide-react'
-import type { PDFDocumentProxy } from 'pdfjs-dist'
+import { Mic, Square } from 'lucide-react'
 import { isVaultUnlocked, getMasterKey } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
 import { encryptText } from '@/lib/crypto/encrypt'
@@ -14,6 +13,7 @@ import { enhanceFlashcards } from '@/lib/scoring/flashcard-enhancer'
 import { GuideUpload, type GuidePayload } from '@/components/study-guide/guide-upload'
 import { startLiveTranscription, type LiveStatus } from '@/lib/live-transcription'
 import { addFilesToExistingSession } from '@/lib/upload'
+import { assertCanRecordLive } from '@/app/actions/record-live'
 import { useSessionStore, getAudioEl } from '@/store/session-store'
 import { useNotificationStore } from '@/store/notification-store'
 import { SessionTitle } from '@/components/session/session-title'
@@ -21,13 +21,23 @@ import { CourseTagPicker } from '@/components/session/course-tag-picker'
 import { KeyboardShortcutOverlay } from '@/components/session/keyboard-shortcut-overlay'
 import { GuidedEmptyState } from '@/components/session/guided-empty-state'
 import { AudioPlayer } from '@/components/audio/audio-player'
-import { PdfViewer, type PdfViewerHandle } from '@/components/pdf/pdf-viewer'
+import { PdfViewer, type PdfViewerHandle, type SlideEntry } from '@/components/pdf/pdf-viewer'
 import { SlideNavStrip } from '@/components/pdf/slide-nav-strip'
 import { FlashcardPanel } from '@/components/study-guide/flashcard-panel'
 import { NotesEditor } from '@/components/notes/notes-editor'
 import { AskPanel } from '@/components/ask/ask-panel'
+import { hasAccess, type Tier } from '@/lib/tiers/features'
+import { LockedFeature } from '@/components/paywall/locked-feature'
 import type { TranscriptWordEntry, StoredKeyword, Flashcard } from '@/store/session-store'
-import type { InputKeyword } from '@/lib/scoring/keyword-scorer'
+import type { InputKeyword, ScoredKeyword } from '@/lib/scoring/keyword-scorer'
+import { diffKeywords, normalizeTerm } from '@/lib/rescore/keyword-diff'
+import { TranscriptPane } from '@/components/transcript/transcript-pane'
+import { SessionSearchBar } from '@/components/session/session-search-bar'
+import { TranscriptionControls } from '@/components/transcript/transcription-controls'
+import { startTranscription } from '@/lib/transcription'
+import type { TranscriptionProgress } from '@/lib/transcription'
+import { startSync, type SyncSegment } from '@/lib/sync/sync-engine'
+import type { SyncProgress } from '@/lib/sync/sync-engine'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,13 +55,44 @@ interface Session {
 interface Props {
   userId: string
   session: Session
-  pdfFile: { id: string; storage_path: string; iv: string } | null
-  audioFile: { id: string; storage_path: string } | null
+  pdfFile: { id: string; storage_path: string } | null
+  /** All slide sources for this session, ordered by session_files.order_index. */
+  slideFiles: { id: string; storage_path: string }[]
+  /**
+   * All audio takes for this session, ordered by session_files.order_index.
+   * Empty array when the session has no audio yet. Newly-recorded takes are
+   * appended client-side via extraAudioFiles state so the timeline renders
+   * immediately without a page reload.
+   */
+  audioFiles: { id: string; storage_path: string }[]
   initialUserField: string | null
   domainPromptDismissed: boolean
+  userTier: Tier
+}
+
+// Which tabs require an upgraded plan.
+const TAB_GATES: Partial<Record<Tab, 'midnight' | 'eclipse'>> = {
+  study: 'midnight',
+  notes: 'midnight',
+  ask: 'eclipse',
 }
 
 type Tab = 'lecture' | 'study' | 'notes' | 'ask'
+
+// Data computed during the score phase, held for deferred execution if user confirmation is required.
+interface RescorePayload {
+  scored:         ScoredKeyword[]
+  cards:          Flashcard[]
+  densityRecord:  Record<number, number>
+  redZoneMap:     Record<number, 'likely' | 'red' | null>
+  existingByNorm: Map<string, string>
+  removedIds:     string[]
+  legacyIds:      string[]
+  uid:            string
+  guideType:      string
+  slides:         { pageNumber: number; text: string }[]
+  currentWords:   TranscriptWordEntry[]
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,23 +103,49 @@ function formatTime(ms: number): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function SessionClient({ userId, session, pdfFile, audioFile, initialUserField, domainPromptDismissed }: Props) {
+export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles, initialUserField, domainPromptDismissed, userTier }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('lecture')
   const [isScoring, setIsScoring] = useState(false)
+  // Synchronous guard for handleScore — prevents the race where two callers
+  // both read isScoring===false before React flushes setIsScoring(true).
+  // isScoring state is kept for UI (disabled buttons, spinner); this ref is
+  // purely for race prevention and is never used in JSX.
+  const isScoringRef = useRef(false)
+  // Live session status — refreshed from DB on mount so a stale SSR prop
+  // (e.g. 'ingesting' at render time, already 'ready' in DB) doesn't permanently
+  // block auto-score or the data load-back.
+  const [liveSessionStatus, setLiveSessionStatus] = useState(session.status)
+  const [guideModalOpen, setGuideModalOpen] = useState(false)
+  const [pendingRescore, setPendingRescore] = useState<{ payload: RescorePayload; reviewCount: number } | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [liveStatus, setLiveStatus] = useState<LiveStatus>({ phase: 'idle' })
   const stopLiveRef = useRef<(() => Promise<Blob | null>) | null>(null)
-  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
+  // Pre-assigned UUID for the current recording take.
+  // Set at recording start so transcript_words and the final files row share the same id.
+  const liveFileIdRef = useRef<string | null>(null)
+  // Takes saved this client session that aren't in the SSR audioFiles prop yet.
+  // Appended on a successful live save so the audio timeline renders immediately.
+  const [extraAudioFiles, setExtraAudioFiles] = useState<{ id: string; storage_path: string }[]>([])
+  const allAudioFiles = [...audioFiles, ...extraAudioFiles]
+  const [selectedTakeIdx, setSelectedTakeIdx] = useState(0)
+  // The currently displayed audio take — drives AudioPlayer, sync, and TranscriptionControls.
+  const audioFile = allAudioFiles[selectedTakeIdx] ?? null
+  const [slideEntries, setSlideEntries] = useState<SlideEntry[]>([])
   const [totalPages, setTotalPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const [ribbon, setRibbon] = useState<'transcript' | 'density'>('transcript')
+  const [transcriptionProgress, setTranscriptionProgress] = useState<TranscriptionProgress | null>(null)
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
+  const [isLoadingTranscript, setIsLoadingTranscript] = useState(false)
   const pdfViewerRef = useRef<PdfViewerHandle | null>(null)
-  const trackRef = useRef<HTMLDivElement>(null)
-  const isDragging = useRef(false)
   const playTrackedRef = useRef(false)
+  // Holds the decrypted plain-text of the current note once the Notes tab is opened.
+  // Updated by NotesEditor via onContentChange; read synchronously by SessionSearchBar.
+  const notesTextRef = useRef<string>('')
   const supabase = createClient()
 
+  const jumpToWord = useSessionStore((s) => s.jumpToWord)
+  const setActiveKeyword = useSessionStore((s) => s.setActiveKeyword)
   const addTranscriptWords = useSessionStore((s) => s.addTranscriptWords)
   const loadTranscriptWords = useSessionStore((s) => s.loadTranscriptWords)
   const loadSyncMap = useSessionStore((s) => s.loadSyncMap)
@@ -123,9 +190,31 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
       .catch(() => setSessionTitle('Session'))
   }, [router, session.title_encrypted]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Refresh session status from DB on mount ──────────────────────────────
+  // Covers the case where the SSR-rendered status was 'ingesting' and has since
+  // flipped to 'ready'. Setting liveSessionStatus triggers both the load-back
+  // and auto-score effects below.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { data } = await supabase
+          .from('sessions')
+          .select('status')
+          .eq('id', session.id)
+          .single()
+        if (data?.status && data.status !== session.status) {
+          setLiveSessionStatus(data.status as string)
+        }
+      } catch {
+        // non-fatal — SSR value is the safe fallback
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id])
+
   // ── Load transcript + sync map + keywords from DB on mount ──────────────
   useEffect(() => {
-    const canLoad = ['ready', 'transcribed', 'synced', 'syncing'].includes(session.status)
+    const canLoad = ['ready', 'transcribed', 'synced', 'syncing'].includes(liveSessionStatus)
     if (!canLoad) return
 
     const mk = getMasterKey()
@@ -151,23 +240,8 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
         loadTranscriptWords(words)
       }
 
-      if (session.status === 'synced' || session.status === 'syncing') {
-        const { data: syncRow } = await supabase
-          .from('sync_map')
-          .select('map_encrypted')
-          .eq('session_id', session.id)
-          .maybeSingle()
-
-        if (syncRow?.map_encrypted) {
-          try {
-            const mapJson = await decryptText(mk!, syncRow.map_encrypted as string)
-            const { segments } = JSON.parse(mapJson) as { segments: import('@/lib/sync/playhead-tracker').SyncSegment[] }
-            loadSyncMap(segments)
-          } catch {
-            // Corrupt sync map — non-fatal
-          }
-        }
-      }
+      // Sync map is loaded by the dedicated audioFile.id effect below,
+      // which handles both initial load and take-switching in one place.
 
       const { data: kwRows } = await supabase
         .from('keywords')
@@ -195,15 +269,15 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
 
       const { data: densityRows } = await supabase
         .from('slides')
-        .select('page_number, density_score, is_likely_zone, is_red_zone')
+        .select('global_slide_index, density_score, is_likely_zone, is_red_zone')
         .eq('session_id', session.id)
       if (densityRows) {
         const rec: Record<number, number> = {}
         const zones: Record<number, 'likely' | 'red' | null> = {}
         densityRows.forEach((r) => {
-          const pn = r.page_number as number
-          if (r.density_score != null) rec[pn] = r.density_score as number
-          zones[pn] = (r.is_likely_zone as boolean | null)
+          const gsi = r.global_slide_index as number
+          if (r.density_score != null) rec[gsi] = r.density_score as number
+          zones[gsi] = (r.is_likely_zone as boolean | null)
             ? 'likely'
             : (r.is_red_zone as boolean | null)
               ? 'red'
@@ -237,8 +311,58 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
       }
     }
 
-    loadData().catch((e) => console.error('[SessionClient] data load error:', e))
-  }, [session.id, session.status]) // eslint-disable-line react-hooks/exhaustive-deps
+    setIsLoadingTranscript(true)
+    loadData()
+      .catch((e) => console.error('[SessionClient] data load error:', e))
+      .finally(() => setIsLoadingTranscript(false))
+  }, [session.id, liveSessionStatus]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Sync map — loaded whenever the selected take or session status changes ──
+  // Consolidated here (not in loadData) so take-switching is self-contained.
+  // Also fires after auto-sync sets liveSessionStatus to 'synced'.
+  useEffect(() => {
+    const canLoad = ['synced', 'syncing'].includes(liveSessionStatus)
+    if (!canLoad || !audioFile) { loadSyncMap([]); return }
+    const mk = getMasterKey()
+    if (!mk) return
+
+    async function loadTakeSyncMap() {
+      // Prefer the take-specific sync_map row written by migration 028+.
+      // Fall back to the legacy NULL-file_id row for sessions synced before the migration.
+      const { data: fileRow } = await supabase
+        .from('sync_map')
+        .select('map_encrypted')
+        .eq('session_id', session.id)
+        .eq('file_id', audioFile!.id)
+        .maybeSingle()
+
+      const { data: legacyRow } = fileRow
+        ? { data: null }
+        : await supabase
+            .from('sync_map')
+            .select('map_encrypted')
+            .eq('session_id', session.id)
+            .is('file_id', null)
+            .maybeSingle()
+
+      const row = fileRow ?? legacyRow
+      if (row?.map_encrypted) {
+        try {
+          const mapJson = await decryptText(mk!, row.map_encrypted as string)
+          const { segments } = JSON.parse(mapJson) as { segments: SyncSegment[] }
+          loadSyncMap(segments)
+        } catch {
+          loadSyncMap([])  // corrupt sync map — non-fatal
+        }
+      } else {
+        loadSyncMap([])
+      }
+    }
+
+    loadTakeSyncMap().catch(console.error)
+  // audioFile.id drives take-switching; liveSessionStatus drives post-sync refresh.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioFile?.id, liveSessionStatus])
 
   // ── Reset store on unmount ───────────────────────────────────────────────
   useEffect(() => {
@@ -347,26 +471,285 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
     return () => window.removeEventListener('keydown', handler)
   }, [seekTo, jumpToSlide])
 
+  // ── Execute rescore DB writes ─────────────────────────────────────────────
+  // Called directly from handleScore when no confirmation is needed, or from the
+  // confirmation dialog after the user approves deletion of SM-2 review history.
+  const executeRescore = useCallback(
+    async (params: RescorePayload) => {
+      const mk = getMasterKey()
+      if (!mk) return
+
+      const { scored, cards, densityRecord, redZoneMap, existingByNorm, removedIds, legacyIds, uid, guideType, slides, currentWords } = params
+
+      // TEMP DIAG (1): scored keyword count
+      console.log('[diag:1] scored.length =', scored.length)
+
+      // ── Slide density DB writes ────────────────────────────────────────────
+      // TEMP DIAG (2): about to write slide density
+      console.log('[diag:2] starting slide-density write | densityRecord keys =', Object.keys(densityRecord).length)
+      loadSlideDensity(densityRecord)
+      if (Object.keys(densityRecord).length > 0) {
+        await Promise.all(
+          Object.entries(densityRecord).map(([pageStr, score]) => {
+            const pageNumber = Number(pageStr)
+            const isRed = score >= 30
+            // pageNumber is global_slide_index — session-wide consistent
+            return supabase.from('slides')
+              .update({ density_score: score, is_red_zone: isRed })
+              .eq('session_id', session.id)
+              .eq('global_slide_index', pageNumber)
+          }),
+        )
+        loadSlideZones(redZoneMap)
+      }
+      // TEMP DIAG (3): slide-density write done
+      console.log('[diag:3] slide-density write complete')
+
+      if (scored.length === 0) {
+        useNotificationStore.getState().notify({ type: 'error', message: 'Scoring produced no keywords — slides may lack scorable content', duration: 5000 })
+        return
+      }
+
+      // ── Clean up NULL-keyword_id flashcards from the old rescore path ──────
+      // These are flashcards whose keyword_id was SET NULL when the old path
+      // deleted keywords. They have no stable identity and must be replaced.
+      await supabase.from('flashcards')
+        .delete()
+        .eq('session_id', session.id)
+        .is('keyword_id', null)
+
+      // ── Keyword upsert ────────────────────────────────────────────────────
+      // Delete legacy rows (normalized_term='') and removed recognized rows.
+      const idsToDelete = [...legacyIds, ...removedIds]
+      if (idsToDelete.length > 0) {
+        await supabase.from('keywords').delete().in('id', idsToDelete)
+      }
+
+      // Update existing keyword rows in place — preserves IDs and SM-2 chain
+      const normToKwId = new Map<string, string>(existingByNorm)
+      const kwsToUpdate = scored.filter((kw) => existingByNorm.has(normalizeTerm(kw.term)))
+
+      if (kwsToUpdate.length > 0) {
+        const updateRows = await Promise.all(
+          kwsToUpdate.map(async (kw) => ({
+            id: existingByNorm.get(normalizeTerm(kw.term))!,
+            session_id: session.id,
+            user_id: uid,
+            normalized_term: normalizeTerm(kw.term),
+            term_encrypted: await encryptText(mk, kw.term),
+            source: kw.source,
+            zone: kw.zone,
+            confidence_score: kw.confidenceScore,
+            mention_count: kw.mentionCount,
+            dwell_time_ms: kw.dwellTimeMs,
+            emphasis_score: kw.emphasisScore,
+            lecture_confidence: kw.lectureConfidence,
+            slide_indices: kw.slideIndices,
+          })),
+        )
+        await supabase.from('keywords').upsert(updateRows, { onConflict: 'id' })
+      }
+
+      // Insert new keywords (terms with no existing row)
+      const kwsToInsert = scored.filter((kw) => !existingByNorm.has(normalizeTerm(kw.term)))
+      if (kwsToInsert.length > 0) {
+        const insertRows = await Promise.all(
+          kwsToInsert.map(async (kw) => ({
+            session_id: session.id,
+            user_id: uid,
+            normalized_term: normalizeTerm(kw.term),
+            term_encrypted: await encryptText(mk, kw.term),
+            source: kw.source,
+            zone: kw.zone,
+            confidence_score: kw.confidenceScore,
+            mention_count: kw.mentionCount,
+            dwell_time_ms: kw.dwellTimeMs,
+            emphasis_score: kw.emphasisScore,
+            lecture_confidence: kw.lectureConfidence,
+            slide_indices: kw.slideIndices,
+          })),
+        )
+        // TEMP DIAG (4): row count and session ID immediately before the insert
+        console.log('[diag:4] insertRows.length =', insertRows.length, '| session_id =', session.id)
+        const { data: insertedKwRows, error: kwInsertErr } = await supabase
+          .from('keywords')
+          .insert(insertRows)
+          .select('id, normalized_term')
+
+        // TEMP DIAG (5): full error object if present, or confirmation it's null
+        console.log('[diag:5] kwInsertErr =', kwInsertErr ? JSON.stringify(kwInsertErr) : null)
+
+        if (kwInsertErr) {
+          // PG error 23505 = unique_violation. If it names our partial unique index
+          // it means a concurrent handleScore call already inserted these keywords
+          // for this session — that call will have loaded everything into the store,
+          // so we can silently bail rather than surfacing a spurious error toast.
+          // Any other error (different code or different constraint) is a genuine
+          // failure and warrants the notification.
+          const isRaceDuplicate =
+            kwInsertErr.code === '23505' &&
+            kwInsertErr.message.includes('keywords_session_normalized_term_idx')
+          if (isRaceDuplicate) {
+            console.warn('[keywords] unique conflict on insert — concurrent score already completed, no-op')
+            return
+          }
+          console.error('[keywords] insert failed:', kwInsertErr.message)
+          useNotificationStore.getState().notify({ type: 'error', message: `Scoring failed: ${kwInsertErr.message}`, duration: 6000 })
+          return
+        }
+        for (const row of insertedKwRows ?? []) {
+          normToKwId.set(row.normalized_term as string, row.id as string)
+        }
+      }
+
+      // Load keywords — IDs come from the now-stable normToKwId map; no DB re-fetch needed
+      const loadedKws: StoredKeyword[] = scored.map((kw) => ({
+        id: normToKwId.get(normalizeTerm(kw.term))!,
+        term: kw.term,
+        source: kw.source,
+        zone: kw.zone,
+        confidenceScore: kw.confidenceScore,
+        mentionCount: kw.mentionCount,
+        dwellTimeMs: kw.dwellTimeMs,
+        emphasisScore: kw.emphasisScore,
+        lectureConfidence: kw.lectureConfidence,
+        slideIndices: kw.slideIndices,
+      }))
+      loadKeywords(loadedKws)
+
+      // TEMP DIAG (6): reached flashcard write phase
+      console.log('[diag:6] reached flashcard writes | cards.length =', cards.length)
+
+      // ── Flashcard upsert keyed by keyword_id ──────────────────────────────
+      if (cards.length > 0) {
+        // Fetch existing flashcards by keyword_id so we can reuse their DB IDs.
+        // This preserves flashcard_reviews FK chains for unchanged terms.
+        const { data: existingFcRows } = await supabase
+          .from('flashcards')
+          .select('id, keyword_id')
+          .eq('session_id', session.id)
+          .not('keyword_id', 'is', null)
+
+        const existingFcByKwId = new Map<string, string>(
+          (existingFcRows ?? []).map((r) => [r.keyword_id as string, r.id as string]),
+        )
+
+        const fcsToUpdate: Flashcard[] = []
+        const fcsToInsert: Flashcard[] = []
+
+        for (const card of cards) {
+          const kwId = normToKwId.get(normalizeTerm(card.keywordTerm))
+          if (!kwId) continue
+          const existingFcId = existingFcByKwId.get(kwId)
+          if (existingFcId) {
+            // Patch card.id to the existing DB id so enhanceFlashcards targets the right row
+            card.id = existingFcId
+            fcsToUpdate.push(card)
+          } else {
+            fcsToInsert.push(card)
+          }
+        }
+
+        // Delete flashcards for removed keywords.
+        // The FK is ON DELETE SET NULL, not CASCADE, so we must delete explicitly.
+        if (removedIds.length > 0) {
+          await supabase.from('flashcards').delete().in('keyword_id', removedIds)
+        }
+
+        if (fcsToUpdate.length > 0) {
+          const updateFcRows = await Promise.all(
+            fcsToUpdate.map(async (c) => ({
+              id: c.id,
+              session_id: session.id,
+              user_id: uid,
+              keyword_id: normToKwId.get(normalizeTerm(c.keywordTerm))!,
+              front_encrypted: await encryptText(mk, c.front),
+              back_encrypted: await encryptText(mk, c.back),
+              slide_index: c.slideIndex,
+              zone: c.zone,
+            })),
+          )
+          await supabase.from('flashcards').upsert(updateFcRows, { onConflict: 'id' })
+        }
+
+        if (fcsToInsert.length > 0) {
+          const insertFcRows = await Promise.all(
+            fcsToInsert.map(async (c) => ({
+              id: c.id,
+              session_id: session.id,
+              user_id: uid,
+              keyword_id: normToKwId.get(normalizeTerm(c.keywordTerm))!,
+              front_encrypted: await encryptText(mk, c.front),
+              back_encrypted: await encryptText(mk, c.back),
+              slide_index: c.slideIndex,
+              zone: c.zone,
+            })),
+          )
+          await supabase.from('flashcards').insert(insertFcRows)
+        }
+
+        loadFlashcards(cards)
+
+        // Enhance flashcard backs with Claude — Midnight+ only.
+        // Dusk users keep the auto-generated backs; no server call is made.
+        if (hasAccess(userTier, 'midnight')) {
+          void enhanceFlashcards({
+            sessionId: session.id,
+            scored,
+            cards,
+            slides,
+            words: currentWords,
+            mk,
+            supabase,
+            loadFlashcards,
+          })
+        }
+      }
+
+      // ── Session metadata ───────────────────────────────────────────────────
+      if (guideType !== 'synthetic') {
+        if (scored.length > 0) {
+          useNotificationStore.getState().notify({
+            type: 'success',
+            message: 'Red Zone keywords identified',
+            duration: 3000,
+          })
+          await supabase.from('sessions').update({ has_study_guide: true, guide_type: guideType }).eq('id', session.id)
+        }
+      } else if (scored.length > 0) {
+        await supabase.from('sessions').update({ has_study_guide: true, guide_type: 'synthetic' }).eq('id', session.id)
+      }
+    },
+    [session.id, supabase, loadKeywords, loadFlashcards, loadSlideDensity, loadSlideZones, userTier],
+  )
+
   // ── Scoring handler ──────────────────────────────────────────────────────
   // payload.type === 'extract': call LLM to extract terms (guide text or null for auto)
   // payload.type === 'anki':    use pre-extracted card fronts directly
   const handleScore = useCallback(
     async (payload: GuidePayload | { type: 'extract'; guideText: string | null }) => {
       const mk = getMasterKey()
-      if (!mk || isScoring) return
+      if (!mk) {
+        useNotificationStore.getState().notify({ type: 'error', message: 'Vault is locked — unlock before scoring', duration: 4000 })
+        return
+      }
+      if (isScoringRef.current || isScoring || !!pendingRescore) return
+      isScoringRef.current = true
 
       setIsScoring(true)
       try {
         const { data: slideRows } = await supabase
           .from('slides')
-          .select('page_number, text_encrypted')
+          .select('global_slide_index, text_encrypted')
           .eq('session_id', session.id)
-          .order('page_number')
+          .order('global_slide_index')
 
         const slides = slideRows
           ? await Promise.all(
               slideRows.map(async (s) => ({
-                pageNumber: s.page_number as number,
+                // Property name kept as 'pageNumber' for keyword-scorer compatibility;
+                // value is global_slide_index so citations are session-wide consistent.
+                pageNumber: s.global_slide_index as number,
                 text: s.text_encrypted
                   ? await decryptText(mk, s.text_encrypted as string).catch(() => '')
                   : '',
@@ -398,6 +781,7 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
 
           if (!resp.ok) {
             console.error('[SessionClient] extraction failed:', resp.status)
+            useNotificationStore.getState().notify({ type: 'error', message: `Keyword extraction failed (${resp.status}) — check console`, duration: 5000 })
             return
           }
 
@@ -405,7 +789,10 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
             keywords: { term: string; source: 'guide' | 'inferred' | 'both' }[]
           }
 
-          if (!extracted?.length) return
+          if (!extracted?.length) {
+            useNotificationStore.getState().notify({ type: 'error', message: 'No keywords found — slides may not have enough text yet', duration: 5000 })
+            return
+          }
 
           // Map LLM source tags to InputKeyword source values
           inputKws = extracted.map((kw) => ({
@@ -416,139 +803,114 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
           }))
         }
 
+        // TEMP DIAG: LLM extraction result before scoreKeywords
+        console.log('[diag:llm] inputKws.length =', inputKws.length, '| first 5 =', inputKws.slice(0, 5))
+
         const currentSyncMap = useSessionStore.getState().syncMap
         const scored = scoreKeywords(inputKws, transcriptText, slides, currentSyncMap)
         const density = computeSlideDensity(inputKws, slides)
 
         const densityRecord: Record<number, number> = {}
         density.forEach((v, k) => { densityRecord[k] = v })
-        loadSlideDensity(densityRecord)
 
-        if (density.size > 0) {
-          const redZoneMap: Record<number, 'likely' | 'red' | null> = {}
-          await Promise.all(
-            Array.from(density.entries()).map(([pageNumber, score]) => {
-              const isRed = score >= 30
-              redZoneMap[pageNumber] = isRed ? 'red' : null
-              return supabase.from('slides')
-                .update({ density_score: score, is_red_zone: isRed })
-                .eq('session_id', session.id)
-                .eq('page_number', pageNumber)
-            }),
-          )
-          loadSlideZones(redZoneMap)
-        }
+        const redZoneMap: Record<number, 'likely' | 'red' | null> = {}
+        density.forEach((score, pageNumber) => { redZoneMap[pageNumber] = score >= 30 ? 'red' : null })
 
         const cards = generateFlashcards(scored, currentWords)
-        loadFlashcards(cards)
 
-        await supabase.from('keywords').delete().eq('session_id', session.id)
-        await supabase.from('flashcards').delete().eq('session_id', session.id)
+        const uid = (await supabase.auth.getUser()).data.user?.id
+        if (!uid) return
 
-        if (scored.length > 0) {
-          const uid = (await supabase.auth.getUser()).data.user?.id
-          if (uid) {
-            const rows = await Promise.all(
-              scored.map(async (kw) => ({
-                session_id: session.id,
-                user_id: uid,
-                term_encrypted: await encryptText(mk, kw.term),
-                source: kw.source,
-                zone: kw.zone,
-                confidence_score: kw.confidenceScore,
-                mention_count: kw.mentionCount,
-                dwell_time_ms: kw.dwellTimeMs,
-                emphasis_score: kw.emphasisScore,
-                lecture_confidence: kw.lectureConfidence,
-                slide_indices: kw.slideIndices,
-              })),
-            )
+        // ── Diff old vs. new keyword sets for upsert ──────────────────────────
+        const { data: existingKwRows } = await supabase
+          .from('keywords')
+          .select('id, normalized_term, source')
+          .eq('session_id', session.id)
 
-            const { data: inserted, error } = await supabase
-              .from('keywords')
-              .insert(rows)
-              .select('id, term_encrypted, source, zone, confidence_score, mention_count, dwell_time_ms, emphasis_score, lecture_confidence, slide_indices')
+        const { existingByNorm, removedIds, legacyIds } = diffKeywords(
+          (existingKwRows ?? []).map((r) => ({
+            id: r.id as string,
+            normalized_term: (r.normalized_term as string) ?? '',
+            source: r.source as string,
+          })),
+          scored.map((kw) => kw.term),
+        )
 
-            if (error) {
-              console.error('[keywords] insert failed:', error.message)
-            } else if (inserted) {
-              const loaded: StoredKeyword[] = await Promise.all(
-                inserted.map(async (k) => ({
-                  id: k.id as string,
-                  term: await decryptText(mk, k.term_encrypted as string),
-                  source: k.source as StoredKeyword['source'],
-                  zone: k.zone as StoredKeyword['zone'],
-                  confidenceScore: k.confidence_score as number,
-                  mentionCount: k.mention_count as number,
-                  dwellTimeMs: k.dwell_time_ms as number,
-                  emphasisScore: k.emphasis_score as number,
-                  lectureConfidence: k.lecture_confidence as number,
-                  slideIndices: (k.slide_indices as number[]) ?? [],
-                })),
-              )
-              loadKeywords(loaded)
-            }
+        const rescorePayload: RescorePayload = {
+          scored, cards, densityRecord, redZoneMap,
+          existingByNorm, removedIds, legacyIds,
+          uid, guideType, slides, currentWords,
+        }
 
-            if (cards.length > 0) {
-              const fcRows = await Promise.all(
-                cards.map(async (c) => ({
-                  id: c.id,
-                  session_id: session.id,
-                  user_id: uid,
-                  front_encrypted: await encryptText(mk, c.front),
-                  back_encrypted: await encryptText(mk, c.back),
-                  slide_index: c.slideIndex,
-                  zone: c.zone,
-                })),
-              )
-              await supabase.from('flashcards').insert(fcRows)
+        // ── Check for SM-2 review history on removed recognized keywords ──────
+        if (removedIds.length > 0) {
+          const { data: removedFcs } = await supabase
+            .from('flashcards')
+            .select('id')
+            .in('keyword_id', removedIds)
+            .eq('session_id', session.id)
 
-              // Enhance flashcard backs with Claude (non-blocking — falls back to originals on error)
-              void enhanceFlashcards({
-                sessionId: session.id,
-                scored,
-                cards,
-                slides,
-                words: currentWords,
-                mk,
-                supabase,
-                loadFlashcards,
-              })
-            }
+          const removedFcIds = (removedFcs ?? []).map((f) => f.id as string)
+          let reviewCount = 0
+
+          if (removedFcIds.length > 0) {
+            const { count } = await supabase
+              .from('flashcard_reviews')
+              .select('id', { count: 'exact', head: true })
+              .in('flashcard_id', removedFcIds)
+            reviewCount = count ?? 0
+          }
+
+          if (reviewCount > 0) {
+            // Pause and surface a confirmation dialog before deleting review history
+            setIsScoring(false)
+            setPendingRescore({ payload: rescorePayload, reviewCount })
+            return
           }
         }
 
-        if (guideType !== 'synthetic') {
-          if (scored.length > 0) {
-            useNotificationStore.getState().notify({
-              type: 'success',
-              message: 'Red Zone keywords identified',
-              duration: 3000,
-            })
-            await supabase.from('sessions').update({ has_study_guide: true, guide_type: guideType }).eq('id', session.id)
-          }
-        } else if (scored.length > 0) {
-          await supabase.from('sessions').update({ has_study_guide: true, guide_type: 'synthetic' }).eq('id', session.id)
-        }
+        await executeRescore(rescorePayload)
       } catch (e) {
         console.error('[SessionClient] scoring error:', e)
       } finally {
+        isScoringRef.current = false
         setIsScoring(false)
       }
     },
-    [isScoring, session.id, supabase, loadKeywords, loadFlashcards, loadSlideDensity, loadSlideZones, initialUserField],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isScoring, pendingRescore, session.id, supabase, executeRescore],
   )
 
   // ── Live recording ────────────────────────────────────────────────────────
-  const handleStartRecording = useCallback(() => {
+  const handleStartRecording = useCallback(async () => {
     const mk = getMasterKey()
     if (!mk || isRecording) return
+
+    // Server-authoritative tier check before requesting mic access or spinning
+    // up the Whisper worker.  A Dusk user must not produce a single transcribed
+    // word via live recording, not just be blocked from saving the result.
+    // The client-side hasAccess guard on the Record Live button is the fast
+    // first line; this call is the authoritative backstop before anything starts.
+    try {
+      await assertCanRecordLive()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Record Live unavailable'
+      useNotificationStore.getState().notify({ type: 'error', message: msg, duration: 5000 })
+      return
+    }
+
+    // Pre-assign the file UUID so transcript_words written during recording and
+    // the files row written on stop share the same id — required for scoped sync.
+    const fileId = crypto.randomUUID()
+    liveFileIdRef.current = fileId
+
     setIsRecording(true)
     setLiveStatus({ phase: 'requesting_mic' })
     stopLiveRef.current = startLiveTranscription(
       supabase,
       session.id,
       mk,
+      fileId,
       (words) => {
         // Filter out the model-warmup chunk (chunkStartMs = -99999, so startMs < 0)
         const valid = words.filter((w) => w.startMs >= 0)
@@ -562,25 +924,76 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
     if (!stopLiveRef.current) return
     const stopFn = stopLiveRef.current
     stopLiveRef.current = null
+
+    // Capture the pre-assigned fileId before clearing the ref.
+    const fileId = liveFileIdRef.current
+    liveFileIdRef.current = null
+
     setLiveStatus({ phase: 'saving' })
 
     try {
       const blob = await stopFn()
-      if (blob) {
+      if (blob && fileId) {
         const mk = getMasterKey()
         if (!mk) throw new Error('Vault locked')
         const buf = await blob.arrayBuffer()
+
+        // Pass the pre-assigned fileId so the files row uses the same id that
+        // was already written to transcript_words.file_id during recording.
+        // source: 'recording' marks this for the DB-level RLS gate on
+        // transcript_words that blocks recording-sourced rows without midnight+.
+        // addFilesToExistingSession throws on any DB write failure and rolls
+        // back the storage blob + files row — no silent orphans.
         await addFilesToExistingSession(
           supabase,
-          [{ data: buf, name: 'live-recording.webm', mimeType: blob.type || 'audio/webm', type: 'audio', sizeBytes: buf.byteLength }],
+          [{
+            id: fileId,
+            data: buf,
+            name: 'live-recording.webm',
+            mimeType: blob.type || 'audio/webm',
+            type: 'audio',
+            source: 'recording',
+            sizeBytes: buf.byteLength,
+          }],
           userId,
           session.id,
           () => {},
         )
-        // Words already in DB from live transcription — mark directly as transcribed
+
+        // Words already in DB from live transcription — mark directly as transcribed.
+        // Only set status AFTER addFilesToExistingSession fully succeeds so a failed
+        // save never leaves the session in a state that looks like it has audio.
         await supabase.from('sessions').update({ has_audio: true, status: 'transcribed' }).eq('id', session.id)
         useSessionStore.getState().setHasAudio(true)
+
+        // Append the new take to the client-side list so the audio timeline
+        // renders immediately (the SSR audioFiles prop is immutable).
+        const newTake = { id: fileId, storage_path: `${userId}/recordings/${fileId}.bin` }
+        const nextTakeIdx = audioFiles.length + extraAudioFiles.length
+        setExtraAudioFiles((prev) => [...prev, newTake])
+        setSelectedTakeIdx(nextTakeIdx)
+
         useNotificationStore.getState().notify({ type: 'success', message: 'Recording saved', duration: 3000 })
+
+        // Auto-sync the just-saved take against the session's existing slides.
+        // Fire-and-forget — progress is surfaced via syncProgress → TranscriptionControls.
+        // Only when there are slides to sync against; sessions without slides skip silently.
+        if (session.has_slides) {
+          setSyncProgress(null)
+          setLiveSessionStatus('syncing')
+          startSync(
+            supabase,
+            session.id,
+            newTake.storage_path,
+            setSyncProgress,
+            fileId,
+            (segments) => {
+              // Populate the store directly from the computed segments — no DB round-trip.
+              loadSyncMap(segments)
+              setLiveSessionStatus('synced')
+            },
+          )
+        }
       }
     } catch (e) {
       console.error('[SessionClient] live save error:', e)
@@ -589,78 +1002,91 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
       setIsRecording(false)
       setLiveStatus({ phase: 'idle' })
     }
-  }, [supabase, session.id, userId])
+  }, [supabase, session.id, session.has_slides, userId, audioFiles.length, extraAudioFiles.length, loadSyncMap]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Single auto-score gate ────────────────────────────────────────────────
+  // Both trigger sites (status change + PdfViewer slide extraction) funnel
+  // through here so the synchronous ref guard is checked exactly once before
+  // any call reaches handleScore — closing the window where two callers both
+  // read isScoringRef.current===false before the first sets it to true.
+  //
+  // Root-cause fix: the gate queries the DB for existing keywords rather than
+  // reading the Zustand store. The store reads 0 before the async load-back
+  // completes, causing a false 'no keywords exist' result on every re-entry to
+  // an already-scored session. DB count is the authoritative source of truth:
+  // if ANY keyword row exists for this session, auto-score never fires.
+  const maybeAutoScore = useCallback(async () => {
+    if (isScoringRef.current) return
+    if (session.has_study_guide && session.guide_type !== 'synthetic' && session.guide_type !== null) return
+
+    // Query DB directly — never trust the client store, which may not yet
+    // reflect rows loaded by the concurrent load-back effect.
+    const { count, error } = await supabase
+      .from('keywords')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', session.id)
+
+    if (error) {
+      // Fail safe: if we can't confirm zero keywords, don't fire.
+      console.warn('[maybeAutoScore] keywords count query failed, skipping auto-score:', error.message)
+      return
+    }
+
+    if ((count ?? 0) > 0) return  // session already scored — full stop
+
+    handleScore({ type: 'extract', guideText: null })
+  }, [handleScore, session.has_study_guide, session.guide_type, session.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  // supabase is captured from the render-scope closure (same pattern as loadData effect above)
 
   // ── Callback from PdfViewer after fresh slide extraction ─────────────────
   const handleSlidesExtracted = useCallback(() => {
-    if (session.has_study_guide && session.guide_type !== 'synthetic' && session.guide_type !== null) return
-    const hasKws = useSessionStore.getState().keywords.length > 0
-    if (!hasKws && !isScoring) {
-      handleScore({ type: 'extract', guideText: null })
-    }
-  }, [isScoring, handleScore, session.has_study_guide, session.guide_type])
+    void maybeAutoScore()  // async — fire-and-forget; errors are caught inside
+  }, [maybeAutoScore])
 
-  // ── Auto-score ───────────────────────────────────────────────────────────
+  // ── Auto-score on status change ───────────────────────────────────────────
+  // Depends on liveSessionStatus (not the static SSR prop) so it re-evaluates
+  // once the mount-time status fetch resolves a stale initial value.
+  // maybeAutoScore is intentionally excluded from deps — it changes whenever
+  // isScoring changes, which would cause a scoring→complete→re-run loop.
+  // The ref guard inside maybeAutoScore makes this safe.
   useEffect(() => {
     if (!session.has_slides) return
-    if (session.has_study_guide && session.guide_type !== 'synthetic' && session.guide_type !== null) return
-    const hasKws = useSessionStore.getState().keywords.length > 0
-    if (!hasKws && ['ready', 'synced'].includes(session.status) && !isScoring) {
-      handleScore({ type: 'extract', guideText: null })
-    }
+    if (!['ready', 'synced'].includes(liveSessionStatus)) return
+    void maybeAutoScore()  // async — fire-and-forget; errors are caught inside
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.status, session.has_slides])
+  }, [liveSessionStatus, session.has_slides])
 
-  // ── Scrubber pointer handlers ─────────────────────────────────────────────
-  const seekFromPointer = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!trackRef.current || durationMs === 0) return
-      const rect = trackRef.current.getBoundingClientRect()
-      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-      seekTo(Math.round(ratio * durationMs))
-    },
-    [durationMs, seekTo],
-  )
+  // ── Transcription / sync handlers ───────────────────────────────────────
+  const handleTranscribe = useCallback(() => {
+    if (!audioFile) return
+    setTranscriptionProgress(null)
+    startTranscription(
+      supabase,
+      session.id,
+      audioFile.storage_path,
+      setTranscriptionProgress,
+      (words) => addTranscriptWords(words.map((w) => ({ ...w, slideIndex: null }))),
+    )
+  }, [audioFile, session.id, supabase, addTranscriptWords])
 
-  const handleTrackDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      isDragging.current = true
-      ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
-      seekFromPointer(e)
-    },
-    [seekFromPointer],
-  )
+  const handleAnalyze = useCallback(() => {
+    if (!audioFile) return
+    setSyncProgress(null)
+    setLiveSessionStatus('syncing')
+    startSync(
+      supabase,
+      session.id,
+      audioFile.storage_path,
+      setSyncProgress,
+      audioFile.id,
+      (segments) => {
+        loadSyncMap(segments)
+        setLiveSessionStatus('synced')
+      },
+    )
+  }, [audioFile, session.id, supabase, loadSyncMap])
 
-  const handleTrackMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!isDragging.current) return
-      seekFromPointer(e)
-    },
-    [seekFromPointer],
-  )
-
-  const handleTrackUp = useCallback(() => { isDragging.current = false }, [])
-
-  const togglePlay = useCallback(() => {
-    const el = getAudioEl()
-    if (!el) return
-    if (isPlaying) el.pause()
-    else el.play().catch(() => {})
-  }, [isPlaying])
-
-  // ── Transcript ribbon tokens ─────────────────────────────────────────────
-  const ribbonTokens = useMemo(() => {
-    if (transcriptWords.length === 0) return []
-    return transcriptWords
-      .filter((w) => w.startMs >= currentTimeMs - 3000 && w.startMs <= currentTimeMs + 20000)
-      .slice(0, 60)
-  }, [transcriptWords, currentTimeMs])
-
-  const keywordTerms = useMemo(
-    () => new Set(keywords.flatMap((k) => k.term.toLowerCase().split(/\s+/))),
-    [keywords],
-  )
-
+  // ── Keyword zone map — used by live recording pane ───────────────────────
   const keywordZoneMap = useMemo(() => {
     const map = new Map<string, 'red' | 'likely'>()
     for (const k of keywords) {
@@ -678,9 +1104,10 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
   )
 
   // ── Derived values ───────────────────────────────────────────────────────
-  const pct = durationMs > 0 ? (currentTimeMs / durationMs) * 100 : 0
   const currentZone = slideZoneMap[currentPage] ?? null
-  const hasAudioFile = hasAudio && !!audioFile
+  // hasAudioFile: true once the store reflects audio existence AND at least one
+  // take is in the combined list (covers newly-saved takes from this client session).
+  const hasAudioFile = hasAudio && allAudioFiles.length > 0
 
   // ── Layout ───────────────────────────────────────────────────────────────
 
@@ -714,30 +1141,68 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
 
         {/* Center: mode tabs */}
         <div style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 10, border: '1px solid #1E1E2E', background: '#0D0D14', flexShrink: 0 }}>
-          {(['lecture', 'study', 'notes', 'ask'] as Tab[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              style={{
-                height: 28, padding: '0 13px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 500,
-                background: tab === t ? '#1E1D2E' : 'transparent',
-                color: tab === t ? '#E2E8F0' : '#5B6478',
-                boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
-              }}
-            >
-              {t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
-          ))}
+          {(['lecture', 'study', 'notes', 'ask'] as Tab[]).map((t) => {
+            const gate = TAB_GATES[t]
+            const locked = !!gate && !hasAccess(userTier, gate)
+            const active = tab === t
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                style={{
+                  height: 28, padding: '0 13px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  fontSize: 12.5, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5,
+                  background: active ? '#1E1D2E' : 'transparent',
+                  color: active ? '#E2E8F0' : locked ? '#3A4155' : '#5B6478',
+                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
+                }}
+              >
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+                {locked && (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                )}
+              </button>
+            )
+          })}
         </div>
 
         {/* Right: subject tag + search + export */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={() => setGuideModalOpen(true)}
+            disabled={isScoring}
+            style={{
+              height: 32, padding: '0 12px', display: 'inline-flex', alignItems: 'center', gap: 6,
+              borderRadius: 8, border: '1px solid #23222F', background: '#0D0D14',
+              fontSize: 12, color: '#7C8398', cursor: isScoring ? 'not-allowed' : 'pointer',
+              opacity: isScoring ? 0.5 : 1, flexShrink: 0,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="1" width="12" height="16" rx="2" /><path d="M6 6 H12 M6 9 H12 M6 12 H9" />
+            </svg>
+            Study guide
+          </button>
           <CourseTagPicker sessionId={session.id} initialTag={session.course_tag} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #1E1E2E', background: '#0D0D14', width: 208 }}>
-            <span style={{ color: '#3F485C', display: 'flex', flexShrink: 0 }}><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><circle cx="8" cy="8" r="5.5" /><path d="M12.5 12.5 L16 16" /></svg></span>
-            <span style={{ fontSize: 12, color: '#3F485C', whiteSpace: 'nowrap' }}>Search transcript &amp; keywords</span>
-          </div>
+          <SessionSearchBar
+            transcriptWords={transcriptWords}
+            keywords={keywords}
+            notesTextRef={notesTextRef}
+            onJumpToTranscript={(wordId, startMs) => {
+              setTab('lecture')
+              seekTo(startMs)
+              jumpToWord(wordId)
+            }}
+            onJumpToKeyword={(id) => {
+              setTab('study')
+              setActiveKeyword(id)
+            }}
+            onJumpToNotes={() => setTab('notes')}
+          />
           <button
             type="button"
             style={{ height: 32, padding: '0 13px', display: 'inline-flex', alignItems: 'center', gap: 7, borderRadius: 8, border: '1px solid #2D2B45', background: 'transparent', fontSize: 12.5, color: '#CBD5E1', cursor: 'pointer' }}
@@ -752,12 +1217,35 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
 
       {/* STUDY mode */}
       {tab === 'study' && (
-        <div className="flex-1 min-h-0 overflow-y-auto p-6">
-          {flashcards.length > 0 ? (
-            <FlashcardPanel sessionTitle={sessionTitle ?? ''} userId={userId} />
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 flex flex-col">
+          {!hasAccess(userTier, 'midnight') ? (
+            <LockedFeature
+              requiredTier="midnight"
+              feature="Study tab"
+              description="Review flashcards with spaced repetition, track mastery, and see per-keyword progress — unlocked on Midnight."
+            />
+          ) : flashcards.length > 0 ? (
+            <FlashcardPanel sessionTitle={sessionTitle ?? ''} sessionId={session.id} userId={userId} />
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
               <span className="text-text-tertiary text-body-sm">No flashcards yet — add a study guide or let Nocturne score your slides.</span>
+              {session.has_slides && (
+                <button
+                  type="button"
+                  onClick={() => handleScore({ type: 'extract', guideText: null })}
+                  disabled={isScoring}
+                  style={{
+                    marginTop: 4, height: 32, padding: '0 16px',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    borderRadius: 8, border: '1px solid #23222F', background: '#0D0D14',
+                    fontSize: 12, color: isScoring ? '#3A4155' : '#7C8398',
+                    cursor: isScoring ? 'not-allowed' : 'pointer',
+                    opacity: isScoring ? 0.5 : 1,
+                  }}
+                >
+                  {isScoring ? 'Scoring…' : 'Score now'}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -766,25 +1254,46 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
       {/* NOTES mode */}
       {tab === 'notes' && (
         <div className="flex-1 min-h-0 flex flex-col p-6">
-          <NotesEditor sessionId={session.id} userId={userId} />
+          {!hasAccess(userTier, 'midnight') ? (
+            <LockedFeature
+              requiredTier="midnight"
+              feature="Notes tab"
+              description="Write and save encrypted notes per session — unlocked on Midnight."
+            />
+          ) : (
+            <NotesEditor
+              sessionId={session.id}
+              userId={userId}
+              totalSlides={totalPages}
+              onGoToSlide={(slideIndex) => {
+                setTab('lecture')
+                pdfViewerRef.current?.goToPage(slideIndex)
+                jumpToSlide(slideIndex)
+              }}
+              onContentChange={(text) => { notesTextRef.current = text }}
+            />
+          )}
         </div>
       )}
 
       {/* ASK mode */}
       {tab === 'ask' && (
         <div className="flex-1 min-h-0 flex flex-col p-6">
-          <AskPanel sessionId={session.id} userId={userId} />
+          {!hasAccess(userTier, 'eclipse') ? (
+            <LockedFeature
+              requiredTier="eclipse"
+              feature="Ask tab"
+              description="Ask questions grounded in this session's slides and transcript — answered by Claude using only your lecture content."
+            />
+          ) : (
+            <AskPanel sessionId={session.id} userId={userId} />
+          )}
         </div>
       )}
 
       {/* LECTURE mode */}
       {tab === 'lecture' && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-
-          {/* Headless audio element — decrypts + registers with store */}
-          {hasAudioFile && audioFile && (
-            <AudioPlayer audioStoragePath={audioFile.storage_path} headless />
-          )}
 
           {/* Row: outline rail + slide hero */}
           <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
@@ -796,10 +1305,9 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
                 <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 10, color: '#3F485C' }}>{totalPages > 0 ? `${totalPages} slides` : ''}</span>
               </div>
 
-              {pdfDoc && totalPages > 0 ? (
+              {slideEntries.length > 0 ? (
                 <SlideNavStrip
-                  pdfDoc={pdfDoc}
-                  totalPages={totalPages}
+                  slides={slideEntries}
                   currentPage={currentPage}
                   onPageSelect={(page) => {
                     pdfViewerRef.current?.goToPage(page)
@@ -809,11 +1317,6 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
               ) : (
                 <div style={{ flex: 1 }} />
               )}
-
-              {/* Study guide upload */}
-              <div style={{ borderTop: '1px solid #16151E', flexShrink: 0 }}>
-                <GuideUpload onGuide={handleScore} isScoring={isScoring} />
-              </div>
 
               {/* Legend */}
               <div style={{ padding: '9px 14px', borderTop: '1px solid #16151E', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
@@ -838,25 +1341,44 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                  {/* Record live button */}
-                  <button
-                    type="button"
-                    onClick={isRecording ? handleStopRecording : handleStartRecording}
-                    disabled={liveStatus.phase === 'saving'}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      height: 32, padding: '0 11px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
-                      border: isRecording ? '1px solid rgba(251,113,133,0.4)' : '1px solid #23222F',
-                      background: isRecording ? 'rgba(251,113,133,0.1)' : '#0D0D14',
-                      color: isRecording ? '#FB7185' : '#5B6478',
-                      opacity: liveStatus.phase === 'saving' ? 0.5 : 1,
-                    }}
-                  >
-                    {isRecording
-                      ? <><Square size={10} strokeWidth={0} style={{ fill: '#FB7185', flexShrink: 0 }} /> Stop</>
-                      : <><Mic size={11} strokeWidth={1.5} style={{ flexShrink: 0 }} /> Record live</>
-                    }
-                  </button>
+                  {/* Record live button — Midnight+ only */}
+                  {hasAccess(userTier, 'midnight') ? (
+                    <button
+                      type="button"
+                      onClick={isRecording ? handleStopRecording : handleStartRecording}
+                      disabled={liveStatus.phase === 'saving'}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        height: 32, padding: '0 11px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
+                        border: isRecording ? '1px solid rgba(251,113,133,0.4)' : '1px solid #23222F',
+                        background: isRecording ? 'rgba(251,113,133,0.1)' : '#0D0D14',
+                        color: isRecording ? '#FB7185' : '#5B6478',
+                        opacity: liveStatus.phase === 'saving' ? 0.5 : 1,
+                      }}
+                    >
+                      {isRecording
+                        ? <><Square size={10} strokeWidth={0} style={{ fill: '#FB7185', flexShrink: 0 }} /> Stop</>
+                        : <><Mic size={11} strokeWidth={1.5} style={{ flexShrink: 0 }} /> Record live</>
+                      }
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      title="Upgrade to Midnight to record live"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        height: 32, padding: '0 11px', borderRadius: 8, fontSize: 11.5, cursor: 'not-allowed',
+                        border: '1px solid #1B1A29', background: '#0D0D14',
+                        color: '#3A4155', opacity: 0.55, flexShrink: 0,
+                      }}
+                    >
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                      Record live
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -890,9 +1412,11 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
                   <PdfViewer
                     ref={pdfViewerRef}
                     storagePath={pdfFile.storage_path}
+                    fileId={pdfFile.id}
+                    slideFiles={slideFiles}
                     sessionId={session.id}
                     onSlidesExtracted={handleSlidesExtracted}
-                    onPdfDocReady={(doc, pages) => { setPdfDoc(doc); setTotalPages(pages) }}
+                    onPdfDocReady={(entries, pages) => { setSlideEntries(entries); setTotalPages(pages) }}
                     onPageChange={setCurrentPage}
                   />
                 ) : (
@@ -919,154 +1443,118 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
           </div>
 
           {/* ── Timeline spine ────────────────────────────────────────────── */}
-          {hasAudioFile && (
-            <div style={{ flexShrink: 0, borderTop: '1px solid #16151E', background: '#0A0A0F', padding: '13px 26px 15px' }}>
+          {hasAudioFile && audioFile && (
+            <div style={{ flexShrink: 0, height: 400, borderTop: '1px solid #16151E', background: '#0A0A0F', display: 'flex', flexDirection: 'column' }}>
 
-              {/* Ribbon toggle + clock */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 }}>
-                <div style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 9, border: '1px solid #1E1E2E', background: '#0D0D14' }}>
-                  {(['transcript', 'density'] as const).map((r) => (
+              {/* Take selector — only visible when there are multiple audio takes */}
+              {allAudioFiles.length > 1 && (
+                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderBottom: '1px solid #16151E' }}>
+                  <span style={{ fontSize: 9.5, color: '#3F485C', fontFamily: 'var(--font-mono), monospace', letterSpacing: '0.05em', textTransform: 'uppercase', marginRight: 4 }}>Take</span>
+                  {allAudioFiles.map((_, i) => (
                     <button
-                      key={r}
+                      key={i}
                       type="button"
-                      onClick={() => setRibbon(r)}
+                      onClick={() => setSelectedTakeIdx(i)}
                       style={{
-                        height: 26, padding: '0 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500,
-                        background: ribbon === r ? '#1E1D2E' : 'transparent',
-                        color: ribbon === r ? '#E2E8F0' : '#5B6478',
-                        boxShadow: ribbon === r ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
+                        height: 22, padding: '0 9px', borderRadius: 5,
+                        border: `1px solid ${selectedTakeIdx === i ? '#2D2B45' : 'transparent'}`,
+                        background: selectedTakeIdx === i ? '#111119' : 'transparent',
+                        color: selectedTakeIdx === i ? '#C4B5FD' : '#5B6478',
+                        fontSize: 10.5, fontFamily: 'var(--font-mono), monospace',
+                        cursor: 'pointer',
                       }}
                     >
-                      {r === 'transcript' ? 'Transcript' : 'Red Zone density'}
+                      {i + 1}
                     </button>
                   ))}
                 </div>
-                <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 11, color: '#5B6478' }}>
-                  Slide {String(currentPage).padStart(2, '0')} / {totalPages || '—'} · {formatTime(currentTimeMs)} / {formatTime(durationMs)}
-                </span>
+              )}
+
+              {/* Transcription controls header */}
+              <div style={{ flexShrink: 0 }}>
+                <TranscriptionControls
+                  progress={transcriptionProgress}
+                  syncProgress={syncProgress}
+                  sessionStatus={liveSessionStatus}
+                  hasAudio={!!audioFile}
+                  hasSlides={hasSlides}
+                  onTranscribe={handleTranscribe}
+                  onAnalyze={handleAnalyze}
+                />
               </div>
 
-              {/* Ribbon body */}
-              <div style={{ height: 62, marginBottom: 11 }}>
-                {ribbon === 'transcript' ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, height: '100%' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {ribbonTokens.length > 0 ? (
-                        <div style={{ fontSize: 13.5, lineHeight: 1.55, color: '#7C8398', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {ribbonTokens.map((w) => {
-                            const clean = w.word.toLowerCase().replace(/[^a-z0-9]/g, '')
-                            const zone = keywordZoneMap.get(clean)
-                            return (
-                              <span
-                                key={w.id}
-                                style={zone ? {
-                                  color: zone === 'red' ? '#FDA4AF' : '#FDE68A',
-                                  background: zone === 'red' ? 'rgba(251,113,133,0.12)' : 'rgba(251,191,36,0.1)',
-                                  borderRadius: 4,
-                                  padding: '0 2px',
-                                } : undefined}
-                              >
-                                {w.word}{' '}
-                              </span>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: 13, color: '#3F485C', fontStyle: 'italic' }}>No transcript yet</span>
-                      )}
-                    </div>
-                    {ribbonTokens.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => { if (ribbonTokens[0]) seekTo(ribbonTokens[0].startMs) }}
-                        style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 13px', borderRadius: 8, border: '1px solid rgba(99,102,241,0.34)', background: 'rgba(99,102,241,0.1)', color: '#A5B4FC', fontSize: 12, cursor: 'pointer' }}
-                      >
-                        <svg width="11" height="11" viewBox="0 0 18 18" fill="#A5B4FC"><path d="M5 3 L14 9 L5 15 Z" /></svg>
-                        Play from here
-                      </button>
-                    )}
+              {/* Transcript pane */}
+              <div style={{ flex: 1, minHeight: 0, borderTop: '1px solid #16151E' }}>
+                <TranscriptPane
+                  progress={transcriptionProgress}
+                  sessionStatus={liveSessionStatus}
+                  hasAudio={!!audioFile}
+                  isLoadingTranscript={isLoadingTranscript}
+                  onTranscribe={handleTranscribe}
+                />
+              </div>
+
+              {/* Time-axis density ribbon — bars sized by audio duration, not slide count */}
+              {syncMap.length > 0 && durationMs > 0 && (
+                <div style={{ flexShrink: 0, height: 40, borderTop: '1px solid #16151E', padding: '0 16px', display: 'flex', alignItems: 'flex-end' }}>
+                  <div style={{ position: 'relative', width: '100%', height: 32 }}>
+                    {syncMap.map((seg, i) => {
+                      const leftPct  = (seg.startMs / durationMs) * 100
+                      const widthPct = ((seg.endMs - seg.startMs) / durationMs) * 100
+                      const score    = slideDensityMap[seg.slideIndex] ?? 0
+                      const zone     = slideZoneMap[seg.slideIndex]
+                      const barColor = zone === 'red' ? '#FB7185' : zone === 'likely' ? '#FBBF24' : '#2D2B45'
+                      const barH     = Math.max(3, Math.round((score / 100) * 32))
+                      return (
+                        <div
+                          key={i}
+                          style={{
+                            position: 'absolute',
+                            left: `${leftPct}%`,
+                            width: `${widthPct}%`,
+                            bottom: 0,
+                            height: barH,
+                            background: barColor,
+                            borderRadius: '2px 2px 0 0',
+                            opacity: seg.slideIndex === currentPage ? 1 : 0.6,
+                          }}
+                        />
+                      )
+                    })}
                   </div>
-                ) : (
-                  /* Density bars */
-                  <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 46 }}>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
-                        const score = slideDensityMap[pageNum] ?? 0
-                        const zone = slideZoneMap[pageNum]
-                        const barColor = zone === 'red' ? '#FB7185' : zone === 'likely' ? '#FBBF24' : '#2D2B45'
-                        const height = Math.max(4, Math.round((score / 100) * 46))
-                        return (
-                          <div
-                            key={pageNum}
-                            style={{ flex: 1, height, background: barColor, borderRadius: '2px 2px 0 0', opacity: pageNum === currentPage ? 1 : 0.65 }}
-                          />
-                        )
-                      })}
-                    </div>
-                  </div>
+                </div>
+              )}
+
+              {/* Audio player */}
+              <div style={{ height: 150, flexShrink: 0, borderTop: '1px solid #16151E' }}>
+                <AudioPlayer audioStoragePath={audioFile.storage_path} />
+              </div>
+            </div>
+          )}
+
+          {/* ── No-audio empty state ─────────────────────────────────────── */}
+          {!hasAudioFile && !isRecording && (
+            <div style={{ flexShrink: 0, borderTop: '1px solid #16151E', background: '#0A0A0F', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '14px 26px' }}>
+              <Mic size={14} strokeWidth={1.5} style={{ color: '#3F485C', flexShrink: 0 }} />
+              <span style={{ fontSize: 12.5, color: '#5B6478' }}>No audio recorded for this session</span>
+              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                {hasAccess(userTier, 'midnight') && (
+                  <button
+                    type="button"
+                    onClick={handleStartRecording}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid #23222F', background: '#0D0D14', color: '#5B6478', fontSize: 11.5, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    <Mic size={10} strokeWidth={1.5} />
+                    Record live
+                  </button>
                 )}
-              </div>
-
-              {/* Scrubber row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                {/* Play/pause */}
                 <button
                   type="button"
-                  onClick={togglePlay}
-                  style={{ width: 38, height: 38, flexShrink: 0, borderRadius: '50%', background: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#09090F', border: 'none', cursor: 'pointer' }}
+                  onClick={() => useSessionStore.getState().openUploadPanel()}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid #23222F', background: '#0D0D14', color: '#5B6478', fontSize: 11.5, cursor: 'pointer', flexShrink: 0 }}
                 >
-                  {isPlaying
-                    ? <Pause size={14} strokeWidth={2} />
-                    : <Play size={14} strokeWidth={2} style={{ transform: 'translateX(1px)' }} />
-                  }
+                  Upload audio
                 </button>
-
-                {/* Current time */}
-                <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 11.5, color: '#94A3B8', flexShrink: 0, width: 38 }}>
-                  {formatTime(currentTimeMs)}
-                </span>
-
-                {/* Track */}
-                <div
-                  ref={trackRef}
-                  onPointerDown={handleTrackDown}
-                  onPointerMove={handleTrackMove}
-                  onPointerUp={handleTrackUp}
-                  style={{ position: 'relative', flex: 1, height: 18, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-                  role="slider"
-                  aria-valuenow={Math.round(currentTimeMs / 1000)}
-                  aria-valuemin={0}
-                  aria-valuemax={Math.round(durationMs / 1000)}
-                  aria-label="Seek"
-                >
-                  {/* Baseline */}
-                  <div style={{ position: 'absolute', left: 0, right: 0, height: 5, borderRadius: 9999, background: '#16151F' }} />
-                  {/* Fill */}
-                  <div style={{ position: 'absolute', left: 0, height: 5, borderRadius: 9999, background: 'linear-gradient(90deg,#6366F1,#818CF8)', width: `${pct}%`, pointerEvents: 'none' }} />
-                  {/* Slide ticks */}
-                  {durationMs > 0 && syncMap.map((seg, i) => {
-                    const tickPct = (seg.startMs / durationMs) * 100
-                    if (tickPct <= 0.5 || tickPct >= 99.5) return null
-                    return (
-                      <div
-                        key={i}
-                        style={{ position: 'absolute', left: `${tickPct}%`, top: -1, width: 2, height: 7, background: 'rgba(255,255,255,0.18)', transform: 'translateX(-50%)', pointerEvents: 'none' }}
-                      />
-                    )
-                  })}
-                  {/* Playhead dot */}
-                  <div style={{ position: 'absolute', left: `${pct}%`, top: '50%', width: 13, height: 13, borderRadius: '50%', background: '#A5B4FC', boxShadow: '0 0 0 4px rgba(165,180,252,0.18)', transform: 'translate(-50%,-50%)', pointerEvents: 'none' }} />
-                </div>
-
-                {/* Total time */}
-                <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 11.5, color: '#5B6478', flexShrink: 0, width: 38, textAlign: 'right' }}>
-                  {durationMs > 0 ? formatTime(durationMs) : '--:--'}
-                </span>
-              </div>
-
-              {/* Caption */}
-              <div style={{ marginTop: 9, fontSize: 11, color: '#3F485C', textAlign: 'center' }}>
-                Scrub the timeline or pick a slide — audio, transcript and slides stay locked together.
               </div>
             </div>
           )}
@@ -1125,6 +1613,73 @@ export function SessionClient({ userId, session, pdfFile, audioFile, initialUser
       )}
 
       <KeyboardShortcutOverlay />
+
+      {/* ── Study guide modal ────────────────────────────────────────────── */}
+      {guideModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(2px)' }}>
+          <div style={{ background: '#0D0D14', border: '1px solid #23222F', borderRadius: 14, width: 360, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 12px', borderBottom: '1px solid #16151E' }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: '#E2E8F0' }}>Update study guide</span>
+              <button
+                type="button"
+                onClick={() => setGuideModalOpen(false)}
+                style={{ width: 26, height: 26, borderRadius: 7, border: '1px solid #1E1E2E', background: 'transparent', color: '#5B6478', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <svg width="11" height="11" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 4 L14 14 M14 4 L4 14" /></svg>
+              </button>
+            </div>
+            {/* Upload form */}
+            <GuideUpload
+              onGuide={(payload) => { setGuideModalOpen(false); handleScore(payload) }}
+              isScoring={isScoring}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Rescore confirmation dialog ──────────────────────────────────── */}
+      {pendingRescore && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.65)' }}>
+          <div style={{ background: '#0F0F19', border: '1px solid #1E1E2E', borderRadius: 16, padding: 28, maxWidth: 400, width: '90%', display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <div>
+              <p style={{ fontSize: 15, fontWeight: 600, color: '#E2E8F0', margin: '0 0 10px' }}>Remove studied keywords?</p>
+              <p style={{ fontSize: 13.5, color: '#94A3B8', lineHeight: 1.65, margin: 0 }}>
+                This rescore removes {pendingRescore.payload.removedIds.length} keyword{pendingRescore.payload.removedIds.length !== 1 ? 's' : ''} you&apos;ve been reviewing.{' '}
+                <span style={{ color: '#E2E8F0', fontWeight: 500 }}>{pendingRescore.reviewCount} review{pendingRescore.reviewCount !== 1 ? 's' : ''}</span>{' '}
+                (streak progress, ease factors, due dates) will be permanently deleted.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setPendingRescore(null)}
+                style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid #1E1E2E', background: 'transparent', color: '#94A3B8', fontSize: 13.5, cursor: 'pointer' }}
+              >
+                Keep current keywords
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const p = pendingRescore.payload
+                  setPendingRescore(null)
+                  setIsScoring(true)
+                  try {
+                    await executeRescore(p)
+                  } catch (e) {
+                    console.error('[SessionClient] confirmed rescore error:', e)
+                  } finally {
+                    setIsScoring(false)
+                  }
+                }}
+                style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', fontSize: 13.5, cursor: 'pointer', fontWeight: 500 }}
+              >
+                Remove and rescore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

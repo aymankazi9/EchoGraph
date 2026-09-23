@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   pbkdf2_salt          text,
   encrypted_master_key text,
   field                text,
-  tier                 text        NOT NULL DEFAULT 'free',
+  tier                 text        NOT NULL DEFAULT 'free', -- DEPRECATED: never written post-launch; tier authority is now public.subscriptions.tier. Safe to DROP after confirming no read path remains.
   storage_used_bytes   bigint      NOT NULL DEFAULT 0,
   created_at           timestamptz NOT NULL DEFAULT now()
 );

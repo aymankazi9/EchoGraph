@@ -1,26 +1,61 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { AuthBrandCanvas } from '@/components/auth/auth-brand-canvas'
 
-export default function LoginPage() {
+function LoginContent() {
   const heroRef = useRef<HTMLElement>(null)
+  const oauthInFlight = useRef(false)
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [sentEmail, setSentEmail] = useState('')
   const [showError, setShowError] = useState(false)
+  const searchParams = useSearchParams()
+
+  // Read and surface auth errors redirected back from /auth/callback.
+  const authError = searchParams.get('error')
+  const AUTH_ERROR_MESSAGES: Record<string, string> = {
+    auth_failed:    'Something went wrong signing in — please try again.',
+    missing_code:   'The sign-in link was incomplete — please try again.',
+    session_expired: 'Sign-in session expired — please try again.',
+  }
+  const authErrorMsg = authError
+    ? (AUTH_ERROR_MESSAGES[authError] ?? 'Sign-in failed — please try again.')
+    : null
+
+  useEffect(() => {
+    if (authError) console.error('[login] auth error from callback:', authError)
+  }, [authError])
+
+  // Thread an optional post-auth destination through the callback URL.
+  // Only relative paths are accepted; anything else is dropped.
+  function callbackUrl(): string {
+    const next = searchParams.get('next') ?? ''
+    const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : ''
+    const base = `${window.location.origin}/auth/callback`
+    return safeNext ? `${base}?next=${encodeURIComponent(safeNext)}` : base
+  }
 
   async function handleGoogleSignIn() {
+    // Synchronous ref guard — blocks a second call before the first redirect
+    // fires, preventing it from overwriting the PKCE code-verifier cookie.
+    if (oauthInFlight.current) return
+    oauthInFlight.current = true
     setLoading(true)
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl() },
     })
-    // Browser redirects — no setLoading(false) needed
+    // Browser navigates away on success — no cleanup needed.
+    // If signInWithOAuth somehow resolves without redirecting (e.g. a network
+    // error before the redirect fires), release the guard so the user can retry.
+    oauthInFlight.current = false
+    setLoading(false)
   }
 
   async function onSend() {
@@ -29,7 +64,7 @@ export default function LoginPage() {
     setShowError(false)
     setLoading(true)
     const supabase = createClient()
-    await supabase.auth.signInWithOtp({ email: v, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } })
+    await supabase.auth.signInWithOtp({ email: v, options: { emailRedirectTo: callbackUrl() } })
     setSent(true); setSentEmail(v); setLoading(false)
   }
 
@@ -123,6 +158,18 @@ export default function LoginPage() {
 
           <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 6px', color: '#E2E8F0' }}>Sign in</h2>
           <p style={{ fontSize: 14, color: '#94A3B8', margin: '0 0 30px' }}>Continue to your vault to keep studying.</p>
+
+          {/* Auth error banner — shown when /auth/callback redirects back with ?error= */}
+          {authErrorMsg && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 13px', borderRadius: 8, background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.25)', marginBottom: 20 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FB7185" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <p style={{ fontSize: 13, color: '#FB7185', margin: 0, lineHeight: 1.5 }}>{authErrorMsg}</p>
+            </div>
+          )}
 
           {/* Google button */}
           <button
@@ -218,5 +265,13 @@ export default function LoginPage() {
         </p>
       </section>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }

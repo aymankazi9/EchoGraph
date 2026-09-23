@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react'
 const FEATURES = [
   {
     title: 'Red Zone Detection',
-    body: 'Cross-references your study guide against slide density and verbal repetition to surface the highest-yield keywords.',
+    body: 'AI-powered Red Zone Detection cross-references your study guide against slide density and verbal repetition to surface the highest-yield keywords.',
     red: true,
     icon: (
       <svg width={18} height={18} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">

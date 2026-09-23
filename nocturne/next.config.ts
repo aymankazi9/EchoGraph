@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next'
 import withPWAInit from '@ducanh2912/next-pwa'
+import { withSentryConfig } from '@sentry/nextjs/config'
 
 const withPWA = withPWAInit({
   dest: 'public',
@@ -94,4 +95,16 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withPWA(nextConfig)
+// withSentryConfig wraps the PWA config so Sentry can inject its webpack plugin,
+// source-map upload, and tunnel route.  All options are conservative defaults
+// that don't change bundle output when NEXT_PUBLIC_SENTRY_DSN is unset.
+export default withSentryConfig(withPWA(nextConfig), {
+  // Suppress Sentry's own build output to keep CI logs clean.
+  silent: !process.env.CI,
+
+  // Source maps are uploaded to Sentry and then stripped from the deployed
+  // bundle so they never reach end-users.
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+})

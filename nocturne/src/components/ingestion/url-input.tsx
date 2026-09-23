@@ -84,7 +84,7 @@ export function UrlInput({ onFetched, disabled = false }: Props) {
           placeholder="https://example.com/lecture.mp3"
           disabled={fetching || disabled}
           className={[
-            'flex-1 h-9 rounded-input border bg-bg-input text-body text-text-primary px-2.5',
+            'flex-1 h-9 rounded-card border bg-bg-input text-body text-text-primary px-2.5',
             'placeholder:text-text-tertiary focus:outline-none focus:border-indigo-500 focus:shadow-teal',
             error ? 'border-rose-400 shadow-red' : 'border-border-default',
             fetching || disabled ? 'opacity-60 cursor-not-allowed' : '',

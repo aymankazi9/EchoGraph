@@ -4,6 +4,7 @@ import { HelpClient } from '../HelpClient'
 export const metadata: Metadata = {
   title: 'Help Center — Nocturne',
   description: 'Search documentation, browse FAQs, or submit a support ticket. Our team replies within one business day.',
+  alternates: { canonical: '/help' },
 }
 
 export default function HelpPage() {

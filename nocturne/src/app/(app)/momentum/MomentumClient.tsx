@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
+import { hasAccess, type Tier } from '@/lib/tiers/features'
+import { LockedFeature } from '@/components/paywall/locked-feature'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -291,7 +293,7 @@ const STREAK_TARGETS = [7, 14, 21, 30, 60, 100]
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export function MomentumClient({ userId }: { userId: string }) {
+export function MomentumClient({ userId, userTier }: { userId: string; userTier: Tier }) {
   // -- Persistent UI state --
   const [balance,      setBalance]      = useState(0)
   const [redeemed,     setRedeemed]     = useState<string[]>([])
@@ -423,6 +425,18 @@ export function MomentumClient({ userId }: { userId: string }) {
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+  if (!hasAccess(userTier, 'midnight')) {
+    return (
+      <div style={{ display: 'flex', flex: 1, minHeight: 400 }}>
+        <LockedFeature
+          requiredTier="midnight"
+          feature="Momentum"
+          description="Track your study streak, earn points, unlock milestones, and visualize your progress — available on Midnight."
+        />
+      </div>
+    )
+  }
+
   return (
     <div style={{ maxWidth: 1080, margin: '0 auto', padding: '34px 40px 90px' }}>
 
