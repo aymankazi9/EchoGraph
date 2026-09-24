@@ -13,7 +13,7 @@ import { NotificationStrip } from './notification-strip'
 const NAV_ITEMS = [
   { href: '/vault', icon: LayoutDashboard, label: 'Vault' },
   { href: '/momentum', icon: Flame, label: 'Momentum', beta: true },
-  { href: '/community', icon: Users, label: 'Community', beta: true },
+  { href: '/community', icon: Users, label: 'Community', beta: true, betaHidden: true },
   { href: '/session/new', icon: Plus, label: 'New session' },
   { href: '/help', icon: HelpCircle, label: 'Help' },
   { href: '/billing', icon: CreditCard, label: 'Billing' },
@@ -110,16 +110,18 @@ export function SideNav({ email, usedBytes, tier }: Props) {
 
       {/* Nav items */}
       <div className="flex flex-col gap-0.5 p-2 flex-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => (
-          <NavItem
-            key={item.href}
-            href={item.href}
-            icon={item.icon}
-            label={item.label}
-            collapsed={collapsed}
-            beta={item.beta}
-          />
-        ))}
+        {NAV_ITEMS
+          .filter(item => !(process.env.NEXT_PUBLIC_BETA_MODE === 'true' && item.betaHidden))
+          .map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              collapsed={collapsed}
+              beta={item.beta}
+            />
+          ))}
       </div>
 
       {/* Notification strip */}
