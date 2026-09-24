@@ -4,10 +4,6 @@ import { createServerClient as _createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { IS_BETA_MODE } from '@/lib/beta'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2026-06-24.dahlia',
-})
-
 async function userClient() {
   const cookieStore = await cookies()
   return _createServerClient(
@@ -37,6 +33,10 @@ export async function POST(): Promise<NextResponse> {
       { status: 503 },
     )
   }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2026-06-24.dahlia',
+  })
 
   const supabase = await userClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()

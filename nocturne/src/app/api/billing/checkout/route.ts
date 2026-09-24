@@ -7,10 +7,6 @@ import { priceIdForTier } from '@/lib/tiers/priceMap'
 import type { Tier } from '@/lib/tiers/features'
 import { IS_BETA_MODE } from '@/lib/beta'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2026-06-24.dahlia',
-})
-
 // Anon client scoped to the calling user's session — used only to identify the
 // authenticated user.  All DB writes use the service-role client below since
 // the subscriptions table has no user-writable RLS policies.
@@ -50,6 +46,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 503 },
     )
   }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2026-06-24.dahlia',
+  })
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   const supabase = await userClient()
