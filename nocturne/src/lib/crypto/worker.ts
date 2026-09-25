@@ -14,7 +14,9 @@ type InMsg =
 type OutMsg =
   | { type: 'WRAP_DONE'; masterKey: CryptoKey; wrappedKeyB64: string }
   | { type: 'WRAP_WITH_RECOVERY_DONE'; masterKey: CryptoKey; wrappedKeyB64: string; recoveryWrappedKeyB64: string }
-  | { type: 'UNWRAP_DONE'; masterKey: CryptoKey }
+  // ephemeralKeyB64 + cachedWrappedMKB64: session-cache blob for soft-unlock on reload.
+  // See vault.ts vaultRestoreFromCache() for the consumer.
+  | { type: 'UNWRAP_DONE'; masterKey: CryptoKey; ephemeralKeyB64: string; cachedWrappedMKB64: string }
   | { type: 'CHANGE_PASSPHRASE_DONE'; newWrappedKeyB64: string }
   | { type: 'REDERIVE_RECOVERY_DONE'; recoveryWrappedKeyB64: string }
   | { type: 'ERROR'; message: string }
@@ -136,37 +138,81 @@ self.addEventListener('message', async (event: MessageEvent) => {
 
     if (msg.type === 'DERIVE_AND_UNWRAP') {
       const kek = await deriveKEK(msg.passphrase, msg.salt)
+      const wrappedBuf = b64ToBuffer(msg.wrappedKey)
 
-      const masterKey = await crypto.subtle.unwrapKey(
-        'raw',
-        b64ToBuffer(msg.wrappedKey),
-        kek,
-        { name: 'AES-KW' },
+      // ── Session-cache blob ────────────────────────────────────────────────
+      // Unwrap a temporary extractable copy purely to re-wrap it under an
+      // ephemeral AES-256-KW key that we store in sessionStorage.  The
+      // ephemeral key + wrapped blob let vault.ts restore the MK on reload
+      // without re-running PBKDF2 or asking for the passphrase again —
+      // provided the vault-warm cookie is still alive (≤ 1 h).
+      const extractableMK = await crypto.subtle.unwrapKey(
+        'raw', wrappedBuf, kek, { name: 'AES-KW' },
         { name: 'AES-GCM', length: 256 },
-        false, // non-extractable
+        true,  // temporarily extractable — only for wrapKey below, stays in this worker
+        ['encrypt', 'decrypt'],
+      )
+      const ephemeralKey = await crypto.subtle.generateKey(
+        { name: 'AES-KW', length: 256 },
+        true,  // extractable — exported to sessionStorage as raw bytes
+        ['wrapKey', 'unwrapKey'],
+      )
+      const cachedWrappedMKBuf = await crypto.subtle.wrapKey('raw', extractableMK, ephemeralKey, { name: 'AES-KW' })
+      const ephemeralKeyBuf    = await crypto.subtle.exportKey('raw', ephemeralKey)
+      // extractableMK and ephemeralKey go out of scope after this block.
+
+      // ── Primary (non-extractable) copy for the main thread ───────────────
+      const masterKey = await crypto.subtle.unwrapKey(
+        'raw', wrappedBuf, kek, { name: 'AES-KW' },
+        { name: 'AES-GCM', length: 256 },
+        false, // non-extractable — CONTEXT.md §10 rule 3
         ['encrypt', 'decrypt'],
       )
 
       // kek goes out of scope here.
-      send({ type: 'UNWRAP_DONE', masterKey })
+      send({
+        type: 'UNWRAP_DONE',
+        masterKey,
+        ephemeralKeyB64:    bufferToB64(ephemeralKeyBuf),
+        cachedWrappedMKB64: bufferToB64(cachedWrappedMKBuf),
+      })
     }
 
     if (msg.type === 'UNWRAP_WITH_RECOVERY') {
       // Import recovery salt as AES-128-KW recovery KEK
-      const recoveryKEK = await importRecoveryKEK(msg.recoverySalt, ['unwrapKey'])
+      const recoveryKEK  = await importRecoveryKEK(msg.recoverySalt, ['unwrapKey'])
+      const recoveryBuf  = b64ToBuffer(msg.recoveryWrappedKey)
 
+      // ── Session-cache blob (same pattern as DERIVE_AND_UNWRAP) ───────────
+      const extractableMK = await crypto.subtle.unwrapKey(
+        'raw', recoveryBuf, recoveryKEK, { name: 'AES-KW' },
+        { name: 'AES-GCM', length: 256 },
+        true,  // temporarily extractable for the wrapKey call below
+        ['encrypt', 'decrypt'],
+      )
+      const ephemeralKey = await crypto.subtle.generateKey(
+        { name: 'AES-KW', length: 256 },
+        true,
+        ['wrapKey', 'unwrapKey'],
+      )
+      const cachedWrappedMKBuf = await crypto.subtle.wrapKey('raw', extractableMK, ephemeralKey, { name: 'AES-KW' })
+      const ephemeralKeyBuf    = await crypto.subtle.exportKey('raw', ephemeralKey)
+
+      // ── Primary non-extractable copy ─────────────────────────────────────
       const masterKey = await crypto.subtle.unwrapKey(
-        'raw',
-        b64ToBuffer(msg.recoveryWrappedKey),
-        recoveryKEK,
-        { name: 'AES-KW' },
+        'raw', recoveryBuf, recoveryKEK, { name: 'AES-KW' },
         { name: 'AES-GCM', length: 256 },
         false, // non-extractable
         ['encrypt', 'decrypt'],
       )
 
-      // recoveryKEK goes out of scope here.
-      send({ type: 'UNWRAP_DONE', masterKey })
+      // recoveryKEK, extractableMK, ephemeralKey go out of scope here.
+      send({
+        type: 'UNWRAP_DONE',
+        masterKey,
+        ephemeralKeyB64:    bufferToB64(ephemeralKeyBuf),
+        cachedWrappedMKB64: bufferToB64(cachedWrappedMKBuf),
+      })
     }
     if (msg.type === 'CHANGE_PASSPHRASE') {
       // 1. Derive current KEK, unwrap MK as temporarily extractable inside the worker.

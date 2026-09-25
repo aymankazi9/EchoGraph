@@ -12,7 +12,7 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import { isVaultUnlocked, getMasterKey } from '@/lib/crypto/vault'
+import { isVaultUnlocked, getMasterKey, vaultRestoreFromCache } from '@/lib/crypto/vault'
 import { encryptText } from '@/lib/crypto/encrypt'
 import { decryptText } from '@/lib/crypto/decrypt'
 import { createClient } from '@/lib/supabase'
@@ -136,12 +136,18 @@ export function NewSessionClient({ userId, storageBytesUsed, storageCapBytes }: 
 
   // ── Vault guard + pending sessions count ──────────────────────────────────
   useEffect(() => {
-    if (!isVaultUnlocked()) { router.replace('/unlock'); return }
-    db.localSessions
-      .where('userId').equals(userId)
-      .and((s: LocalSession) => s.status === 'ingesting')
-      .count()
-      .then(setPendingCount)
+    async function init() {
+      if (!isVaultUnlocked()) {
+        const restored = await vaultRestoreFromCache()
+        if (!restored) { router.replace('/unlock'); return }
+      }
+      db.localSessions
+        .where('userId').equals(userId)
+        .and((s: LocalSession) => s.status === 'ingesting')
+        .count()
+        .then(setPendingCount)
+    }
+    void init()
   }, [router, userId])
 
   // ── Track audio duration when an audio file is selected ───────────────────

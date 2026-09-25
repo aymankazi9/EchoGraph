@@ -27,16 +27,28 @@ const AUTH_ONLY_PATHS = [
   '/unlock',
 ]
 
+// Copy any cookies that were set on `source` (e.g. a refreshed Supabase
+// session token) onto `dest` before returning it.  Without this, a token
+// refresh that happens inside getUser() is silently dropped whenever the
+// middleware returns a redirect instead of passing the request through —
+// the consumed refresh token never reaches the browser, so the next
+// server component that tries to use it gets a 401 from Supabase and
+// cascades to /login.
+function withCookies(dest: NextResponse, source: NextResponse): NextResponse {
+  source.cookies.getAll().forEach((cookie) => dest.cookies.set(cookie))
+  return dest
+}
+
 export async function middleware(
   request: NextRequest
 ) {
-  const pathname = 
+  const pathname =
     request.nextUrl.pathname
 
-  // Bypass middleware entirely 
+  // Bypass middleware entirely
   // for public paths
-  const isPublicPath = 
-    PUBLIC_PATHS.some(p => 
+  const isPublicPath =
+    PUBLIC_PATHS.some(p =>
       pathname.startsWith(p)
     )
 
@@ -44,12 +56,12 @@ export async function middleware(
     return NextResponse.next()
   }
 
-  let supabaseResponse = 
+  let supabaseResponse =
     NextResponse.next({ request })
 
   const supabase = createServerClient(
-    url, 
-    anonKey, 
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {
@@ -57,12 +69,12 @@ export async function middleware(
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(
-            ({ name, value }) => 
+            ({ name, value }) =>
               request.cookies.set(
                 name, value
               )
           )
-          supabaseResponse = 
+          supabaseResponse =
             NextResponse.next({ request })
           cookiesToSet.forEach(
             ({ name, value, options }) =>
@@ -79,41 +91,47 @@ export async function middleware(
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Not logged in — send to login
+  // Not logged in — send to login, carrying any refreshed cookies so the
+  // browser has the latest token state even on an unauthenticated redirect.
   if (!user) {
-    return NextResponse.redirect(
-      new URL('/login', request.url)
+    return withCookies(
+      NextResponse.redirect(new URL('/login', request.url)),
+      supabaseResponse,
     )
   }
 
   // Logged in but vault not warm —
   // send to unlock with return path
-  const vaultWarm = 
+  const vaultWarm =
     request.cookies
       .get('nocturne-vault-warm')
       ?.value
 
   if (!vaultWarm) {
-    const isAuthOnlyPath = 
+    const isAuthOnlyPath =
       AUTH_ONLY_PATHS.some(p =>
         pathname.startsWith(p)
       )
 
-    // Already on setup/unlock — 
+    // Already on setup/unlock —
     // let them through
     if (isAuthOnlyPath) {
       return supabaseResponse
     }
 
     const next = encodeURIComponent(
-      request.nextUrl.pathname + 
+      request.nextUrl.pathname +
       request.nextUrl.search
     )
-    return NextResponse.redirect(
-      new URL(
-        `/unlock?next=${next}`,
-        request.url
-      )
+    // Carry refreshed cookies onto the redirect so the token rotation that
+    // may have just happened inside getUser() reaches the browser.  Without
+    // this, the unlock page receives the already-consumed refresh token and
+    // redirects straight to /login.
+    return withCookies(
+      NextResponse.redirect(
+        new URL(`/unlock?next=${next}`, request.url),
+      ),
+      supabaseResponse,
     )
   }
 

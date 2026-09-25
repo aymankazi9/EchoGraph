@@ -1,11 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence } from 'framer-motion'
 import { Plus, RefreshCw } from 'lucide-react'
-import { getMasterKey, isVaultUnlocked } from '@/lib/crypto/vault'
+import { getMasterKey, isVaultUnlocked, vaultRestoreFromCache } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
 import { encryptText } from '@/lib/crypto/encrypt'
 import { createClient } from '@/lib/supabase'
@@ -64,6 +64,7 @@ export function VaultDashboardClient({
   stats,
 }: Props) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
@@ -84,17 +85,25 @@ export function VaultDashboardClient({
 
   // ── Load sessions into store on mount ──────────────────────────────────────
   useEffect(() => {
-    if (!isVaultUnlocked()) {
-      router.replace('/unlock')
-      return
+    async function init() {
+      if (!isVaultUnlocked()) {
+        // Try to restore the MK from the session cache before redirecting.
+        // If vault-warm is still alive and the tab has the cache entries, this
+        // succeeds silently and the user never sees the /unlock page.
+        const restored = await vaultRestoreFromCache()
+        if (!restored) {
+          router.replace(`/unlock?next=${encodeURIComponent(pathname)}`)
+          return
+        }
+      }
+      const rows: SessionRow[] = sessions.map((s) => ({
+        ...s,
+        red_zone_count: redZoneCounts[s.id] ?? 0,
+        storage_used_bytes: fileSizeBytes[s.id] ?? 0,
+      }))
+      setSessions(rows)
     }
-
-    const rows: SessionRow[] = sessions.map((s) => ({
-      ...s,
-      red_zone_count: redZoneCounts[s.id] ?? 0,
-      storage_used_bytes: fileSizeBytes[s.id] ?? 0,
-    }))
-    setSessions(rows)
+    void init()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Decrypt all titles once — store in titleMap for search + sort ──────────

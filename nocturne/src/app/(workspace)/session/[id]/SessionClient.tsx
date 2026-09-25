@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mic, Square } from 'lucide-react'
-import { isVaultUnlocked, getMasterKey } from '@/lib/crypto/vault'
+import { isVaultUnlocked, getMasterKey, vaultRestoreFromCache } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
 import { encryptText } from '@/lib/crypto/encrypt'
 import { createClient } from '@/lib/supabase'
@@ -173,21 +173,27 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
   // ── Vault guard + seed session metadata ─────────────────────────────────
   useEffect(() => {
-    if (!isVaultUnlocked()) { router.replace('/unlock'); return }
+    async function init() {
+      if (!isVaultUnlocked()) {
+        const restored = await vaultRestoreFromCache()
+        if (!restored) { router.replace('/unlock'); return }
+      }
 
-    initSessionMeta({
-      hasSlides: session.has_slides,
-      hasAudio: session.has_audio,
-      hasStudyGuide: session.has_study_guide,
-      status: session.status,
-    })
+      initSessionMeta({
+        hasSlides: session.has_slides,
+        hasAudio: session.has_audio,
+        hasStudyGuide: session.has_study_guide,
+        status: session.status,
+      })
 
-    const mk = getMasterKey()
-    if (!mk) return
+      const mk = getMasterKey()
+      if (!mk) return
 
-    decryptText(mk, session.title_encrypted)
-      .then(setSessionTitle)
-      .catch(() => setSessionTitle('Session'))
+      decryptText(mk, session.title_encrypted)
+        .then(setSessionTitle)
+        .catch(() => setSessionTitle('Session'))
+    }
+    void init()
   }, [router, session.title_encrypted]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Refresh session status from DB on mount ──────────────────────────────

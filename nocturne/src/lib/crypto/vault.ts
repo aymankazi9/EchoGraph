@@ -14,7 +14,7 @@ type WorkerInMsg =
 type WorkerOutMsg =
   | { type: 'WRAP_DONE'; masterKey: CryptoKey; wrappedKeyB64: string }
   | { type: 'WRAP_WITH_RECOVERY_DONE'; masterKey: CryptoKey; wrappedKeyB64: string; recoveryWrappedKeyB64: string }
-  | { type: 'UNWRAP_DONE'; masterKey: CryptoKey }
+  | { type: 'UNWRAP_DONE'; masterKey: CryptoKey; ephemeralKeyB64: string; cachedWrappedMKB64: string }
   | { type: 'CHANGE_PASSPHRASE_DONE'; newWrappedKeyB64: string }
   | { type: 'REDERIVE_RECOVERY_DONE'; recoveryWrappedKeyB64: string }
   | { type: 'ERROR'; message: string }
@@ -24,6 +24,93 @@ type WorkerOutMsg =
 let _masterKey: CryptoKey | null = null
 // Holds recovery blob between setup and backup pages (client-side navigation only).
 let _pendingRecoveryBlob: string | null = null
+
+// ── Session-scoped soft-unlock cache ──────────────────────────────────────────
+// At unlock time we generate a random ephemeral AES-256-KW key, use it to wrap
+// a second extractable copy of the master key, and store both in sessionStorage.
+// On page reload (within the same browser tab/session), if the vault-warm cookie
+// is still alive we can restore the MK from that cache without prompting for the
+// passphrase again — skipping the /unlock redirect entirely.
+//
+// Security tradeoff (documented in docs/status/auth-middleware.md):
+//   • The ephemeral key and wrapped blob are both in sessionStorage.  An attacker
+//     with JS execution in the same origin can read both.  This is the same threat
+//     model as the non-extractable in-memory MK (also reachable via same-origin
+//     JS).  We accept the tradeoff for UX convenience within the ~1 h window.
+//   • sessionStorage is cleared when the tab closes or the browser restarts —
+//     the natural boundary we rely on rather than work around.
+//   • On explicit logout or vault lock both entries are cleared immediately.
+//   • Biometric unlock (WebAuthn/Touch ID/Windows Hello) is scoped as a future
+//     replacement that closes this gap without sacrificing convenience.
+const SS_EK     = 'nocturne-session-ek'   // ephemeral wrapping key, base64 raw
+const SS_WMK    = 'nocturne-session-wmk'  // MK wrapped with ephemeral key, base64
+const SS_EXP    = 'nocturne-session-exp'  // expiry Unix-ms timestamp string
+const CACHE_TTL = 3_600_000               // 1 h — matches vault-warm max-age
+
+function b64ToBuffer(b64: string): ArrayBuffer {
+  const bin = atob(b64)
+  const u8 = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i)
+  return u8.buffer
+}
+
+function sessionCacheWrite(ephemeralKeyB64: string, cachedWrappedMKB64: string): void {
+  const expiry = Date.now() + CACHE_TTL
+  sessionStorage.setItem(SS_EK,  ephemeralKeyB64)
+  sessionStorage.setItem(SS_WMK, cachedWrappedMKB64)
+  sessionStorage.setItem(SS_EXP, String(expiry))
+}
+
+function sessionCacheClear(): void {
+  sessionStorage.removeItem(SS_EK)
+  sessionStorage.removeItem(SS_WMK)
+  sessionStorage.removeItem(SS_EXP)
+}
+
+// Attempts to restore the MK from the session cache without a passphrase prompt.
+// Returns true and sets _masterKey if successful; returns false on any failure
+// (expired cache, cleared sessionStorage, missing vault-warm cookie, crypto error).
+// Call this before redirecting to /unlock on page load.
+export async function vaultRestoreFromCache(): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  try {
+    // Cache is only valid while the vault-warm cookie is alive.
+    if (!document.cookie.includes('nocturne-vault-warm=')) return false
+
+    const ekB64  = sessionStorage.getItem(SS_EK)
+    const wmkB64 = sessionStorage.getItem(SS_WMK)
+    const expStr = sessionStorage.getItem(SS_EXP)
+    if (!ekB64 || !wmkB64 || !expStr) return false
+
+    if (Date.now() > parseInt(expStr, 10)) {
+      sessionCacheClear()
+      return false
+    }
+
+    const ephemeralKey = await crypto.subtle.importKey(
+      'raw', b64ToBuffer(ekB64),
+      { name: 'AES-KW', length: 256 },
+      false,
+      ['unwrapKey'],
+    )
+
+    const masterKey = await crypto.subtle.unwrapKey(
+      'raw', b64ToBuffer(wmkB64), ephemeralKey,
+      { name: 'AES-KW' },
+      { name: 'AES-GCM', length: 256 },
+      false,  // non-extractable — same guarantee as the passphrase unlock path
+      ['encrypt', 'decrypt'],
+    )
+
+    _masterKey = masterKey
+    console.log('[vault] MK restored from session cache (no passphrase required)')
+    return true
+  } catch {
+    // Corrupted or tampered entries — clear and fall back to passphrase prompt.
+    sessionCacheClear()
+    return false
+  }
+}
 
 export const getMasterKey = (): CryptoKey | null => _masterKey
 export const isVaultUnlocked = (): boolean => _masterKey !== null
@@ -97,6 +184,7 @@ export async function vaultUnlock(
   _masterKey = result.masterKey
   console.log('[vault] MK extractable:', result.masterKey.extractable) // will log false
   document.cookie = 'nocturne-vault-warm=1; max-age=3600; path=/; SameSite=Strict'
+  sessionCacheWrite(result.ephemeralKeyB64, result.cachedWrappedMKB64)
 }
 
 // Recovery unlock: import recovery salt as AES-128-KW key, unwrap recovery-wrapped MK.
@@ -118,6 +206,7 @@ export async function vaultUnlockWithRecovery(
   _masterKey = result.masterKey
   console.log('[vault] MK extractable (recovery path):', result.masterKey.extractable) // will log false
   document.cookie = 'nocturne-vault-warm=1; max-age=3600; path=/; SameSite=Strict'
+  sessionCacheWrite(result.ephemeralKeyB64, result.cachedWrappedMKB64)
 }
 
 // Passphrase change: re-wraps the in-storage MK with a new KEK derived from new passphrase + new salt.
@@ -163,8 +252,11 @@ export async function vaultRederiveRecovery(
 
 // Logout: clear MK FIRST, then end the Supabase session.
 // Order is non-negotiable — CONTEXT.md §10 rule 7.
+// Also clears the session cache so the soft-unlock entries cannot outlive
+// an explicit logout or manual vault lock.
 export async function vaultLogout(supabase: SupabaseClient): Promise<void> {
   _masterKey = null
+  sessionCacheClear()
   document.cookie = 'nocturne-vault-warm=; max-age=0; path=/; SameSite=Strict'
   await supabase.auth.signOut()
 }
