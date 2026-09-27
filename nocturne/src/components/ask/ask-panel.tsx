@@ -20,16 +20,6 @@ interface AskMessage {
 }
 
 // ── Markdown renderer for assistant messages ──────────────────────────────────
-//
-// react-markdown + remark-gfm gives us bold, italic, headers, bullet/ordered
-// lists, tables, and strikethrough out of the box.  Custom component overrides
-// apply inline styles so the rendered output matches the chat bubble's existing
-// typography instead of the browser's unstyled defaults.
-//
-// [Slide N] citation tokens are left in the markdown text — the model emits
-// them as literal text so they render as plain inline text, which is correct.
-// The coloured badge row below each bubble is driven by citedSlideIndices (a
-// separate array extracted by the server), not by parsing the rendered HTML.
 
 function MarkdownMessage({ content }: { content: string }) {
   return (
@@ -78,104 +68,164 @@ function MarkdownMessage({ content }: { content: string }) {
 interface Props {
   sessionId: string
   userId: string
+  /** Course the current session belongs to, if any. Enables the course-mode toggle. */
+  courseId?: string | null
+  courseName?: string | null
 }
 
-export function AskPanel({ sessionId, userId }: Props) {
+type Mode = 'session' | 'course'
+
+interface CourseSessionPayload {
+  sessionId: string
+  transcriptText: string
+  slides: { pageNumber: number; text: string }[]
+}
+
+export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
   const transcriptWords   = useSessionStore((s) => s.transcriptWords)
   const askConsentGranted = useSessionStore((s) => s.askConsentGranted)
   const grantAskConsent   = useSessionStore((s) => s.grantAskConsent)
 
   const supabase = useMemo(() => createClient(), [])
 
+  // ── Mode toggle (only relevant when courseId is set) ──────────────────────
+  const [mode, setMode] = useState<Mode>('session')
+
+  // ── Session-mode conversation state ──────────────────────────────────────
+  const [sessionMessages,  setSessionMessages]  = useState<AskMessage[]>([])
+  const [sessionConvoId,   setSessionConvoId]   = useState<string | null>(null)
+
+  // ── Course-mode conversation state ────────────────────────────────────────
+  const [courseMessages,   setCourseMessages]   = useState<AskMessage[]>([])
+  const [courseConvoId,    setCourseConvoId]     = useState<string | null>(null)
+  const [courseConsent,    setCourseConsent]     = useState(false)
+  const [courseSessionCount, setCourseSessionCount] = useState(0)
+
+  // ── Shared UI state ───────────────────────────────────────────────────────
   const [showModal,      setShowModal]      = useState(false)
-  const [messages,       setMessages]       = useState<AskMessage[]>([])
-  const [conversationId, setConversationId] = useState<string | null>(null)
   const [input,          setInput]          = useState('')
   const [submitting,     setSubmitting]     = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [error,          setError]          = useState<string | null>(null)
 
-  // Slide texts fetched once after consent — pageNumber carries global_slide_index
+  // ── Caches ────────────────────────────────────────────────────────────────
+  // Slide texts for the current session (session mode).
   const slideCacheRef = useRef<{ pageNumber: number; text: string }[] | null>(null)
-  const bottomRef     = useRef<HTMLDivElement | null>(null)
+  // Transcript + slides for other sessions in the course (course mode).
+  // Keyed by sessionId; current session is never stored here (always from store/slideCacheRef).
+  const otherSessionsCache = useRef<Map<string, CourseSessionPayload>>(new Map())
 
-  // ── Single mount effect: check for an existing conversation, then load ───
+  const bottomRef = useRef<HTMLDivElement | null>(null)
+
+  // ── Decode a stored message row ───────────────────────────────────────────
+  const decodeMessage = useCallback(async (mk: CryptoKey, row: {
+    id: unknown; role: unknown; content_encrypted: unknown; cited_slide_indices: unknown; created_at: unknown
+  }): Promise<AskMessage> => ({
+    id:                row.id as string,
+    role:              row.role as 'user' | 'assistant',
+    content:           await decryptText(mk, row.content_encrypted as string).catch(() => '[decryption failed]'),
+    citedSlideIndices: (row.cited_slide_indices as number[]) ?? [],
+    createdAt:         row.created_at as string,
+  }), [])
+
+  // ── Mount effect: check for existing conversations + load histories ───────
   //
-  // A row in ask_conversations can only exist if the user previously completed
-  // the full consent → send flow, so its presence is a reliable proxy for
-  // "consent was already granted".  We handle both outcomes in one async pass:
-  //
-  //   row found  → grant consent in store + load history (no modal shown)
-  //   no row     → grant nothing; consent gate renders and waits for the user
-  //
-  // This replaces the previous two-effect waterfall (one gated on askConsentGranted
-  // firing the other) so there is exactly one code path that queries the DB and
-  // resolves all state.
+  // Checks session and course (if courseId set) conversation rows in parallel.
+  // If a row exists, consent was already granted — skip the gate and load history.
   useEffect(() => {
     let cancelled = false
 
     void (async () => {
-      const { data: convo } = await supabase
-        .from('ask_conversations')
-        .select('id')
-        .eq('session_id', sessionId)
-        .maybeSingle()
-
-      if (cancelled) return
-
-      if (!convo) {
-        // No prior conversation — show the consent gate, nothing else to load.
-        setLoadingHistory(false)
-        return
-      }
-
-      // Conversation exists → user already consented.  Grant consent in the
-      // store so the chat UI renders, then immediately load the message history
-      // — both resolved in this same async function, not via a second effect.
-      grantAskConsent()
-      setConversationId(convo.id as string)
-
       const mk = getMasterKey()
-      if (!mk) { setLoadingHistory(false); return }
 
-      const { data: rows } = await supabase
-        .from('ask_messages')
-        .select('id, role, content_encrypted, cited_slide_indices, created_at')
-        .eq('conversation_id', convo.id)
-        .order('created_at')
+      // Parallel: session conversation + (optional) course conversation + course count
+      const [sessionConvoRes, courseConvoRes, courseCountRes] = await Promise.all([
+        supabase
+          .from('ask_conversations')
+          .select('id')
+          .eq('session_id', sessionId)
+          .maybeSingle(),
+
+        courseId
+          ? supabase
+              .from('ask_conversations')
+              .select('id')
+              .eq('course_id', courseId)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+
+        courseId
+          ? supabase
+              .from('sessions')
+              .select('id', { count: 'exact', head: true })
+              .eq('course_id', courseId)
+          : Promise.resolve({ count: 0 }),
+      ])
 
       if (cancelled) return
 
-      if (rows && rows.length > 0) {
-        const decrypted: AskMessage[] = await Promise.all(
-          rows.map(async (r) => ({
-            id:                r.id as string,
-            role:              r.role as 'user' | 'assistant',
-            content:           await decryptText(mk, r.content_encrypted as string).catch(() => '[decryption failed]'),
-            citedSlideIndices: (r.cited_slide_indices as number[]) ?? [],
-            createdAt:         r.created_at as string,
-          })),
-        )
-        if (!cancelled) setMessages(decrypted)
+      // Course session count (for consent copy)
+      const count = (courseCountRes as { count: number | null }).count ?? 0
+      setCourseSessionCount(count)
+
+      // ── Session conversation ─────────────────────────────────────────────
+      if (sessionConvoRes.data) {
+        grantAskConsent()
+        setSessionConvoId(sessionConvoRes.data.id as string)
+
+        if (mk) {
+          const { data: rows } = await supabase
+            .from('ask_messages')
+            .select('id, role, content_encrypted, cited_slide_indices, created_at')
+            .eq('conversation_id', sessionConvoRes.data.id)
+            .order('created_at')
+
+          if (!cancelled && rows?.length) {
+            const decrypted = await Promise.all(rows.map((r) => decodeMessage(mk, r)))
+            if (!cancelled) setSessionMessages(decrypted)
+          }
+        }
       }
 
-      setLoadingHistory(false)
+      // ── Course conversation ──────────────────────────────────────────────
+      if (courseConvoRes.data) {
+        setCourseConsent(true)
+        setCourseConvoId(courseConvoRes.data.id as string)
+
+        if (mk) {
+          const { data: rows } = await supabase
+            .from('ask_messages')
+            .select('id, role, content_encrypted, cited_slide_indices, created_at')
+            .eq('conversation_id', courseConvoRes.data.id)
+            .order('created_at')
+
+          if (!cancelled && rows?.length) {
+            const decrypted = await Promise.all(rows.map((r) => decodeMessage(mk, r)))
+            if (!cancelled) setCourseMessages(decrypted)
+          }
+        }
+      }
+
+      if (!cancelled) setLoadingHistory(false)
     })()
 
     return () => { cancelled = true }
-  // sessionId is stable for the lifetime of this panel; supabase client is
-  // memo-stable.  grantAskConsent is a store action reference that never changes.
+  // sessionId and courseId are stable; supabase + grantAskConsent + decodeMessage are memo-stable.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId])
+  }, [sessionId, courseId])
 
-  // Auto-scroll to bottom on new messages and when the typing indicator appears.
-  // submitting is included so the indicator scrolls into view even if React
-  // doesn't batch the setMessages + setSubmitting renders (React 18 normally does).
+  // Auto-scroll to bottom on new messages and typing indicator.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, submitting])
+  }, [sessionMessages, courseMessages, submitting])
 
-  // ── Fetch + decrypt slide texts (lazy, cached) ───────────────────────────
+  // Clear input when switching modes so there's no stale question.
+  useEffect(() => {
+    setInput('')
+    setError(null)
+  }, [mode])
+
+  // ── Fetch + decrypt slide texts for the current session (lazy, cached) ────
   const getSlideTexts = useCallback(async (): Promise<{ pageNumber: number; text: string }[]> => {
     if (slideCacheRef.current !== null) return slideCacheRef.current
 
@@ -203,6 +253,79 @@ export function AskPanel({ sessionId, userId }: Props) {
     return slides
   }, [sessionId, supabase])
 
+  // ── Fetch + decrypt all course sessions' content (lazy, per-session cache) ─
+  //
+  // Current session: transcript from Zustand store (freshest), slides from slideCacheRef.
+  // Other sessions: fetch from DB once per session, cache in otherSessionsCache.
+  const getCourseContent = useCallback(async (): Promise<CourseSessionPayload[]> => {
+    const mk = getMasterKey()
+    if (!mk || !courseId) return []
+
+    const { data: courseSessions } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('course_id', courseId)
+      .order('created_at')
+
+    if (!courseSessions?.length) return []
+
+    return await Promise.all(
+      courseSessions.map(async (s): Promise<CourseSessionPayload> => {
+        const sid = s.id as string
+
+        // ── Current session: use in-memory data ─────────────────────────────
+        if (sid === sessionId) {
+          const slides = await getSlideTexts()
+          return {
+            sessionId: sid,
+            transcriptText: transcriptWords.map((w) => w.word).join(' '),
+            slides,
+          }
+        }
+
+        // ── Other sessions: use per-session cache, else fetch from DB ────────
+        const cached = otherSessionsCache.current.get(sid)
+        if (cached) return cached
+
+        const [wordRes, slideRes] = await Promise.all([
+          supabase
+            .from('transcript_words')
+            .select('word_encrypted, start_time_ms')
+            .eq('session_id', sid)
+            .order('start_time_ms'),
+          supabase
+            .from('slides')
+            .select('global_slide_index, text_encrypted')
+            .eq('session_id', sid)
+            .order('global_slide_index'),
+        ])
+
+        const transcriptText = wordRes.data?.length
+          ? (await Promise.all(
+              wordRes.data.map((w) =>
+                decryptText(mk, w.word_encrypted as string).catch(() => ''),
+              ),
+            )).join(' ')
+          : ''
+
+        const slides = slideRes.data?.length
+          ? await Promise.all(
+              slideRes.data.map(async (r) => ({
+                pageNumber: r.global_slide_index as number,
+                text: r.text_encrypted
+                  ? await decryptText(mk, r.text_encrypted as string).catch(() => '')
+                  : '',
+              })),
+            )
+          : []
+
+        const payload: CourseSessionPayload = { sessionId: sid, transcriptText, slides }
+        otherSessionsCache.current.set(sid, payload)
+        return payload
+      }),
+    )
+  }, [courseId, sessionId, transcriptWords, getSlideTexts, supabase])
+
   // ── Submit a question ─────────────────────────────────────────────────────
   const handleSubmit = useCallback(async () => {
     const question = input.trim()
@@ -211,38 +334,47 @@ export function AskPanel({ sessionId, userId }: Props) {
     const mk = getMasterKey()
     if (!mk) return
 
+    // Active-mode state accessors
+    const activeMessages    = mode === 'session' ? sessionMessages : courseMessages
+    const setActiveMessages = mode === 'session' ? setSessionMessages : setCourseMessages
+    const activeConvoId     = mode === 'session' ? sessionConvoId : courseConvoId
+    const setActiveConvoId  = mode === 'session' ? setSessionConvoId : setCourseConvoId
+
     setInput('')
     setSubmitting(true)
     setError(null)
 
-    // Capture history BEFORE the optimistic add so the current question is not
-    // included.  Budget: last 10 messages (≈5 user/assistant pairs), oldest first.
-    // Decrypted content is already in memory — no extra DB round-trip needed.
-    const historyTurns = messages
+    // History budget: last 10 messages (≈5 turns), decrypted content already in memory.
+    const historyTurns = activeMessages
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }))
 
-    // Optimistically add the user message to the UI
-    const tempId = `temp-${Date.now()}`
+    // Optimistic user message
+    const tempId  = `temp-${Date.now()}`
     const userMsg: AskMessage = {
-      id: tempId,
-      role: 'user',
-      content: question,
-      citedSlideIndices: [],
-      createdAt: new Date().toISOString(),
+      id: tempId, role: 'user', content: question,
+      citedSlideIndices: [], createdAt: new Date().toISOString(),
     }
-    setMessages((prev) => [...prev, userMsg])
+    setActiveMessages((prev) => [...prev, userMsg])
 
     try {
-      // Build RAG context from in-memory store + decrypted slides
-      const transcriptText = transcriptWords.map((w) => w.word).join(' ')
-      const slides = await getSlideTexts()
+      let requestBody: Record<string, unknown>
 
-      // POST to server — plaintext content is request-scoped only
+      if (mode === 'course') {
+        // Course mode: gather + decrypt all course sessions client-side, then POST.
+        const sessions = await getCourseContent()
+        requestBody = { question, courseId, sessions, history: historyTurns }
+      } else {
+        // Session mode: existing single-session behavior.
+        const transcriptText = transcriptWords.map((w) => w.word).join(' ')
+        const slides = await getSlideTexts()
+        requestBody = { question, transcriptText, slides, sessionId, history: historyTurns }
+      }
+
       const res = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ question, transcriptText, slides, sessionId, history: historyTurns }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!res.ok) {
@@ -255,20 +387,24 @@ export function AskPanel({ sessionId, userId }: Props) {
         citedSlideIndices: number[]
       }
 
-      // Ensure conversation row exists before inserting messages
-      let convoId = conversationId
+      // Ensure conversation row exists
+      let convoId = activeConvoId
       if (!convoId) {
+        const insertPayload = mode === 'session'
+          ? { session_id: sessionId, user_id: userId }
+          : { course_id: courseId, user_id: userId }
+
         const { data: convo, error: convoErr } = await supabase
           .from('ask_conversations')
-          .insert({ session_id: sessionId, user_id: userId })
+          .insert(insertPayload)
           .select('id')
           .single()
         if (convoErr) throw convoErr
         convoId = (convo as { id: string }).id
-        setConversationId(convoId)
+        setActiveConvoId(convoId)
       }
 
-      // Encrypt both messages before storage — plaintext never touches the DB
+      // Encrypt before storage — plaintext never touches the DB
       const [encryptedQuestion, encryptedAnswer] = await Promise.all([
         encryptText(mk, question),
         encryptText(mk, answer),
@@ -282,27 +418,31 @@ export function AskPanel({ sessionId, userId }: Props) {
         ])
         .select('id, role, created_at')
 
-      // Replace the temp user message + add the real assistant message
       const assistantMsg: AskMessage = {
-        id: inserted?.[1]?.id as string ?? `resp-${Date.now()}`,
-        role: 'assistant',
-        content: answer,
+        id:                inserted?.[1]?.id as string ?? `resp-${Date.now()}`,
+        role:              'assistant',
+        content:           answer,
         citedSlideIndices,
-        createdAt: inserted?.[1]?.created_at as string ?? new Date().toISOString(),
+        createdAt:         inserted?.[1]?.created_at as string ?? new Date().toISOString(),
       }
 
-      setMessages((prev) => [
+      setActiveMessages((prev) => [
         ...prev.filter((m) => m.id !== tempId),
         { ...userMsg, id: inserted?.[0]?.id as string ?? tempId },
         assistantMsg,
       ])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
-      setMessages((prev) => prev.filter((m) => m.id !== tempId))
+      setActiveMessages((prev) => prev.filter((m) => m.id !== tempId))
     } finally {
       setSubmitting(false)
     }
-  }, [input, submitting, messages, transcriptWords, getSlideTexts, sessionId, conversationId, userId, supabase])
+  }, [
+    input, submitting, mode,
+    sessionMessages, courseMessages, sessionConvoId, courseConvoId,
+    transcriptWords, getSlideTexts, getCourseContent,
+    sessionId, courseId, userId, supabase,
+  ])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -311,9 +451,32 @@ export function AskPanel({ sessionId, userId }: Props) {
     }
   }, [handleSubmit])
 
-  // ── Still resolving — don't flash the consent gate for returning users ──
-  // loadingHistory starts true and is cleared by the mount effect once it knows
-  // whether a prior conversation exists.  Show nothing meaningful until then.
+  // ── Consent-allow handler (varies by active mode) ─────────────────────────
+  const handleConsentAllow = useCallback(() => {
+    if (mode === 'session') {
+      grantAskConsent()
+    } else {
+      setCourseConsent(true)
+    }
+    setShowModal(false)
+  }, [mode, grantAskConsent])
+
+  // ── Resolve display state for the active mode ─────────────────────────────
+  const activeMessages    = mode === 'session' ? sessionMessages : courseMessages
+  const activeConsent     = mode === 'session' ? askConsentGranted : courseConsent
+  const activePlaceholder = mode === 'session'
+    ? 'Ask about this lecture… (Enter to send, Shift+Enter for new line)'
+    : `Ask across ${courseSessionCount} lecture${courseSessionCount !== 1 ? 's' : ''}… (Enter to send, Shift+Enter for new line)`
+  const activeEmptyHint = mode === 'session'
+    ? 'Ask anything about this lecture.'
+    : courseName
+      ? `Ask anything about ${courseName}.`
+      : 'Ask anything across this course.'
+  const activeEmptySubhint = mode === 'session'
+    ? 'Answers are grounded in transcript and slides — citations included.'
+    : 'Answers draw from transcripts and slides across all lectures in this course.'
+
+  // ── Resolving initial state — don't flash consent gate for returning users ─
   if (loadingHistory) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -322,34 +485,45 @@ export function AskPanel({ sessionId, userId }: Props) {
     )
   }
 
-  // ── No prior conversation confirmed — show consent gate ──────────────────
-  if (!askConsentGranted) {
+  // ── Consent gate ──────────────────────────────────────────────────────────
+  if (!activeConsent) {
+    const buttonLabel = mode === 'session' ? 'Enable Ask' : `Enable Ask for ${courseName ?? 'this course'}`
+    const descLabel = mode === 'session'
+      ? "Answers grounded in this session's transcript and slides. Requires sending content to a Nocturne server for this query only — not stored in plaintext."
+      : `Answers draw from transcripts and slides across ${courseSessionCount} lecture${courseSessionCount !== 1 ? 's' : ''}${courseName ? ` in ${courseName}` : ''}. Requires sending content from multiple sessions to a Nocturne server — request-scoped, not stored in plaintext.`
+
     return (
       <>
         <AskConsentModal
           open={showModal}
-          onAllow={() => { grantAskConsent(); setShowModal(false) }}
+          onAllow={handleConsentAllow}
           onDeny={() => setShowModal(false)}
+          mode={mode}
+          sessionCount={courseSessionCount}
+          courseName={courseName}
         />
 
         <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+          {/* Mode toggle even on consent gate, if course is available */}
+          {courseId && (
+            <ModeToggle mode={mode} onModeChange={setMode} courseName={courseName} />
+          )}
           <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#16151F', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <BookOpen size={18} strokeWidth={1.5} style={{ color: '#5B6478' }} />
           </div>
           <div style={{ maxWidth: 340 }}>
             <p style={{ fontSize: 14, fontWeight: 600, color: '#E2E8F0', margin: '0 0 6px' }}>
-              Ask this lecture anything
+              {mode === 'session' ? 'Ask this lecture anything' : `Ask across ${courseName ?? 'this course'}`}
             </p>
             <p style={{ fontSize: 13, color: '#5B6478', lineHeight: 1.65, margin: '0 0 20px' }}>
-              Answers grounded in this session&apos;s transcript and slides. Requires sending
-              content to a Nocturne server for this query only — not stored in plaintext.
+              {descLabel}
             </p>
             <button
               type="button"
               onClick={() => setShowModal(true)}
               className="h-9 px-5 rounded-btn bg-indigo-500 text-text-inverse text-body font-medium hover:bg-indigo-600 transition-colors"
             >
-              Enable Ask
+              {buttonLabel}
             </button>
           </div>
         </div>
@@ -361,7 +535,6 @@ export function AskPanel({ sessionId, userId }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxWidth: 720, width: '100%', margin: '0 auto' }}>
 
-      {/* Typing-indicator animation — scoped to this panel */}
       <style>{`
         @keyframes askDot {
           0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
@@ -369,16 +542,33 @@ export function AskPanel({ sessionId, userId }: Props) {
         }
       `}</style>
 
+      {/* Mode toggle — shown at top only when session belongs to a course */}
+      {courseId && (
+        <div style={{ flexShrink: 0, marginBottom: 12 }}>
+          <ModeToggle mode={mode} onModeChange={setMode} courseName={courseName} />
+        </div>
+      )}
+
+      {/* Consent modal (shared between modes; content varies by active mode) */}
+      <AskConsentModal
+        open={showModal}
+        onAllow={handleConsentAllow}
+        onDeny={() => setShowModal(false)}
+        mode={mode}
+        sessionCount={courseSessionCount}
+        courseName={courseName}
+      />
+
       {/* Message list */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 8 }}>
-        {messages.length === 0 && (
+        {activeMessages.length === 0 && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center', paddingTop: 48 }}>
-            <p style={{ fontSize: 14, color: '#5B6478' }}>Ask anything about this lecture.</p>
-            <p style={{ fontSize: 12, color: '#3F485C' }}>Answers are grounded in transcript and slides — citations included.</p>
+            <p style={{ fontSize: 14, color: '#5B6478' }}>{activeEmptyHint}</p>
+            <p style={{ fontSize: 12, color: '#3F485C' }}>{activeEmptySubhint}</p>
           </div>
         )}
 
-        {messages.map((msg) => (
+        {activeMessages.map((msg) => (
           <div
             key={msg.id}
             style={{
@@ -398,8 +588,6 @@ export function AskPanel({ sessionId, userId }: Props) {
                 fontSize: 13.5,
                 color: msg.role === 'user' ? '#C7D2FE' : '#CBD5E1',
                 lineHeight: 1.65,
-                // user messages keep pre-wrap for literal newlines; assistant
-                // messages are rendered via react-markdown so no pre-wrap needed
                 whiteSpace: msg.role === 'user' ? 'pre-wrap' : undefined,
                 wordBreak: 'break-word',
               }}
@@ -407,18 +595,15 @@ export function AskPanel({ sessionId, userId }: Props) {
               {msg.role === 'user' ? msg.content : <MarkdownMessage content={msg.content} />}
             </div>
 
-            {/* Slide citation badges */}
-            {msg.citedSlideIndices.length > 0 && (
+            {/* Slide citation badges — session mode only; course citations are inline text */}
+            {mode === 'session' && msg.citedSlideIndices.length > 0 && (
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                 {msg.citedSlideIndices.map((n) => (
                   <span
                     key={n}
                     style={{
-                      fontSize: 11,
-                      padding: '2px 8px',
-                      borderRadius: 9999,
-                      background: 'rgba(99,102,241,0.08)',
-                      border: '1px solid rgba(99,102,241,0.2)',
+                      fontSize: 11, padding: '2px 8px', borderRadius: 9999,
+                      background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
                       color: '#818CF8',
                     }}
                   >
@@ -430,28 +615,19 @@ export function AskPanel({ sessionId, userId }: Props) {
           </div>
         ))}
 
-        {/* Typing indicator — shown immediately on send, removed on response */}
+        {/* Typing indicator */}
         {submitting && (
           <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-            <div
-              style={{
-                padding: '11px 14px',
-                borderRadius: '14px 14px 14px 4px',
-                background: '#0F0F19',
-                border: '1px solid #1E1E2E',
-                display: 'flex',
-                gap: 5,
-                alignItems: 'center',
-              }}
-            >
+            <div style={{
+              padding: '11px 14px', borderRadius: '14px 14px 14px 4px',
+              background: '#0F0F19', border: '1px solid #1E1E2E',
+              display: 'flex', gap: 5, alignItems: 'center',
+            }}>
               {([0, 1, 2] as const).map((i) => (
                 <span
                   key={i}
                   style={{
-                    display: 'inline-block',
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
+                    display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
                     background: '#5B6478',
                     animation: 'askDot 1.2s ease infinite',
                     animationDelay: `${i * 0.2}s`,
@@ -475,36 +651,23 @@ export function AskPanel({ sessionId, userId }: Props) {
       {/* Input */}
       <div
         style={{
-          flexShrink: 0,
-          marginTop: 16,
-          display: 'flex',
-          gap: 10,
-          alignItems: 'flex-end',
-          padding: '12px 14px',
-          borderRadius: 14,
-          border: '1px solid #1E1E2E',
-          background: '#0C0C13',
+          flexShrink: 0, marginTop: 16,
+          display: 'flex', gap: 10, alignItems: 'flex-end',
+          padding: '12px 14px', borderRadius: 14,
+          border: '1px solid #1E1E2E', background: '#0C0C13',
         }}
       >
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask about this lecture… (Enter to send, Shift+Enter for new line)"
+          placeholder={activePlaceholder}
           rows={1}
           style={{
-            flex: 1,
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            resize: 'none',
-            color: '#CBD5E1',
-            caretColor: '#818CF8',
-            fontSize: 13.5,
-            lineHeight: 1.6,
-            fontFamily: 'inherit',
-            maxHeight: 120,
-            overflowY: 'auto',
+            flex: 1, background: 'transparent', border: 'none', outline: 'none',
+            resize: 'none', color: '#CBD5E1', caretColor: '#818CF8',
+            fontSize: 13.5, lineHeight: 1.6, fontFamily: 'inherit',
+            maxHeight: 120, overflowY: 'auto',
           }}
         />
         <button
@@ -512,15 +675,9 @@ export function AskPanel({ sessionId, userId }: Props) {
           onClick={handleSubmit}
           disabled={submitting || !input.trim()}
           style={{
-            flexShrink: 0,
-            width: 34,
-            height: 34,
-            borderRadius: 10,
+            flexShrink: 0, width: 34, height: 34, borderRadius: 10,
             background: submitting || !input.trim() ? '#16151F' : '#6366F1',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: submitting || !input.trim() ? 'not-allowed' : 'pointer',
             transition: 'background 0.15s',
           }}
@@ -529,6 +686,57 @@ export function AskPanel({ sessionId, userId }: Props) {
           <Send size={13} strokeWidth={2} style={{ color: submitting || !input.trim() ? '#3F485C' : '#fff' }} />
         </button>
       </div>
+    </div>
+  )
+}
+
+// ── Mode toggle pill ──────────────────────────────────────────────────────────
+
+function ModeToggle({
+  mode,
+  onModeChange,
+  courseName,
+}: {
+  mode: Mode
+  onModeChange: (m: Mode) => void
+  courseName?: string | null
+}) {
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        background: '#0C0C13',
+        border: '1px solid #1E1E2E',
+        borderRadius: 10,
+        padding: 3,
+        gap: 2,
+      }}
+    >
+      {(['session', 'course'] as const).map((m) => {
+        const active = mode === m
+        const label  = m === 'session' ? 'This session' : courseName ?? 'This course'
+        return (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onModeChange(m)}
+            style={{
+              padding: '5px 12px',
+              borderRadius: 7,
+              border: 'none',
+              fontSize: 12,
+              fontWeight: active ? 600 : 400,
+              color: active ? '#E2E8F0' : '#5B6478',
+              background: active ? '#16151F' : 'transparent',
+              cursor: 'pointer',
+              transition: 'background 0.15s, color 0.15s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {label}
+          </button>
+        )
+      })}
     </div>
   )
 }

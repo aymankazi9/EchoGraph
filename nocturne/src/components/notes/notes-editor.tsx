@@ -9,18 +9,25 @@ import { encryptText } from '@/lib/crypto/encrypt'
 import { decryptText } from '@/lib/crypto/decrypt'
 import { createClient } from '@/lib/supabase'
 import { useSessionStore } from '@/store/session-store'
+import { hasAccess, type Tier } from '@/lib/tiers/features'
+import { AskConsentModal } from '@/components/ask/ask-consent-modal'
 import Highlight from '@tiptap/extension-highlight'
 import { SlideRefExtension } from './extensions/slide-ref'
 import { KeywordHighlightExtension } from './extensions/keyword-highlight'
+import { FactCheckHighlightExtension } from './extensions/fact-check-highlight'
 import { SlashCommandExtension } from './extensions/slash-command'
+import { InlineMath, BlockMath } from './math-extension'
+import 'katex/dist/katex.min.css'
 import { NotesVersionHistory } from './NotesVersionHistory'
 import { NotesToolbar, NotesBubbleMenu } from './NotesToolbar'
+import { FactCheckPanel, type FlaggedItem } from './FactCheckPanel'
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 interface Props {
   sessionId: string
   userId: string
+  userTier: Tier
   /** Switch to Lecture tab and seek to the given global_slide_index. */
   onGoToSlide: (slideIndex: number) => void
   /**
@@ -50,7 +57,7 @@ const STATUS_LABEL: Record<SaveStatus, string> = {
 /** Minimum wall-clock gap between auto-snapshots while the user is actively editing. */
 const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 
-export function NotesEditor({ sessionId, userId, onGoToSlide, onContentChange, totalSlides = 0 }: Props) {
+export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onContentChange, totalSlides = 0 }: Props) {
   const supabase = useMemo(() => createClient(), [])
 
   const [loading, setLoading]           = useState(true)
@@ -58,6 +65,16 @@ export function NotesEditor({ sessionId, userId, onGoToSlide, onContentChange, t
   const [generating, setGenerating]     = useState(false)
   const [editorEmpty, setEditorEmpty]   = useState(true)
   const [showHistory, setShowHistory]   = useState(false)
+
+  // ── Fact-check state ─────────────────────────────────────────────────────
+  const [factCheckFlags,   setFactCheckFlags]   = useState<FlaggedItem[]>([])
+  const [factCheckRunning, setFactCheckRunning] = useState(false)
+  const [activeExcerpt,    setActiveExcerpt]    = useState<string | null>(null)
+  const [showConsentModal, setShowConsentModal] = useState(false)
+  const pendingFactCheckRef = useRef(false)
+
+  const askConsentGranted = useSessionStore((s) => s.askConsentGranted)
+  const grantAskConsent   = useSessionStore((s) => s.grantAskConsent)
 
   const noteIdRef          = useRef<string | null>(null)
   const debounceRef        = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -183,10 +200,16 @@ export function NotesEditor({ sessionId, userId, onGoToSlide, onContentChange, t
       }),
       // Red/Likely Zone keyword highlighting — same matching as transcript pane.
       KeywordHighlightExtension,
+      // Fact-check excerpt highlighting — amber wavy underline for flagged text.
+      FactCheckHighlightExtension,
       // "/" slash command palette.
       SlashCommandExtension.configure({
         getSlidesCount: () => totalSlidesRef.current,
       }),
+      // KaTeX math: $...$  →  inline, $$...$$  →  display block.
+      // Both serialize as raw LaTeX in stored markdown so they round-trip correctly.
+      InlineMath,
+      BlockMath,
     ],
     content: '',
     editorProps: {
@@ -341,6 +364,86 @@ export function NotesEditor({ sessionId, userId, onGoToSlide, onContentChange, t
     setShowHistory(false)
   }, [editor])
 
+  // ── Fact-check ────────────────────────────────────────────────────────────
+
+  const handleFactCheck = useCallback(async () => {
+    if (!editor || factCheckRunning) return
+    const mk = getMasterKey()
+    if (!mk) return
+
+    // Consent gate — same store flag as the Ask tab (same scope: this session's content).
+    if (!askConsentGranted) {
+      pendingFactCheckRef.current = true
+      setShowConsentModal(true)
+      return
+    }
+
+    setFactCheckRunning(true)
+    try {
+      const markdownStorage = editor.storage as unknown as { markdown: { getMarkdown(): string } }
+      const noteMarkdown = markdownStorage.markdown.getMarkdown()
+      if (!noteMarkdown.trim()) return
+
+      const { data: slideRows } = await supabase
+        .from('slides')
+        .select('global_slide_index, text_encrypted')
+        .eq('session_id', sessionId)
+        .order('global_slide_index')
+
+      const slides = await Promise.all(
+        (slideRows ?? []).map(async (s) => ({
+          pageNumber: s.global_slide_index as number,
+          text: s.text_encrypted
+            ? await decryptText(mk, s.text_encrypted as string).catch(() => '')
+            : '',
+        })),
+      )
+
+      const transcriptText = useSessionStore.getState().transcriptWords.map((w) => w.word).join(' ')
+
+      const resp = await fetch('/api/fact-check', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId, noteMarkdown, transcriptText, slides }),
+      })
+
+      if (!resp.ok) return
+
+      const { flags } = await resp.json() as { flags: FlaggedItem[] }
+      setFactCheckFlags(flags)
+      setActiveExcerpt(null)
+      editor.commands.setFactCheckExcerpts(flags.map((f) => f.excerpt))
+    } catch {
+      // silently ignore
+    } finally {
+      setFactCheckRunning(false)
+    }
+  }, [editor, factCheckRunning, askConsentGranted, sessionId, supabase])
+
+  // Run the pending fact-check once consent is granted via the modal.
+  useEffect(() => {
+    if (askConsentGranted && pendingFactCheckRef.current) {
+      pendingFactCheckRef.current = false
+      void handleFactCheck()
+    }
+  }, [askConsentGranted, handleFactCheck])
+
+  const handleConsentAllow = useCallback(() => {
+    grantAskConsent()
+    setShowConsentModal(false)
+  }, [grantAskConsent])
+
+  const handleFlagClick = useCallback((excerpt: string) => {
+    setActiveExcerpt(excerpt)
+    editor?.commands.setActiveFactCheckExcerpt(excerpt)
+  }, [editor])
+
+  const handleFactCheckClose = useCallback(() => {
+    setFactCheckFlags([])
+    setActiveExcerpt(null)
+    editor?.commands.clearFactCheckHighlights()
+  }, [editor])
+
   // ── Cleanup ──────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -351,6 +454,7 @@ export function NotesEditor({ sessionId, userId, onGoToSlide, onContentChange, t
 
   // ── Render ───────────────────────────────────────────────────────────────
   const showGenerateButton = !loading && editorEmpty && !generating
+  const panelOpen          = factCheckFlags.length > 0 || factCheckRunning
 
   return (
     <>
@@ -449,98 +553,219 @@ export function NotesEditor({ sessionId, userId, onGoToSlide, onContentChange, t
           border-radius: 2px;
           cursor: default;
         }
+
+        /* ── Fact-check highlights — amber wavy underline ── */
+        .notes-fc-flag {
+          text-decoration: underline;
+          text-decoration-style: wavy;
+          text-decoration-color: rgba(251, 191, 36, 0.55);
+          text-underline-offset: 3px;
+          cursor: pointer;
+        }
+        .notes-fc-flag-active {
+          background: rgba(251, 191, 36, 0.14);
+          border-radius: 2px;
+        }
       `}</style>
 
-      {/* position: relative so the history overlay can use position: absolute */}
-      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, maxWidth: 720, width: '100%', margin: '0 auto' }}>
+      {/* Consent modal — reuses the Ask tab's shared component and session-store flag */}
+      <AskConsentModal
+        open={showConsentModal}
+        onAllow={handleConsentAllow}
+        onDeny={() => {
+          setShowConsentModal(false)
+          pendingFactCheckRef.current = false
+        }}
+        mode="session"
+      />
 
-        {/* Version history overlay */}
-        {showHistory && (
-          <NotesVersionHistory
-            sessionId={sessionId}
-            onRestore={handleRestore}
-            onClose={() => setShowHistory(false)}
-          />
-        )}
+      {/* Outer row — editor + optional fact-check side panel */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-        {/* Bubble menu — rendered via a portal at document.body so fixed
-            positioning is unaffected by ancestor overflow or transforms */}
-        <NotesBubbleMenu editor={editor} />
+        {/* Editor column */}
+        <div
+          style={{
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+            minWidth: 0,
+            // When the side panel is open, the editor fills available space.
+            // When closed, it centres at max 720 px (original layout).
+            maxWidth: panelOpen ? undefined : 720,
+            width: '100%',
+            margin: panelOpen ? undefined : '0 auto',
+          }}
+        >
+          {/* Version history overlay */}
+          {showHistory && (
+            <NotesVersionHistory
+              sessionId={sessionId}
+              onRestore={handleRestore}
+              onClose={() => setShowHistory(false)}
+            />
+          )}
 
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexShrink: 0 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#E2E8F0', margin: 0, letterSpacing: '-0.01em' }}>Notes</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {!loading && !generating && (
-              <button
-                onClick={() => setShowHistory(true)}
-                title="Version history"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3F485C', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                aria-label="Open version history"
-              >
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="10" cy="10" r="8" />
-                  <path d="M10 6v4l3 3" />
-                </svg>
-              </button>
-            )}
-            {!editorEmpty && !generating && (
-              <button
-                onClick={handleGenerate}
-                style={{ fontSize: 12, color: '#6366F1', background: 'none', border: 'none', cursor: 'pointer', padding: 0, opacity: 0.8 }}
-              >
-                Regenerate
-              </button>
-            )}
-            <span style={{ fontSize: 12, color: STATUS_COLOR[status], transition: 'color 0.2s' }}>
-              {generating ? 'Generating…' : STATUS_LABEL[status]}
-            </span>
-          </div>
-        </div>
+          {/* Bubble menu — rendered via a portal at document.body so fixed
+              positioning is unaffected by ancestor overflow or transforms */}
+          <NotesBubbleMenu editor={editor} />
 
-        {/* Fixed toolbar — hidden during loading/generating so it doesn't appear
-            over spinners, but always present once the editor is ready */}
-        {!loading && !generating && <NotesToolbar editor={editor} />}
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexShrink: 0 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: '#E2E8F0', margin: 0, letterSpacing: '-0.01em' }}>Notes</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {!loading && !generating && (
+                <button
+                  onClick={() => setShowHistory(true)}
+                  title="Version history"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3F485C', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  aria-label="Open version history"
+                >
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="10" cy="10" r="8" />
+                    <path d="M10 6v4l3 3" />
+                  </svg>
+                </button>
+              )}
+              {!editorEmpty && !generating && (
+                <button
+                  onClick={handleGenerate}
+                  style={{ fontSize: 12, color: '#6366F1', background: 'none', border: 'none', cursor: 'pointer', padding: 0, opacity: 0.8 }}
+                >
+                  Regenerate
+                </button>
+              )}
 
-        {loading ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3F485C', fontSize: 13 }}>
-            Loading…
-          </div>
-        ) : generating ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#5B6478' }}>
-            <div style={{ width: 24, height: 24, border: '2px solid #6366F1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-            <span style={{ fontSize: 13 }}>Generating notes from your lecture…</span>
-          </div>
-        ) : showGenerateButton ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-            <button
-              onClick={handleGenerate}
-              style={{ height: 40, padding: '0 20px', borderRadius: 8, fontSize: 14, fontWeight: 500, background: '#6366F1', color: '#09090F', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
-            >
-              ✦ Generate notes from lecture
-            </button>
-            <p style={{ fontSize: 12, color: '#3F485C', margin: 0 }}>
-              Or start writing below — notes are encrypted and auto-saved.
-            </p>
-            {/* Editor is mounted but visually hidden behind the generate prompt */}
-            <div style={{ position: 'relative', width: '100%', minHeight: 160 }}>
-              <EditorContent
-                editor={editor}
-                style={{ flex: 1, minHeight: 160, width: '100%' }}
-              />
-              {/* Placeholder shown while editor is empty */}
-              <div
-                aria-hidden="true"
-                style={{ position: 'absolute', top: 0, left: 0, color: '#3F485C', fontSize: 14.5, lineHeight: 1.8, pointerEvents: 'none', userSelect: 'none' }}
-              >
-                Start writing…
-              </div>
+              {/* Fact-check button — Eclipse-gated; visible once the editor has content */}
+              {!loading && !generating && !editorEmpty && (
+                hasAccess(userTier, 'eclipse') ? (
+                  <button
+                    onClick={handleFactCheck}
+                    disabled={factCheckRunning}
+                    title="Check notes against lecture content for inconsistencies"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      fontSize: 12,
+                      color: factCheckRunning ? '#5B6478' : '#FBBF24',
+                      background: 'none',
+                      border: 'none',
+                      cursor: factCheckRunning ? 'default' : 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 2 L11.5 7.5 L17 8.3 L13 12 L14 17.5 L9 15 L4 17.5 L5 12 L1 8.3 L6.5 7.5 Z" />
+                    </svg>
+                    {factCheckRunning ? 'Checking…' : 'Fact-check'}
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    title="Eclipse plan required for fact-checking"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      fontSize: 12,
+                      color: '#3F485C',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'not-allowed',
+                      padding: 0,
+                      opacity: 0.5,
+                    }}
+                  >
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                    Fact-check
+                  </button>
+                )
+              )}
+
+              <span style={{ fontSize: 12, color: STATUS_COLOR[status], transition: 'color 0.2s' }}>
+                {generating ? 'Generating…' : STATUS_LABEL[status]}
+              </span>
             </div>
           </div>
-        ) : (
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 2px 0 0' }}>
-            <EditorContent editor={editor} style={{ width: '100%' }} />
-          </div>
+
+          {/* Fixed toolbar — hidden during loading/generating so it doesn't appear
+              over spinners, but always present once the editor is ready */}
+          {!loading && !generating && <NotesToolbar editor={editor} />}
+
+          {loading ? (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3F485C', fontSize: 13 }}>
+              Loading…
+            </div>
+          ) : generating ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#5B6478' }}>
+              <div style={{ width: 24, height: 24, border: '2px solid #6366F1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <span style={{ fontSize: 13 }}>Generating notes from your lecture…</span>
+            </div>
+          ) : showGenerateButton ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+              <button
+                onClick={handleGenerate}
+                style={{ height: 40, padding: '0 20px', borderRadius: 8, fontSize: 14, fontWeight: 500, background: '#6366F1', color: '#09090F', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+              >
+                ✦ Generate notes from lecture
+              </button>
+              <p style={{ fontSize: 12, color: '#3F485C', margin: 0 }}>
+                Or start writing below — notes are encrypted and auto-saved.
+              </p>
+              {/* Editor is mounted but visually hidden behind the generate prompt */}
+              <div style={{ position: 'relative', width: '100%', minHeight: 160 }}>
+                <EditorContent
+                  editor={editor}
+                  style={{ flex: 1, minHeight: 160, width: '100%' }}
+                />
+                {/* Placeholder shown while editor is empty */}
+                <div
+                  aria-hidden="true"
+                  style={{ position: 'absolute', top: 0, left: 0, color: '#3F485C', fontSize: 14.5, lineHeight: 1.8, pointerEvents: 'none', userSelect: 'none' }}
+                >
+                  Start writing…
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 2px 0 0' }}>
+              <EditorContent editor={editor} style={{ width: '100%' }} />
+            </div>
+          )}
+        </div>
+
+        {/* Fact-check side panel — visible while a run is active or results are present */}
+        {panelOpen && (
+          factCheckRunning ? (
+            // Loading state while the API call is in flight
+            <div
+              style={{
+                width: 288,
+                flexShrink: 0,
+                borderLeft: '1px solid #1E1E2E',
+                background: '#0B0B11',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+              }}
+            >
+              <div style={{ width: 20, height: 20, border: '2px solid #FBBF24', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <span style={{ fontSize: 12, color: '#5B6478' }}>Checking notes…</span>
+            </div>
+          ) : (
+            <FactCheckPanel
+              flags={factCheckFlags}
+              activeExcerpt={activeExcerpt}
+              onFlagClick={handleFlagClick}
+              onClose={handleFactCheckClose}
+            />
+          )
         )}
       </div>
     </>

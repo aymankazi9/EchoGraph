@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { LayoutDashboard, Plus, Settings, ChevronLeft, ChevronRight, Flame, Users, HelpCircle, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Plus, Settings, ChevronLeft, ChevronRight, Flame, Users, HelpCircle, CreditCard, Sparkles, ScrollText } from 'lucide-react'
 import { STORAGE_CAPS_BYTES, type Tier } from '@/lib/tiers/features'
 import { NavItem } from './nav-item'
 import { PrivacyBadge } from './privacy-badge'
@@ -11,14 +11,17 @@ import { UserRow } from './user-row'
 import { NotificationStrip } from './notification-strip'
 
 const NAV_ITEMS = [
-  { href: '/vault', icon: LayoutDashboard, label: 'Vault' },
-  { href: '/momentum', icon: Flame, label: 'Momentum', beta: true },
-  { href: '/community', icon: Users, label: 'Community', beta: true, betaHidden: true },
-  { href: '/session/new', icon: Plus, label: 'New session' },
-  { href: '/help', icon: HelpCircle, label: 'Help' },
-  { href: '/billing', icon: CreditCard, label: 'Billing' },
-  { href: '/vault/settings', icon: Settings, label: 'Settings' },
+  { href: '/vault',          icon: LayoutDashboard, label: 'Vault' },
+  { href: '/vault/ask',      icon: Sparkles,        label: 'Vault Ask' },
+  { href: '/momentum',       icon: Flame,           label: 'Momentum', beta: true },
+  { href: '/community',      icon: Users,           label: 'Community', beta: true, betaHidden: true },
+  { href: '/session/new',    icon: Plus,            label: 'New session' },
+  { href: '/help',           icon: HelpCircle,      label: 'Help' },
+  { href: '/billing',        icon: CreditCard,      label: 'Billing' },
+  { href: '/vault/settings', icon: Settings,        label: 'Settings' },
 ]
+
+const IS_BETA = process.env.NEXT_PUBLIC_BETA_MODE === 'true'
 
 interface Props {
   email: string
@@ -110,8 +113,29 @@ export function SideNav({ email, usedBytes, tier }: Props) {
 
       {/* Nav items */}
       <div className="flex flex-col gap-0.5 p-2 flex-1 overflow-y-auto">
+
+        {/* Beta Guide — pinned first, amber-accented, only shown during beta */}
+        {IS_BETA && (
+          <>
+            <NavItem
+              href="/beta-guide"
+              icon={ScrollText}
+              label="Beta Guide"
+              collapsed={collapsed}
+              guide
+            />
+            {/* Subtle separator between the guide item and the main workspace nav */}
+            {!collapsed && (
+              <div style={{
+                margin: '3px 4px',
+                borderTop: '1px solid rgba(255,255,255,0.04)',
+              }} />
+            )}
+          </>
+        )}
+
         {NAV_ITEMS
-          .filter(item => !(process.env.NEXT_PUBLIC_BETA_MODE === 'true' && item.betaHidden))
+          .filter(item => !(IS_BETA && item.betaHidden))
           .map((item) => (
             <NavItem
               key={item.href}

@@ -219,7 +219,7 @@ export function NewSessionClient({ userId, storageBytesUsed, storageCapBytes }: 
   const storageUsedPct  = Math.min(100, (storageBytesUsed / storageCapBytes) * 100)
 
   const libraryByType = useMemo<Record<FileType, LibraryFileRow[]>>(() => {
-    const grouped: Record<FileType, LibraryFileRow[]> = { pdf: [], audio: [], guide: [] }
+    const grouped: Record<FileType, LibraryFileRow[]> = { pdf: [], audio: [], guide: [], handwritten: [] }
     for (const f of libraryFiles) grouped[f.fileType].push(f)
     return grouped
   }, [libraryFiles])

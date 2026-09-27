@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase-server'
+import { getUserTier } from '@/lib/tiers/server'
 import { VaultDashboardClient } from '@/components/dashboard/vault-dashboard-client'
 import type { ContinueSessionData } from '@/components/dashboard/continue-card'
 import type { VaultStats } from '@/components/dashboard/stat-tiles'
@@ -44,10 +45,11 @@ export default async function VaultPage() {
     { data: activityRows },
     { data: exportRows },
     { data: playbackRows },
+    userTier,
   ] = await Promise.all([
     supabase
       .from('sessions')
-      .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, created_at, last_opened_at, course_tag')
+      .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, created_at, last_opened_at, course_id, courses(name)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false }),
 
@@ -92,6 +94,8 @@ export default async function VaultPage() {
     supabase
       .from('sessions_playback')
       .select('session_id, last_position_ms'),
+
+    getUserTier(supabase, user.id),
   ])
 
   // ── Count maps ──────────────────────────────────────────────────────────────
@@ -152,7 +156,7 @@ export default async function VaultPage() {
     continueSession = {
       id: candidate.id,
       title_encrypted: candidate.title_encrypted,
-      course_tag: (candidate.course_tag as string | null) ?? null,
+      course_name: ((candidate.courses as unknown as { name: string } | null)?.name) ?? null,
       last_opened_at: (candidate.last_opened_at as string | null) ?? null,
       last_position_ms: playbackBySession[candidate.id] ?? null,
       slide_count: slideCounts[candidate.id] ?? 0,
@@ -176,6 +180,7 @@ export default async function VaultPage() {
       checklistExported={profile?.checklist_exported ?? false}
       continueSession={continueSession}
       stats={stats}
+      tier={userTier}
     />
   )
 }

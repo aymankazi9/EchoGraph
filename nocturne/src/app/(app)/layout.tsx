@@ -3,6 +3,8 @@ import { createServerClient } from '@/lib/supabase-server'
 import { getUserTier } from '@/lib/tiers/server'
 import { AppShell } from '@/components/nav/app-shell'
 import { InstallBanner } from '@/components/pwa/install-banner'
+import { ThemeProvider } from '@/lib/theme/provider'
+import { parseUiPrefs } from '@/lib/theme/types'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerClient()
@@ -15,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [{ data: profile }, { data: usedBytesRaw }, userTier, { data: subRow }] = await Promise.all([
     supabase
       .from('users')
-      .select('pbkdf2_salt')
+      .select('pbkdf2_salt, ui_preferences')
       .eq('id', user.id)
       .single(),
 
@@ -34,13 +36,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const usedBytes = (usedBytesRaw as number | null) ?? 0
   const pastDue = subRow?.status === 'past_due'
+  const initialPrefs = parseUiPrefs(profile?.ui_preferences as Record<string, unknown> | null)
 
   return (
-    <>
+    <ThemeProvider userId={user.id} initialPrefs={initialPrefs}>
       <AppShell email={user.email ?? ''} usedBytes={usedBytes} tier={userTier} pastDue={pastDue}>
         {children}
       </AppShell>
       <InstallBanner navOffset />
-    </>
+    </ThemeProvider>
   )
 }

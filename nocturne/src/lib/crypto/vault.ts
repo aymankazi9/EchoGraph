@@ -184,7 +184,14 @@ export async function vaultUnlock(
   _masterKey = result.masterKey
   console.log('[vault] MK extractable:', result.masterKey.extractable) // will log false
   document.cookie = 'nocturne-vault-warm=1; max-age=3600; path=/; SameSite=Strict'
-  sessionCacheWrite(result.ephemeralKeyB64, result.cachedWrappedMKB64)
+  // Cache is a convenience feature — swallow any write failure (QuotaExceededError,
+  // private-browsing restrictions, etc.) so the unlock flow still completes and
+  // the user reaches /vault via the in-memory _masterKey path.
+  try {
+    sessionCacheWrite(result.ephemeralKeyB64, result.cachedWrappedMKB64)
+  } catch (e) {
+    console.warn('[vault] Session cache write failed (non-fatal):', e)
+  }
 }
 
 // Recovery unlock: import recovery salt as AES-128-KW key, unwrap recovery-wrapped MK.
@@ -206,7 +213,11 @@ export async function vaultUnlockWithRecovery(
   _masterKey = result.masterKey
   console.log('[vault] MK extractable (recovery path):', result.masterKey.extractable) // will log false
   document.cookie = 'nocturne-vault-warm=1; max-age=3600; path=/; SameSite=Strict'
-  sessionCacheWrite(result.ephemeralKeyB64, result.cachedWrappedMKB64)
+  try {
+    sessionCacheWrite(result.ephemeralKeyB64, result.cachedWrappedMKB64)
+  } catch (e) {
+    console.warn('[vault] Session cache write failed (non-fatal):', e)
+  }
 }
 
 // Passphrase change: re-wraps the in-storage MK with a new KEK derived from new passphrase + new salt.

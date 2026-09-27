@@ -8,6 +8,7 @@ import { vaultSetup, getPendingRecoveryBlob, clearPendingRecoveryBlob } from '@/
 import { downloadRecoveryKit, formatRecoveryKit } from '@/lib/crypto/recovery'
 import { createClient } from '@/lib/supabase'
 import { validateInviteCode } from '@/app/actions/validate-invite'
+import { MagicLinkSentCard } from '@/components/auth/magic-link-sent'
 
 // When BETA_MODE is on, new users must supply a valid invite code before
 // proceeding with vault setup.  The validated flag is stored in localStorage
@@ -91,8 +92,12 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
   const [step, setStep] = useState<Step>(initialStep)
 
   // Step 0 — account
-  const [emailVal, setEmailVal] = useState('')
-  const [emailError, setEmailError] = useState(false)
+  const [emailVal,       setEmailVal]       = useState('')
+  const [emailError,     setEmailError]     = useState(false)
+  const [emailSending,   setEmailSending]   = useState(false)
+  const [emailSent,      setEmailSent]      = useState(false)
+  const [emailSentTo,    setEmailSentTo]    = useState('')
+  const [emailSendError, setEmailSendError] = useState<string | null>(null)
 
   // Step 1 — passphrase
   const [pass, setPass] = useState('')
@@ -119,11 +124,34 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
     })
   }
 
-  function onEmailContinue() {
+  async function onEmailSend() {
     const v = emailVal.trim()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { setEmailError(true); return }
     setEmailError(false)
-    setStep(1)
+    setEmailSendError(null)
+    setEmailSending(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithOtp({
+        email: v,
+        options: {
+          // Callback routes to /setup automatically for new users (no pbkdf2_salt).
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+      if (error) {
+        setEmailSendError(error.message || 'Could not send sign-in link — please try again.')
+        return
+      }
+      setEmailSentTo(v)
+      setEmailSent(true)
+    } finally {
+      setEmailSending(false)
+    }
+  }
+
+  function onEmailReset() {
+    setEmailSent(false); setEmailSentTo(''); setEmailVal(''); setEmailSendError(null)
   }
 
   async function onCreateVault() {
@@ -403,25 +431,38 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                 <span style={{ flex: 1, height: 1, background: '#1E1E2E' }} />
               </div>
 
-              <label style={{ display: 'block', fontSize: 12.5, color: '#94A3B8', margin: '0 0 8px' }}>Email address</label>
-              <input
-                type="email"
-                placeholder="you@university.edu"
-                value={emailVal}
-                onChange={e => { setEmailVal(e.target.value); setEmailError(false) }}
-                onKeyDown={e => e.key === 'Enter' && onEmailContinue()}
-                style={{ width: '100%', height: 46, borderRadius: 9, background: '#13121C', border: '1px solid #2D2B45', color: '#E2E8F0', padding: '0 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
-              />
-              {emailError && <p style={{ fontSize: 12, color: '#FB7185', margin: '8px 0 0' }}>Enter a valid email address.</p>}
+              {emailSent ? (
+                <MagicLinkSentCard
+                  email={emailSentTo}
+                  onReset={onEmailReset}
+                  note="You can close this tab — your vault setup will continue wherever you open that link."
+                />
+              ) : (
+                <>
+                  <label style={{ display: 'block', fontSize: 12.5, color: '#94A3B8', margin: '0 0 8px' }}>Email address</label>
+                  <input
+                    type="email"
+                    placeholder="you@university.edu"
+                    value={emailVal}
+                    onChange={e => { setEmailVal(e.target.value); setEmailError(false); setEmailSendError(null) }}
+                    onKeyDown={e => e.key === 'Enter' && onEmailSend()}
+                    disabled={emailSending}
+                    style={{ width: '100%', height: 46, borderRadius: 9, background: '#13121C', border: '1px solid #2D2B45', color: '#E2E8F0', padding: '0 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
+                  />
+                  {emailError     && <p style={{ fontSize: 12, color: '#FB7185', margin: '8px 0 0' }}>Enter a valid email address.</p>}
+                  {emailSendError && <p style={{ fontSize: 12, color: '#FB7185', margin: '8px 0 0' }}>{emailSendError}</p>}
 
-              <button
-                data-btn
-                data-shine
-                onClick={onEmailContinue}
-                style={{ width: '100%', height: 46, marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 9, fontSize: 15, fontWeight: 500, background: '#6366F1', color: '#09090F', border: 'none', cursor: 'pointer', boxShadow: '0 8px 26px rgba(99,102,241,0.32)' }}
-              >
-                Continue <span data-arrow style={{ color: '#09090F' }}>→</span>
-              </button>
+                  <button
+                    data-btn
+                    data-shine
+                    onClick={onEmailSend}
+                    disabled={emailSending}
+                    style={{ width: '100%', height: 46, marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 9, fontSize: 15, fontWeight: 500, background: '#6366F1', color: '#09090F', border: 'none', cursor: emailSending ? 'not-allowed' : 'pointer', boxShadow: '0 8px 26px rgba(99,102,241,0.32)', opacity: emailSending ? 0.7 : 1 }}
+                  >
+                    {emailSending ? 'Sending…' : <>Send sign-up link <span data-arrow style={{ color: '#09090F' }}>→</span></>}
+                  </button>
+                </>
+              )}
 
               <p style={{ fontSize: 13.5, color: '#5B6478', margin: '28px 0 0', textAlign: 'center' }}>
                 Already have an account?{' '}

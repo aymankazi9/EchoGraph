@@ -25,7 +25,7 @@ type Thread = {
   created_at: string
 }
 
-type DeckTerm = { front: string; back?: string }
+type DeckTerm = { front: string; back: string; zone: 'red' | 'likely' }
 
 type SharedDeck = {
   deck_id: string
@@ -202,10 +202,10 @@ export function CommunityClient({ userId, userTier }: { userId: string; userTier
       .rpc('get_active_count', { p_room_id: activeRoomId })
       .then(({ data }) => setActiveCount((data as number) ?? 0))
 
-    // Shared deck count for room stats
+    // Shared deck count for room stats (community_decks = new format)
     supabase
-      .from('shared_decks')
-      .select('deck_id', { count: 'exact', head: true })
+      .from('community_decks')
+      .select('id', { count: 'exact', head: true })
       .eq('room_id', activeRoomId)
       .then(({ count }) => setSharedDeckCount(count ?? 0))
   }, [activeRoomId, supabase])
@@ -320,9 +320,9 @@ export function CommunityClient({ userId, userTier }: { userId: string; userTier
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // 1. Create a new session to house the imported cards
       const sessionId = crypto.randomUUID()
       const titleEncrypted = await encryptText(mk, deck.title)
-
       const { error: sessionErr } = await supabase.from('sessions').insert({
         id: sessionId,
         user_id: user.id,
@@ -335,18 +335,49 @@ export function CommunityClient({ userId, userTier }: { userId: string; userTier
       if (sessionErr) { alert('Failed to create session'); return }
 
       if (deck.terms.length > 0) {
-        const rows = await Promise.all(
-          deck.terms.map(async t => ({
-            id: crypto.randomUUID(),
-            session_id: sessionId,
-            user_id: user.id,
-            front_encrypted: await encryptText(mk, t.front),
-            back_encrypted: await encryptText(mk, t.back ?? ''),
-            slide_index: null,
-            zone: null,
+        // 2. Encrypt all terms client-side (re-encrypts under this user's master key)
+        const prepared = await Promise.all(
+          deck.terms.map(async (t) => ({
+            keywordId:     crypto.randomUUID(),
+            flashcardId:   crypto.randomUUID(),
+            termEncrypted: await encryptText(mk, t.front),
+            backEncrypted: await encryptText(mk, t.back),
+            zone:          t.zone,
           }))
         )
-        await supabase.from('flashcards').insert(rows)
+
+        // 3. Batch-insert keywords (source: 'imported', zero scores)
+        await supabase.from('keywords').insert(
+          prepared.map((p) => ({
+            id:               p.keywordId,
+            session_id:       sessionId,
+            user_id:          user.id,
+            term_encrypted:   p.termEncrypted,
+            source:           'imported',
+            zone:             p.zone,
+            confidence_score: 0,
+            mention_count:    0,
+            dwell_time_ms:    0,
+            emphasis_score:   0,
+            lecture_confidence: 0,
+            slide_indices:    [],
+            normalized_term:  '',
+          }))
+        )
+
+        // 4. Batch-insert flashcards linked to their keyword
+        await supabase.from('flashcards').insert(
+          prepared.map((p) => ({
+            id:              p.flashcardId,
+            session_id:      sessionId,
+            user_id:         user.id,
+            keyword_id:      p.keywordId,
+            front_encrypted: p.termEncrypted,
+            back_encrypted:  p.backEncrypted,
+            slide_index:     null,
+            zone:            p.zone,
+          }))
+        )
       }
 
       setVaultSuccess(true)

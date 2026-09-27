@@ -69,7 +69,7 @@ export function MomentumRibbon() {
           .gte('date', since.toISOString().slice(0, 10))
           .order('date'),
         supabase.from('users').select('momentum_points, id').single(),
-        supabase.from('sessions').select('id, course_tag').not('course_tag', 'is', null),
+        supabase.from('sessions').select('id, course_id, courses(id, name)').not('course_id', 'is', null),
       ])
 
       const activityRows = activityRes.data ?? []
@@ -86,15 +86,16 @@ export function MomentumRibbon() {
       let topCourse: { name: string; pct: number } | null = null
       if (taggedRes.data && taggedRes.data.length > 0 && userRes.data?.id) {
         const userId = userRes.data.id as string
-        const tagGroups: Record<string, string[]> = {}
+        const courseGroups: Record<string, { name: string; sessionIds: string[] }> = {}
         for (const s of taggedRes.data) {
-          const t = s.course_tag as string
-          if (!tagGroups[t]) tagGroups[t] = []
-          tagGroups[t].push(s.id as string)
+          const course = s.courses as unknown as { id: string; name: string } | null
+          if (!course) continue
+          if (!courseGroups[course.id]) courseGroups[course.id] = { name: course.name, sessionIds: [] }
+          courseGroups[course.id]!.sessionIds.push(s.id as string)
         }
         const results: { name: string; pct: number }[] = []
-        for (const [tag, sIds] of Object.entries(tagGroups)) {
-          const { data: fcs } = await supabase.from('flashcards').select('id').in('session_id', sIds)
+        for (const { name, sessionIds } of Object.values(courseGroups)) {
+          const { data: fcs } = await supabase.from('flashcards').select('id').in('session_id', sessionIds)
           const total = fcs?.length ?? 0
           if (total === 0) continue
           const { data: revs } = await supabase
@@ -103,7 +104,7 @@ export function MomentumRibbon() {
             .in('flashcard_id', (fcs ?? []).map((f) => f.id as string))
             .eq('user_id', userId)
           const reviewed = new Set((revs ?? []).map((r) => r.flashcard_id as string)).size
-          results.push({ name: tag, pct: Math.round((reviewed / total) * 100) })
+          results.push({ name, pct: Math.round((reviewed / total) * 100) })
         }
         results.sort((a, b) => b.pct - a.pct)
         if (results.length > 0) topCourse = results[0]!

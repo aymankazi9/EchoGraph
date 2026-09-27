@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { isVaultUnlocked } from '@/lib/crypto/vault'
+import { isVaultUnlocked, vaultRestoreFromCache } from '@/lib/crypto/vault'
 import type { Tier } from '@/lib/tiers/features'
+import { useTheme } from '@/lib/theme/provider'
 import { SideNav } from './side-nav'
 
 interface Props {
@@ -18,13 +19,34 @@ interface Props {
 export function AppShell({ email, usedBytes, tier, pastDue = false, children }: Props) {
   const [vaultReady, setVaultReady] = useState(false)
   const router = useRouter()
+  const { prefs } = useTheme()
 
   useEffect(() => {
-    if (!isVaultUnlocked()) {
-      router.replace('/unlock')
-    } else {
+    void (async () => {
+      // TEMP INSTRUMENTATION — remove after investigation
+      console.log('[AppShell] effect fired, isVaultUnlocked =', isVaultUnlocked())
+      if (!isVaultUnlocked()) {
+        // On page reload the module scope resets (_masterKey = null) even though
+        // the vault-warm cookie may still be alive.  Attempt to restore the MK
+        // from the sessionStorage cache before concluding the vault is locked.
+        let restored = false
+        try {
+          restored = await vaultRestoreFromCache()
+        } catch (e) {
+          console.log('[AppShell] vaultRestoreFromCache threw:', e)
+        }
+        console.log('[AppShell] vaultRestoreFromCache result =', restored)
+        if (!restored) {
+          console.log('[AppShell] decision: redirecting to /unlock')
+          router.replace('/unlock')
+          return
+        }
+        console.log('[AppShell] decision: restore succeeded, continuing to render')
+      } else {
+        console.log('[AppShell] decision: already unlocked, continuing to render')
+      }
       setVaultReady(true)
-    }
+    })()
   }, [router])
 
   if (!vaultReady) {
@@ -33,8 +55,15 @@ export function AppShell({ email, usedBytes, tier, pastDue = false, children }: 
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-bg-base">
-      <SideNav email={email} usedBytes={usedBytes} tier={tier} />
+    <div
+      className="h-screen flex overflow-hidden bg-bg-base"
+      data-theme={prefs.theme !== 'midnight' ? prefs.theme : undefined}
+      data-accent={prefs.accent !== 'indigo' ? prefs.accent : undefined}
+      {...(prefs.focus_mode ? { 'data-focus-mode': '' } : {})}
+    >
+      <div data-app-nav="">
+        <SideNav email={email} usedBytes={usedBytes} tier={tier} />
+      </div>
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {pastDue && (
           <div style={{

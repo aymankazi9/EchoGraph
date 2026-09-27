@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { hasAccess, type Tier } from '@/lib/tiers/features'
 import { LockedFeature } from '@/components/paywall/locked-feature'
+import { computeMastery, type MasteryState } from '@/lib/scoring/srs'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,10 +28,25 @@ interface MilestoneItem {
 }
 
 interface CourseData {
+  id: string
   name: string
+  exam_date: string | null  // ISO date e.g. "2026-12-15"
   pct: number
   done: number
   total: number
+}
+
+interface WeakSpotRow {
+  flashcardId: string
+  sessionId:   string
+  term:        string        // display-ready title-cased normalized_term
+  courseId:    string
+  courseName:  string
+  masteryBucket: MasteryState
+  masteryProgress: number    // 0–1
+  examDate:    string | null
+  daysUntil:   number        // Infinity if no exam set; ≤0 means passed
+  urgency:     number        // 0–1 sort key
 }
 
 // ---------------------------------------------------------------------------
@@ -109,11 +126,45 @@ const ArrowRightIcon = ({ size = 14 }: { size?: number }) => (
     <path d="M4 9 h9 M9 5 l4 4 l-4 4" />
   </svg>
 )
+const TriangleAlertIcon = ({ size = 13 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 2 L16 15 H2 Z" /><line x1="9" y1="7" x2="9" y2="11" /><circle cx="9" cy="13.5" r="0.5" fill="currentColor" stroke="none" />
+  </svg>
+)
 const DownloadIcon = ({ size = 13 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 3 v8 M5.5 7.5 L9 11 L12.5 7.5 M3 14 H15" />
   </svg>
 )
+
+// ---------------------------------------------------------------------------
+// Weak-spot helpers
+// ---------------------------------------------------------------------------
+
+/** Days remaining until the exam at local midnight. Infinity = no exam set. ≤0 = passed. */
+function weakSpotDaysUntil(examDate: string | null): number {
+  if (!examDate) return Infinity
+  return (new Date(examDate + 'T00:00:00').getTime() - Date.now()) / 86400000
+}
+
+/**
+ * Urgency score: (1 - masteryProgress) × examProximityFactor.
+ * Mirrors the Study tab's pre-exam weighting (≤7 days = max urgency, scales
+ * inversely beyond that; Infinity = no exam, uses 0.3 base factor).
+ */
+function computeUrgency(masteryProgress: number, daysUntil: number): number {
+  if (daysUntil <= 0) return 0
+  const deficit = 1 - masteryProgress
+  const examFactor =
+    daysUntil === Infinity ? 0.3
+    : daysUntil <= 7        ? 1.0
+    : Math.min(1.0, 7 / daysUntil)
+  return deficit * examFactor
+}
+
+function titleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase())
+}
 
 // ---------------------------------------------------------------------------
 // Heatmap constants
@@ -294,6 +345,8 @@ const STREAK_TARGETS = [7, 14, 21, 30, 60, 100]
 // Component
 // ---------------------------------------------------------------------------
 export function MomentumClient({ userId, userTier }: { userId: string; userTier: Tier }) {
+  const router = useRouter()
+
   // -- Persistent UI state --
   const [balance,      setBalance]      = useState(0)
   const [redeemed,     setRedeemed]     = useState<string[]>([])
@@ -315,6 +368,16 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
   const [weeklyEarnings, setWeeklyEarnings] = useState(0)
   const [courses,        setCourses]        = useState<CourseData[]>([])
   const [milestones,     setMilestones]     = useState<MilestoneItem[]>([])
+
+  // -- Weak-spot state --
+  const [weakSpots,      setWeakSpots]      = useState<WeakSpotRow[]>([])
+  const [weakSpotsReady, setWeakSpotsReady] = useState(false)
+
+  // -- Course inline-edit state --
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null)
+  const [editCourseName,  setEditCourseName]  = useState('')
+  const [editCourseDate,  setEditCourseDate]  = useState('') // 'YYYY-MM-DD' or ''
+  const [courseEditSaving, setCourseEditSaving] = useState(false)
 
   // -- Derived --
   const studiedThisWeek = weekDays.filter((d) => d.done).length
@@ -342,7 +405,7 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
         supabase.from('users').select('momentum_points').eq('id', userId).single(),
         supabase.from('momentum_ledger').select('delta').gte('created_at', weekAgo.toISOString()).gt('delta', 0),
         supabase.from('user_milestones').select('milestone_id'),
-        supabase.from('sessions').select('id, course_tag').not('course_tag', 'is', null),
+        supabase.from('sessions').select('id, course_id, courses(id, name, exam_date)').not('course_id', 'is', null),
       ])
 
       const activityRows = activityRes.data ?? []
@@ -356,16 +419,19 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
       const weeklyEarned = (ledgerRes.data ?? []).reduce((s, r) => s + (r.delta as number), 0)
       const earnedIds    = new Set((earnedRes.data ?? []).map((r) => r.milestone_id as string))
 
-      // Course mastery: multi-step query per tag
-      const tagGroups: Record<string, string[]> = {}
-      for (const s of taggedRes.data ?? []) {
-        const t = s.course_tag as string
-        if (!tagGroups[t]) tagGroups[t] = []
-        tagGroups[t].push(s.id as string)
+      // Course mastery: group session IDs by course_id, then query flashcards per group
+      type TaggedRow = { id: string; course_id: string; courses: { id: string; name: string; exam_date: string | null } | null }
+      const courseGroups: Record<string, { name: string; exam_date: string | null; sessionIds: string[] }> = {}
+      for (const s of (taggedRes.data ?? []) as unknown as TaggedRow[]) {
+        const cId = s.course_id
+        const meta = s.courses
+        if (!cId || !meta) continue
+        if (!courseGroups[cId]) courseGroups[cId] = { name: meta.name, exam_date: meta.exam_date, sessionIds: [] }
+        courseGroups[cId]!.sessionIds.push(s.id)
       }
       const courseResults: CourseData[] = []
-      for (const [tag, sIds] of Object.entries(tagGroups)) {
-        const { data: fcs } = await supabase.from('flashcards').select('id').in('session_id', sIds)
+      for (const [cId, { name, exam_date, sessionIds }] of Object.entries(courseGroups)) {
+        const { data: fcs } = await supabase.from('flashcards').select('id').in('session_id', sessionIds)
         const total = fcs?.length ?? 0
         if (total === 0) continue
         const { data: revs } = await supabase
@@ -373,7 +439,7 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
           .in('flashcard_id', (fcs ?? []).map((f) => f.id as string))
           .eq('user_id', userId)
         const reviewed = new Set((revs ?? []).map((r) => r.flashcard_id as string)).size
-        courseResults.push({ name: tag, pct: Math.round((reviewed / total) * 100), done: reviewed, total })
+        courseResults.push({ id: cId, name, exam_date, pct: Math.round((reviewed / total) * 100), done: reviewed, total })
       }
       courseResults.sort((a, b) => b.pct - a.pct)
 
@@ -391,10 +457,102 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
       setWeeklyEarnings(weeklyEarned)
       setCourses(courseResults)
       setMilestones(buildMilestoneItems(earnedIds, current, sessionCount ?? 0, cardCount ?? 0, courseResults))
+
+      // ── Weak-spot data ─────────────────────────────────────────────────────
+      // Collect every session ID across all courses.
+      const allSessionIds = Object.values(courseGroups).flatMap((g) => g.sessionIds)
+
+      // Build reverse map: session_id → course info (for joining below).
+      const sessionToCourse: Record<string, { courseId: string; name: string; exam_date: string | null }> = {}
+      for (const [cId, { name, exam_date, sessionIds }] of Object.entries(courseGroups)) {
+        for (const sid of sessionIds) {
+          sessionToCourse[sid] = { courseId: cId, name, exam_date }
+        }
+      }
+
+      if (allSessionIds.length > 0) {
+        // Red Zone flashcards with their keyword's normalized_term (plaintext — safe to display).
+        type RedFcRow = { id: string; session_id: string; keywords: { normalized_term: string } | null }
+        const { data: redFcs } = await supabase
+          .from('flashcards')
+          .select('id, session_id, keywords(normalized_term)')
+          .eq('zone', 'red')
+          .in('session_id', allSessionIds) as { data: RedFcRow[] | null }
+
+        const redFcIds = (redFcs ?? []).map((f) => f.id)
+
+        // Latest flashcard_review per card (ordered desc → first hit = latest).
+        type RevRow = { flashcard_id: string; interval_days: number }
+        const { data: redRevs } = redFcIds.length > 0
+          ? await supabase
+              .from('flashcard_reviews')
+              .select('flashcard_id, interval_days')
+              .in('flashcard_id', redFcIds)
+              .eq('user_id', userId)
+              .order('reviewed_at', { ascending: false })
+          : { data: [] as RevRow[] }
+
+        // Latest interval per flashcard_id (first occurrence in desc-ordered result).
+        const latestInterval: Record<string, number> = {}
+        for (const r of (redRevs ?? []) as RevRow[]) {
+          const id = r.flashcard_id
+          if (!(id in latestInterval)) latestInterval[id] = r.interval_days
+        }
+
+        const spots: WeakSpotRow[] = []
+        for (const fc of (redFcs ?? []) as RedFcRow[]) {
+          const course = sessionToCourse[fc.session_id]
+          if (!course) continue
+          const normalizedTerm = fc.keywords?.normalized_term
+          if (!normalizedTerm) continue
+
+          const intervalDays = latestInterval[fc.id]
+          const { progress, state } = computeMastery(intervalDays)
+          if (state === 'mastered') continue  // already mastered — not a weak spot
+
+          const daysUntil = weakSpotDaysUntil(course.exam_date)
+          if (daysUntil <= 0) continue  // exam already passed
+
+          spots.push({
+            flashcardId:     fc.id,
+            sessionId:       fc.session_id,
+            term:            titleCase(normalizedTerm),
+            courseId:        course.courseId,
+            courseName:      course.name,
+            masteryBucket:   state,
+            masteryProgress: progress,
+            examDate:        course.exam_date,
+            daysUntil,
+            urgency:         computeUrgency(progress, daysUntil),
+          })
+        }
+        spots.sort((a, b) => b.urgency - a.urgency)
+        setWeakSpots(spots.slice(0, 30))
+      }
+
+      setWeakSpotsReady(true)
     }
 
     load().catch(console.error)
   }, [userId])
+
+  async function saveCourseEdit(courseId: string) {
+    const trimmed = editCourseName.trim()
+    if (courseEditSaving || !trimmed) return
+    setCourseEditSaving(true)
+    const supabase = createClient()
+    await supabase
+      .from('courses')
+      .update({ name: trimmed, exam_date: editCourseDate || null })
+      .eq('id', courseId)
+    setCourses((prev) =>
+      prev.map((c) =>
+        c.id === courseId ? { ...c, name: trimmed, exam_date: editCourseDate || null } : c,
+      ),
+    )
+    setEditingCourseId(null)
+    setCourseEditSaving(false)
+  }
 
   function toggleCohort() {
     const next = !cohortOn
@@ -753,11 +911,36 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
             {courses.map((course) => {
               const tag = masteryTag(course.pct)
               const deg = Math.round(course.pct * 3.6)
+              const isEditing = editingCourseId === course.id
               return (
-                <div key={course.name} style={{
+                <div key={course.id} style={{
                   borderRadius: 14, border: '1px solid #1E1E2E', background: '#0C0C13',
-                  padding: 22, textAlign: 'center',
+                  padding: 22, textAlign: 'center', position: 'relative',
                 }}>
+                  {/* Pencil icon — top-right corner */}
+                  {!isEditing && (
+                    <button
+                      type="button"
+                      title="Edit course"
+                      onClick={() => {
+                        setEditingCourseId(course.id)
+                        setEditCourseName(course.name)
+                        setEditCourseDate(course.exam_date ?? '')
+                      }}
+                      style={{
+                        position: 'absolute', top: 10, right: 10,
+                        background: 'none', border: 'none', padding: 4, borderRadius: 6,
+                        color: '#3F485C', cursor: 'pointer', lineHeight: 1,
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#818CF8' }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#3F485C' }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M13 2 L16 5 L7 14 L3 15 L4 11 Z" /><path d="M11 4 L14 7" />
+                      </svg>
+                    </button>
+                  )}
+
                   <div style={{
                     width: 96, height: 96, borderRadius: '50%',
                     background: `conic-gradient(#6366F1 0deg, #6366F1 ${deg}deg, #16151F ${deg}deg, #16151F 360deg)`,
@@ -778,20 +961,223 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', margin: '12px 0 4px' }}>
                     {course.name}
                   </div>
-                  <div style={{ fontSize: 11, color: '#5B6478', marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#5B6478', marginBottom: 6 }}>
                     {course.done} / {course.total} keywords
                   </div>
 
+                  {/* Exam date badge */}
+                  {course.exam_date && !isEditing && (
+                    <div style={{ fontSize: 11, color: '#818CF8', marginBottom: 8 }}>
+                      Exam {new Date(course.exam_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
+                  )}
+
+                  {!isEditing && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center',
+                      padding: '4px 10px', borderRadius: 9999,
+                      fontSize: 11, fontWeight: 500,
+                      color: tag.color, background: tag.bg,
+                      border: `1px solid ${tag.border}`,
+                    }}>
+                      {tag.label}
+                    </span>
+                  )}
+
+                  {/* Inline edit form */}
+                  {isEditing && (
+                    <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 7, textAlign: 'left' }}>
+                      <input
+                        autoFocus
+                        value={editCourseName}
+                        onChange={(e) => setEditCourseName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveCourseEdit(course.id)
+                          if (e.key === 'Escape') setEditingCourseId(null)
+                        }}
+                        placeholder="Course name"
+                        style={{
+                          width: '100%', boxSizing: 'border-box',
+                          background: '#16151E', border: '1px solid #2D2B45',
+                          borderRadius: 7, padding: '6px 10px',
+                          fontSize: 12, color: '#CBD5E1', outline: 'none',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      <input
+                        type="date"
+                        value={editCourseDate}
+                        onChange={(e) => setEditCourseDate(e.target.value)}
+                        title="Exam date (optional)"
+                        style={{
+                          width: '100%', boxSizing: 'border-box',
+                          background: '#16151E', border: '1px solid #2D2B45',
+                          borderRadius: 7, padding: '6px 10px',
+                          fontSize: 12, color: editCourseDate ? '#CBD5E1' : '#5B6478',
+                          outline: 'none', fontFamily: 'inherit', colorScheme: 'dark',
+                        }}
+                      />
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => saveCourseEdit(course.id)}
+                          disabled={courseEditSaving || !editCourseName.trim()}
+                          style={{
+                            flex: 1, padding: '6px 0', borderRadius: 7,
+                            background: '#6366F1', border: 'none',
+                            fontSize: 12, color: '#fff',
+                            cursor: courseEditSaving || !editCourseName.trim() ? 'not-allowed' : 'pointer',
+                            opacity: courseEditSaving || !editCourseName.trim() ? 0.5 : 1,
+                          }}
+                        >
+                          {courseEditSaving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingCourseId(null)}
+                          style={{
+                            padding: '6px 12px', borderRadius: 7,
+                            background: 'none', border: '1px solid #1E1E2E',
+                            fontSize: 12, color: '#5B6478', cursor: 'pointer',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ==============================
+          Section 4.5: Weak spots
+          ============================== */}
+      <div style={{ marginTop: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <span style={{ color: '#FDA4AF', display: 'flex' }}><TriangleAlertIcon size={14} /></span>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#E2E8F0' }}>Weak spots</div>
+          <span style={{ fontSize: 11.5, color: '#5B6478' }}>Red Zone · lowest mastery × exam urgency</span>
+          {weakSpotsReady && weakSpots.length > 0 && (
+            <span style={{
+              marginLeft: 4,
+              fontSize: 10.5, fontWeight: 600,
+              padding: '2px 7px', borderRadius: 9999,
+              background: 'rgba(251,113,133,0.1)',
+              color: '#FDA4AF',
+              border: '1px solid rgba(251,113,133,0.22)',
+            }}>
+              {weakSpots.length}
+            </span>
+          )}
+        </div>
+
+        {!weakSpotsReady ? (
+          <div style={{
+            padding: '28px 24px', borderRadius: 14,
+            border: '1px solid #1E1E2E', background: '#0C0C13',
+            textAlign: 'center', color: '#3F485C', fontSize: 13,
+          }}>
+            Loading…
+          </div>
+        ) : weakSpots.length === 0 ? (
+          <div style={{
+            padding: '28px 24px', borderRadius: 14,
+            border: '1px solid #1E1E2E', background: '#0C0C13',
+            textAlign: 'center', color: '#3F485C', fontSize: 13,
+          }}>
+            No weak spots — tag sessions with courses to track urgency across exams.
+          </div>
+        ) : (
+          <div style={{ borderRadius: 14, border: '1px solid #1E1E2E', background: '#0C0C13', overflow: 'hidden' }}>
+            {/* Table header */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 200px 130px 90px',
+              padding: '10px 18px',
+              borderBottom: '1px solid #1A1928',
+              gap: 12,
+            }}>
+              {(['Term', 'Course', 'Mastery', 'Exam in'] as const).map((col) => (
+                <span key={col} style={{ fontSize: 11, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                  {col}
+                </span>
+              ))}
+            </div>
+
+            {/* Rows */}
+            {weakSpots.map((ws) => {
+              const bucketColor = ws.masteryBucket === 'new'
+                ? { text: '#5B6478', bg: 'rgba(75,85,99,0.12)', border: 'rgba(75,85,99,0.22)' }
+                : { text: '#FDE68A', bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.25)' }
+
+              const daysLabel = ws.daysUntil === Infinity ? '—'
+                : ws.daysUntil < 1   ? 'Today'
+                : ws.daysUntil < 2   ? 'Tomorrow'
+                : `${Math.ceil(ws.daysUntil)}d`
+
+              const daysUrgent = ws.daysUntil !== Infinity && ws.daysUntil <= 7
+
+              return (
+                <button
+                  key={ws.flashcardId}
+                  type="button"
+                  onClick={() => router.push(`/session/${ws.sessionId}?tab=study&fcid=${ws.flashcardId}`)}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 200px 130px 90px',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '12px 18px',
+                    gap: 12,
+                    alignItems: 'center',
+                    borderBottom: '1px solid #13121C',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottomColor: '#13121C',
+                    borderBottomWidth: 1,
+                    borderBottomStyle: 'solid',
+                    cursor: 'pointer',
+                    transition: 'background 0.12s',
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#111020' }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+                >
+                  {/* Term */}
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#CBD5E1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {ws.term}
+                  </span>
+
+                  {/* Course */}
+                  <span style={{ fontSize: 12, color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {ws.courseName}
+                  </span>
+
+                  {/* Mastery bucket */}
                   <span style={{
                     display: 'inline-flex', alignItems: 'center',
-                    padding: '4px 10px', borderRadius: 9999,
+                    padding: '3px 9px', borderRadius: 9999,
                     fontSize: 11, fontWeight: 500,
-                    color: tag.color, background: tag.bg,
-                    border: `1px solid ${tag.border}`,
+                    color: bucketColor.text,
+                    background: bucketColor.bg,
+                    border: `1px solid ${bucketColor.border}`,
+                    justifySelf: 'start',
                   }}>
-                    {tag.label}
+                    {ws.masteryBucket === 'new' ? 'Not started' : 'Learning'}
                   </span>
-                </div>
+
+                  {/* Days until exam */}
+                  <span style={{
+                    fontSize: 12, fontWeight: daysUrgent ? 600 : 400,
+                    color: daysUrgent ? '#FDA4AF' : '#5B6478',
+                    fontFamily: 'var(--font-mono, monospace)',
+                  }}>
+                    {daysLabel}
+                  </span>
+                </button>
               )
             })}
           </div>

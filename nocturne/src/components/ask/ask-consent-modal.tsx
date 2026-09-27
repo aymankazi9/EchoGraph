@@ -26,9 +26,37 @@ interface Props {
   open: boolean
   onAllow: () => void
   onDeny: () => void
+  /** 'session' (default) shows per-session copy; 'course' shows cross-session copy;
+   *  'vault' shows whole-vault copy with distinct wording per spec. */
+  mode?: 'session' | 'course' | 'vault'
+  /** Number of sessions in the course — shown in course-mode copy. */
+  sessionCount?: number
+  /** Course name — shown in course-mode copy. */
+  courseName?: string | null
 }
 
-export function AskConsentModal({ open, onAllow, onDeny }: Props) {
+export function AskConsentModal({ open, onAllow, onDeny, mode = 'session', sessionCount, courseName }: Props) {
+  const isCourse = mode === 'course'
+  const isVault  = mode === 'vault'
+
+  const title = isVault
+    ? 'This will access content from across your entire vault'
+    : isCourse
+    ? 'This feature sends content from multiple sessions'
+    : 'This feature sends content to a server'
+
+  const body = isVault
+    ? 'To answer your question, Nocturne will select the most relevant lectures from your vault, decrypt their transcripts and slide text client-side, then send that content to a Nocturne server endpoint for this query only — not just one lecture. The content is request-scoped and discarded immediately after your answer is returned; nothing is stored in plaintext at any point.'
+    : isCourse
+    ? `To answer your question, Nocturne will decrypt content from ${sessionCount ?? 'all'} session${sessionCount !== 1 ? 's' : ''}${courseName ? ` in ${courseName}` : ' in this course'} client-side, then send it to a Nocturne server endpoint for this query only. Content from each session is used to generate your answer and is not stored in plaintext at any point — it is request-scoped and discarded immediately after the response is returned.`
+    : "To answer your question, Nocturne will decrypt this session's transcript and slide text client-side, then send it to a Nocturne server endpoint for this query only. The content is used to generate your answer and is not stored in plaintext at any point — it is request-scoped and discarded immediately after the response is returned."
+
+  const allowLabel = isVault
+    ? 'Allow access to my vault'
+    : isCourse
+    ? 'Allow for this course'
+    : 'Allow for this session'
+
   return (
     <AnimatePresence>
       {open && (
@@ -53,14 +81,10 @@ export function AskConsentModal({ open, onAllow, onDeny }: Props) {
                   id="ask-consent-title"
                   className="text-subheading font-medium text-text-primary mb-2"
                 >
-                  This feature sends content to a server
+                  {title}
                 </h2>
                 <p className="text-body-sm text-text-secondary leading-relaxed">
-                  To answer your question, Nocturne will decrypt this session&apos;s transcript
-                  and slide text client-side, then send it to a Nocturne server endpoint
-                  for this query only. The content is used to generate your answer and is
-                  not stored in plaintext at any point — it is request-scoped and discarded
-                  immediately after the response is returned.
+                  {body}
                 </p>
               </div>
             </div>
@@ -71,7 +95,7 @@ export function AskConsentModal({ open, onAllow, onDeny }: Props) {
                 onClick={onAllow}
                 className="w-full h-9 rounded-btn bg-indigo-500 text-text-inverse text-body font-medium hover:bg-indigo-600 transition-colors"
               >
-                Allow for this session
+                {allowLabel}
               </button>
               <button
                 type="button"

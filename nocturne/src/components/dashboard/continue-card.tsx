@@ -10,7 +10,7 @@ import type { SyncSegment } from '@/lib/sync/playhead-tracker'
 export interface ContinueSessionData {
   id: string
   title_encrypted: string | null
-  course_tag: string | null
+  course_name: string | null
   last_opened_at: string | null
   last_position_ms: number | null
   slide_count: number   // fallback denominator when no sync_map loaded yet
@@ -115,9 +115,9 @@ export function ContinueCard({ session }: Props) {
 
         {/* Subtitle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const }}>
-          {session.course_tag && (
+          {session.course_name && (
             <>
-              <span style={{ fontSize: 12.5, color: '#64748B' }}>{session.course_tag}</span>
+              <span style={{ fontSize: 12.5, color: '#64748B' }}>{session.course_name}</span>
               <span style={{ fontSize: 12.5, color: '#2D3548' }}>·</span>
             </>
           )}

@@ -59,10 +59,14 @@ export function UnlockForm({ salt, wrappedKey, recoverySalt, next }: Props) {
 
       await vaultUnlock(passphrase, salt, wrappedKey)
 
+      // TEMP INSTRUMENTATION — remove after investigation
+      console.log('[UnlockForm] vaultUnlock resolved, isVaultUnlocked =', (await import('@/lib/crypto/vault')).isVaultUnlocked())
+
       finishProgressAnimation()
       setStatus('unlocked')
       const safeNext =
         next && (next.startsWith('/vault') || next.startsWith('/session')) ? next : '/vault'
+      console.log('[UnlockForm] calling router.push to', safeNext)
       router.push(safeNext)
     } catch (err) {
       finishProgressAnimation()

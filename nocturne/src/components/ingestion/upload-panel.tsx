@@ -23,6 +23,9 @@ export function UploadPanel({ sessionId, userId }: Props) {
   const setHasStudyGuide = useSessionStore((s) => s.setHasStudyGuide)
 
   const [selectedFiles, setSelectedFiles] = useState<Partial<Record<FileType, File>>>({})
+  // Handwritten zone allows multiple files — stored separately so the panel can
+  // display the count and build the ingestion array correctly.
+  const [selectedHandwrittenFiles, setSelectedHandwrittenFiles] = useState<File[]>([])
   const [progress, setProgress] = useState<FileProgress[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,26 +33,41 @@ export function UploadPanel({ sessionId, userId }: Props) {
   const supabase = createClient()
 
   const handleFileSelect = useCallback((type: FileType, file: File) => {
-    setSelectedFiles((prev) => ({ ...prev, [type]: file }))
+    if (type === 'handwritten') {
+      setSelectedHandwrittenFiles((prev) => [...prev, file])
+    } else {
+      setSelectedFiles((prev) => ({ ...prev, [type]: file }))
+    }
   }, [])
 
   async function handleUpload() {
     const entries = Object.entries(selectedFiles) as [FileType, File][]
-    if (entries.length === 0) return
+    if (entries.length === 0 && selectedHandwrittenFiles.length === 0) return
 
     setIsUploading(true)
     setError(null)
 
     try {
-      const ingestionFiles: IngestionFile[] = await Promise.all(
-        entries.map(async ([type, file]) => ({
-          data: await file.arrayBuffer(),
-          name: file.name,
-          mimeType: file.type,
-          type,
-          sizeBytes: file.size,
-        })),
-      )
+      const ingestionFiles: IngestionFile[] = [
+        ...await Promise.all(
+          entries.map(async ([type, file]) => ({
+            data: await file.arrayBuffer(),
+            name: file.name,
+            mimeType: file.type,
+            type,
+            sizeBytes: file.size,
+          })),
+        ),
+        ...await Promise.all(
+          selectedHandwrittenFiles.map(async (file) => ({
+            data: await file.arrayBuffer(),
+            name: file.name,
+            mimeType: file.type,
+            type: 'handwritten' as const,
+            sizeBytes: file.size,
+          })),
+        ),
+      ]
 
       await addFilesToExistingSession(supabase, ingestionFiles, userId, sessionId, setProgress)
 
@@ -73,7 +91,7 @@ export function UploadPanel({ sessionId, userId }: Props) {
     }
   }
 
-  const hasFiles = Object.keys(selectedFiles).length > 0
+  const hasFiles = Object.keys(selectedFiles).length > 0 || selectedHandwrittenFiles.length > 0
 
   return (
     <motion.div
@@ -105,6 +123,7 @@ export function UploadPanel({ sessionId, userId }: Props) {
           <DropZone
             onFileSelect={handleFileSelect}
             selectedFiles={selectedFiles}
+            handwrittenFiles={selectedHandwrittenFiles}
             disabled={isUploading}
           />
         ) : (

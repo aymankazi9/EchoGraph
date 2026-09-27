@@ -24,10 +24,12 @@ import { AudioPlayer } from '@/components/audio/audio-player'
 import { PdfViewer, type PdfViewerHandle, type SlideEntry } from '@/components/pdf/pdf-viewer'
 import { SlideNavStrip } from '@/components/pdf/slide-nav-strip'
 import { FlashcardPanel } from '@/components/study-guide/flashcard-panel'
+import { QuizPanel } from '@/components/study-guide/quiz-panel'
 import { NotesEditor } from '@/components/notes/notes-editor'
 import { AskPanel } from '@/components/ask/ask-panel'
 import { hasAccess, type Tier } from '@/lib/tiers/features'
 import { LockedFeature } from '@/components/paywall/locked-feature'
+import { PublishDeckModal } from '@/components/community/publish-deck-modal'
 import type { TranscriptWordEntry, StoredKeyword, Flashcard } from '@/store/session-store'
 import type { InputKeyword, ScoredKeyword } from '@/lib/scoring/keyword-scorer'
 import { diffKeywords, normalizeTerm } from '@/lib/rescore/keyword-diff'
@@ -49,7 +51,8 @@ interface Session {
   has_study_guide: boolean
   guide_type: string | null
   status: string
-  course_tag: string | null
+  course_id: string | null
+  courses: { name: string; exam_date: string | null } | null
 }
 
 interface Props {
@@ -65,19 +68,26 @@ interface Props {
    * immediately without a page reload.
    */
   audioFiles: { id: string; storage_path: string }[]
+  /** Handwritten image/PDF uploads, ordered by session_files.order_index. */
+  handwrittenFiles: { id: string; storage_path: string; orderIndex: number }[]
   initialUserField: string | null
   domainPromptDismissed: boolean
   userTier: Tier
+  /** Deep-link: open this tab on mount (validated by page.tsx). */
+  initialTab?: Tab
+  /** Deep-link: scroll the Study queue to this flashcard ID on mount. */
+  initialFlashcardId?: string
 }
 
 // Which tabs require an upgraded plan.
 const TAB_GATES: Partial<Record<Tab, 'midnight' | 'eclipse'>> = {
   study: 'midnight',
   notes: 'midnight',
-  ask: 'eclipse',
+  quiz:  'eclipse',
+  ask:   'eclipse',
 }
 
-type Tab = 'lecture' | 'study' | 'notes' | 'ask'
+type Tab = 'lecture' | 'study' | 'quiz' | 'notes' | 'ask'
 
 // Data computed during the score phase, held for deferred execution if user confirmation is required.
 interface RescorePayload {
@@ -103,9 +113,9 @@ function formatTime(ms: number): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles, initialUserField, domainPromptDismissed, userTier }: Props) {
+export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles, handwrittenFiles, initialUserField, domainPromptDismissed, userTier, initialTab, initialFlashcardId }: Props) {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>('lecture')
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'lecture')
   const [isScoring, setIsScoring] = useState(false)
   // Synchronous guard for handleScore — prevents the race where two callers
   // both read isScoring===false before React flushes setIsScoring(true).
@@ -117,6 +127,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   // block auto-score or the data load-back.
   const [liveSessionStatus, setLiveSessionStatus] = useState(session.status)
   const [guideModalOpen, setGuideModalOpen] = useState(false)
+  const [publishDeckOpen, setPublishDeckOpen] = useState(false)
   const [pendingRescore, setPendingRescore] = useState<{ payload: RescorePayload; reviewCount: number } | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [liveStatus, setLiveStatus] = useState<LiveStatus>({ phase: 'idle' })
@@ -137,6 +148,9 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   const [transcriptionProgress, setTranscriptionProgress] = useState<TranscriptionProgress | null>(null)
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
   const [isLoadingTranscript, setIsLoadingTranscript] = useState(false)
+  // Decrypted and concatenated OCR text from handwritten uploads.
+  // Populated by an effect on mount; fed into guideText during keyword extraction.
+  const [handwrittenOcrText, setHandwrittenOcrText] = useState<string | null>(null)
   const pdfViewerRef = useRef<PdfViewerHandle | null>(null)
   const playTrackedRef = useRef(false)
   // Holds the decrypted plain-text of the current note once the Notes tab is opened.
@@ -195,6 +209,61 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
     }
     void init()
   }, [router, session.title_encrypted]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Handwritten OCR — check for cached text, trigger if absent ──────────
+  useEffect(() => {
+    if (!handwrittenFiles.length) return
+
+    void (async () => {
+      if (!isVaultUnlocked()) {
+        const restored = await vaultRestoreFromCache()
+        if (!restored) return
+      }
+      const mk = getMasterKey()
+      if (!mk) return
+
+      const decrypt = (enc: string) => decryptText(mk, enc).catch(() => '')
+
+      // Return cached OCR text if all files already have rows.
+      const { data: existing } = await supabase
+        .from('handwritten_pages')
+        .select('text_encrypted, order_index')
+        .eq('session_id', session.id)
+        .order('order_index')
+
+      if (existing && existing.length >= handwrittenFiles.length) {
+        const texts = await Promise.all(
+          existing.map((r) => r.text_encrypted ? decrypt(r.text_encrypted as string) : Promise.resolve(''))
+        )
+        setHandwrittenOcrText(texts.filter(Boolean).join('\n\n'))
+        return
+      }
+
+      // Run OCR for missing files — dynamic import avoids pulling browser-only
+      // fetchAndDecryptFile into the server bundle.
+      const { extractHandwrittenText } = await import('@/lib/handwritten/extractor')
+      await extractHandwrittenText(
+        handwrittenFiles.map((f) => ({ fileId: f.id, storagePath: f.storage_path, orderIndex: f.orderIndex })),
+        session.id,
+        mk,
+        supabase,
+      )
+
+      // Read back the newly stored rows.
+      const { data: newRows } = await supabase
+        .from('handwritten_pages')
+        .select('text_encrypted, order_index')
+        .eq('session_id', session.id)
+        .order('order_index')
+
+      if (newRows) {
+        const texts = await Promise.all(
+          newRows.map((r) => r.text_encrypted ? decrypt(r.text_encrypted as string) : Promise.resolve(''))
+        )
+        setHandwrittenOcrText(texts.filter(Boolean).join('\n\n'))
+      }
+    })()
+  }, [session.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Refresh session status from DB on mount ──────────────────────────────
   // Covers the case where the SSR-rendered status was 'ingesting' and has since
@@ -774,15 +843,18 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           inputKws = payload.terms.map((t) => ({ term: t, source: 'anki' as const }))
           guideType = 'anki'
         } else {
-          // LLM extraction path (guide text provided, or null = infer from lecture only)
-          const guideText = payload.type === 'extract' ? payload.guideText : payload.rawText
+          // LLM extraction path (guide text provided, or null = infer from lecture only).
+          // Handwritten OCR text is treated as an additional guide source — same 'guide'
+          // source tag, same Red Zone treatment, same 'both' bonus when corroborated.
+          const typedGuideText = payload.type === 'extract' ? payload.guideText : payload.rawText
+          const guideText = [typedGuideText, handwrittenOcrText].filter(Boolean).join('\n\n') || null
           const hasGuide = !!guideText?.trim()
           guideType = hasGuide ? 'real_guide' : 'synthetic'
 
           const resp = await fetch('/api/extract/keywords', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ sessionId: session.id, guideText: guideText ?? null, transcriptText, slides }),
+            body: JSON.stringify({ sessionId: session.id, guideText, transcriptText, slides }),
           })
 
           if (!resp.ok) {
@@ -1147,7 +1219,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
         {/* Center: mode tabs */}
         <div style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 10, border: '1px solid #1E1E2E', background: '#0D0D14', flexShrink: 0 }}>
-          {(['lecture', 'study', 'notes', 'ask'] as Tab[]).map((t) => {
+          {(['lecture', 'study', 'quiz', 'notes', 'ask'] as Tab[]).map((t) => {
             const gate = TAB_GATES[t]
             const locked = !!gate && !hasAccess(userTier, gate)
             const active = tab === t
@@ -1193,7 +1265,12 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             </svg>
             Study guide
           </button>
-          <CourseTagPicker sessionId={session.id} initialTag={session.course_tag} />
+          <CourseTagPicker
+            sessionId={session.id}
+            userId={userId}
+            initialCourseId={session.course_id}
+            initialCourseName={session.courses?.name ?? null}
+          />
           <SessionSearchBar
             transcriptWords={transcriptWords}
             keywords={keywords}
@@ -1231,7 +1308,31 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               description="Review flashcards with spaced repetition, track mastery, and see per-keyword progress — unlocked on Midnight."
             />
           ) : flashcards.length > 0 ? (
-            <FlashcardPanel sessionTitle={sessionTitle ?? ''} sessionId={session.id} userId={userId} />
+            <>
+              {hasAccess(userTier, 'eclipse') && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPublishDeckOpen(true)}
+                    style={{
+                      height: 30, padding: '0 12px',
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      borderRadius: 8,
+                      border: '1px solid rgba(99,102,241,0.35)',
+                      background: 'rgba(99,102,241,0.08)',
+                      color: '#818CF8', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="14" cy="4" r="2" /><circle cx="4" cy="9" r="2" /><circle cx="14" cy="14" r="2" />
+                      <path d="M6 10 L12 13 M6 8 L12 5" />
+                    </svg>
+                    Publish to room
+                  </button>
+                </div>
+              )}
+              <FlashcardPanel sessionTitle={sessionTitle ?? ''} sessionId={session.id} userId={userId} examDate={(session.courses as unknown as { exam_date: string | null } | null)?.exam_date ?? null} initialFlashcardId={initialFlashcardId} />
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
               <span className="text-text-tertiary text-body-sm">No flashcards yet — add a study guide or let Nocturne score your slides.</span>
@@ -1257,6 +1358,26 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         </div>
       )}
 
+      {/* QUIZ mode */}
+      {tab === 'quiz' && (
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 flex flex-col">
+          {!hasAccess(userTier, 'eclipse') ? (
+            <LockedFeature
+              requiredTier="eclipse"
+              feature="Quiz"
+              description="Generate multiple-choice questions from your flashcard deck — AI-crafted distractors grounded in your lecture content, scored separately from spaced repetition."
+            />
+          ) : (
+            <QuizPanel
+              sessionId={session.id}
+              userId={userId}
+              courseId={session.course_id ?? null}
+              courseName={session.courses?.name ?? null}
+            />
+          )}
+        </div>
+      )}
+
       {/* NOTES mode */}
       {tab === 'notes' && (
         <div className="flex-1 min-h-0 flex flex-col p-6">
@@ -1270,6 +1391,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             <NotesEditor
               sessionId={session.id}
               userId={userId}
+              userTier={userTier}
               totalSlides={totalPages}
               onGoToSlide={(slideIndex) => {
                 setTab('lecture')
@@ -1292,7 +1414,12 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               description="Ask questions grounded in this session's slides and transcript — answered by Claude using only your lecture content."
             />
           ) : (
-            <AskPanel sessionId={session.id} userId={userId} />
+            <AskPanel
+              sessionId={session.id}
+              userId={userId}
+              courseId={session.course_id ?? null}
+              courseName={session.courses?.name ?? null}
+            />
           )}
         </div>
       )}
@@ -1685,6 +1812,16 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Publish deck modal ───────────────────────────────────────────── */}
+      {publishDeckOpen && (
+        <PublishDeckModal
+          sessionId={session.id}
+          sessionTitle={sessionTitle ?? ''}
+          flashcards={flashcards}
+          onClose={() => setPublishDeckOpen(false)}
+        />
       )}
     </div>
   )

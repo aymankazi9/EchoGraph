@@ -24,6 +24,18 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { createClient } from '@/lib/supabase'
 
+// Eight distinct hues for course colour tags — deterministic from course_id UUID.
+const COURSE_COLORS = [
+  '#6366F1', '#8B5CF6', '#0EA5E9', '#14B8A6',
+  '#F59E0B', '#F43F5E', '#22D3EE', '#4ADE80',
+]
+
+function courseColorFromId(courseId: string): string {
+  const hex = courseId.replace(/-/g, '').slice(0, 8)
+  const n = parseInt(hex, 16) || 0
+  return COURSE_COLORS[n % COURSE_COLORS.length]!
+}
+
 interface Props {
   id: string
   title: string | null
@@ -40,6 +52,10 @@ interface Props {
   onRename: (id: string, newTitle: string) => Promise<void>
   /** When non-empty, highlights the matched substring in the title. */
   highlightQuery?: string
+  /** Course UUID — used to render a left-border colour tag (Midnight+). */
+  courseId?: string | null
+  /** True when the user's tier allows course colour tags. */
+  showCourseTag?: boolean
 }
 
 function formatDate(iso: string): string {
@@ -83,8 +99,10 @@ function HighlightedTitle({ title, query }: { title: string; query: string }) {
 
 export function SessionCard({
   id, title, status, hasSlides, hasAudio, hasStudyGuide, guideType,
-  createdAt, redZoneCount, slideCount, sizeMB, onDelete, onRename, highlightQuery = '',
+  createdAt, redZoneCount, slideCount, sizeMB, onDelete, onRename,
+  highlightQuery = '', courseId, showCourseTag = false,
 }: Props) {
+  const courseColor = showCourseTag && courseId ? courseColorFromId(courseId) : null
   const router = useRouter()
   const renameInputRef = useRef<HTMLInputElement>(null)
   const [deleting, setDeleting] = useState(false)
@@ -164,6 +182,7 @@ export function SessionCard({
       whileHover="hover"
       exit={{ opacity: 0, height: 0, marginBottom: 0, transition: { duration: 0.2 } }}
       className="group relative flex flex-col gap-3 p-4 rounded-card border border-border-default bg-bg-elevated cursor-pointer hover:border-border-strong transition-colors duration-75"
+      style={courseColor ? { borderLeftColor: courseColor, borderLeftWidth: 3 } : undefined}
       onClick={navigateToSession}
     >
       {/* Row 1 — status + date */}

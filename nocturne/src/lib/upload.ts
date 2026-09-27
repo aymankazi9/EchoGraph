@@ -5,7 +5,7 @@ import { getMasterKey } from '@/lib/crypto/vault'
 import { encryptText } from '@/lib/crypto/encrypt'
 import { db } from '@/lib/db/dexie'
 
-export type FileType = 'pdf' | 'audio' | 'guide'
+export type FileType = 'pdf' | 'audio' | 'guide' | 'handwritten'
 
 export interface IngestionFile {
   /**

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence } from 'framer-motion'
 import { Plus, RefreshCw } from 'lucide-react'
-import { getMasterKey, isVaultUnlocked, vaultRestoreFromCache } from '@/lib/crypto/vault'
+import { getMasterKey, isVaultUnlocked } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
 import { encryptText } from '@/lib/crypto/encrypt'
 import { createClient } from '@/lib/supabase'
@@ -22,6 +22,7 @@ import { GettingStarted } from './getting-started'
 import { MomentumRibbon } from './momentum-ribbon'
 import { ContinueCard, type ContinueSessionData } from './continue-card'
 import { StatTiles, type VaultStats } from './stat-tiles'
+import { hasAccess, type Tier } from '@/lib/tiers/features'
 
 interface RawSession {
   id: string
@@ -32,6 +33,7 @@ interface RawSession {
   guide_type: string | null
   status: string
   created_at: string
+  course_id?: string | null
 }
 
 interface Props {
@@ -47,6 +49,7 @@ interface Props {
   checklistExported: boolean
   continueSession: ContinueSessionData | null
   stats: VaultStats
+  tier: Tier
 }
 
 export function VaultDashboardClient({
@@ -62,7 +65,9 @@ export function VaultDashboardClient({
   checklistExported,
   continueSession,
   stats,
+  tier,
 }: Props) {
+  const showCourseTag = hasAccess(tier, 'midnight')
   const router = useRouter()
   const pathname = usePathname()
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -86,20 +91,22 @@ export function VaultDashboardClient({
   // ── Load sessions into store on mount ──────────────────────────────────────
   useEffect(() => {
     async function init() {
+      // TEMP INSTRUMENTATION — remove after investigation
+      console.log('[VaultDashboardClient] effect fired, isVaultUnlocked =', isVaultUnlocked())
       if (!isVaultUnlocked()) {
-        // Try to restore the MK from the session cache before redirecting.
-        // If vault-warm is still alive and the tab has the cache entries, this
-        // succeeds silently and the user never sees the /unlock page.
-        const restored = await vaultRestoreFromCache()
-        if (!restored) {
-          router.replace(`/unlock?next=${encodeURIComponent(pathname)}`)
-          return
-        }
+        // AppShell's guard already ran vaultRestoreFromCache() before rendering
+        // children — if we reach here with the vault still locked, the restore
+        // already failed upstream and AppShell has issued the /unlock redirect.
+        console.log('[VaultDashboardClient] decision: vault still locked, redirecting')
+        router.replace(`/unlock?next=${encodeURIComponent(pathname)}`)
+        return
       }
+      console.log('[VaultDashboardClient] decision: vault unlocked, loading sessions')
       const rows: SessionRow[] = sessions.map((s) => ({
         ...s,
         red_zone_count: redZoneCounts[s.id] ?? 0,
         storage_used_bytes: fileSizeBytes[s.id] ?? 0,
+        course_id: s.course_id ?? null,
       }))
       setSessions(rows)
     }
@@ -174,7 +181,7 @@ export function VaultDashboardClient({
     try {
       const { data } = await supabase
         .from('sessions')
-        .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, created_at')
+        .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, created_at, course_id')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
       if (data) {
@@ -184,6 +191,7 @@ export function VaultDashboardClient({
           ...s,
           red_zone_count: existingMap[s.id]?.red_zone_count ?? 0,
           storage_used_bytes: existingMap[s.id]?.storage_used_bytes ?? 0,
+          course_id: (s as { course_id?: string | null }).course_id ?? null,
         }))
         useDashboardStore.getState().setSessions(rows)
       }
@@ -347,6 +355,8 @@ export function VaultDashboardClient({
                 onDelete={handleDelete}
                 onRename={handleRename}
                 highlightQuery={searchQuery}
+                courseId={s.course_id}
+                showCourseTag={showCourseTag}
               />
             ))}
           </AnimatePresence>

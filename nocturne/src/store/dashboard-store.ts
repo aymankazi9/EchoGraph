@@ -14,6 +14,7 @@ export interface SessionRow {
   created_at: string
   red_zone_count: number
   storage_used_bytes: number
+  course_id?: string | null
 }
 
 export type StatusFilter =

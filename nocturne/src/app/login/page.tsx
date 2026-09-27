@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { AuthBrandCanvas } from '@/components/auth/auth-brand-canvas'
+import { MagicLinkSentCard } from '@/components/auth/magic-link-sent'
 
 function LoginContent() {
   const heroRef = useRef<HTMLElement>(null)
@@ -14,14 +15,16 @@ function LoginContent() {
   const [sent, setSent] = useState(false)
   const [sentEmail, setSentEmail] = useState('')
   const [showError, setShowError] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   const searchParams = useSearchParams()
 
   // Read and surface auth errors redirected back from /auth/callback.
   const authError = searchParams.get('error')
   const AUTH_ERROR_MESSAGES: Record<string, string> = {
-    auth_failed:    'Something went wrong signing in — please try again.',
-    missing_code:   'The sign-in link was incomplete — please try again.',
+    auth_failed:     'Something went wrong signing in — please try again.',
+    missing_code:    'The sign-in link was incomplete — please try again.',
     session_expired: 'Sign-in session expired — please try again.',
+    link_expired:    'This sign-in link has expired or was already used — request a new one.',
   }
   const authErrorMsg = authError
     ? (AUTH_ERROR_MESSAGES[authError] ?? 'Sign-in failed — please try again.')
@@ -62,14 +65,24 @@ function LoginContent() {
     const v = email.trim()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { setShowError(true); return }
     setShowError(false)
+    setSendError(null)
     setLoading(true)
     const supabase = createClient()
-    await supabase.auth.signInWithOtp({ email: v, options: { emailRedirectTo: callbackUrl() } })
-    setSent(true); setSentEmail(v); setLoading(false)
+    const { error } = await supabase.auth.signInWithOtp({
+      email: v,
+      options: { emailRedirectTo: callbackUrl() },
+    })
+    setLoading(false)
+    if (error) {
+      setSendError(error.message || 'Could not send sign-in link — please try again.')
+      return
+    }
+    setSent(true)
+    setSentEmail(v)
   }
 
   function onReset() {
-    setSent(false); setSentEmail(''); setEmail('')
+    setSent(false); setSentEmail(''); setEmail(''); setSendError(null)
   }
 
   function onKey(e: React.KeyboardEvent) {
@@ -203,11 +216,12 @@ function LoginContent() {
                 type="email"
                 placeholder="you@university.edu"
                 value={email}
-                onChange={e => { setEmail(e.target.value); setShowError(false) }}
+                onChange={e => { setEmail(e.target.value); setShowError(false); setSendError(null) }}
                 onKeyDown={onKey}
                 style={{ width: '100%', height: 46, borderRadius: 9, background: '#13121C', border: '1px solid #2D2B45', color: '#E2E8F0', padding: '0 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
               />
               {showError && <p style={{ fontSize: 12, color: '#FB7185', margin: '8px 0 0' }}>Enter a valid email address.</p>}
+              {sendError && <p style={{ fontSize: 12, color: '#FB7185', margin: '8px 0 0' }}>{sendError}</p>}
               <button
                 data-btn
                 data-shine
@@ -219,21 +233,7 @@ function LoginContent() {
               </button>
             </div>
           ) : (
-            <div data-anim style={{ border: '1px solid rgba(99,102,241,0.32)', background: 'rgba(99,102,241,0.07)', borderRadius: 11, padding: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <span style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(99,102,241,0.16)', border: '1px solid rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A5B4FC', flexShrink: 0 }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <rect x="2" y="4" width="20" height="16" rx="2" />
-                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                  </svg>
-                </span>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#E2E8F0' }}>Check your inbox</span>
-              </div>
-              <p style={{ fontSize: 13.5, lineHeight: 1.6, color: '#94A3B8', margin: 0 }}>
-                We sent a secure sign-in link to <span style={{ color: '#E2E8F0' }}>{sentEmail}</span>. It expires in 15 minutes.
-              </p>
-              <button onClick={onReset} data-link style={{ position: 'relative', marginTop: 14, background: 'none', border: 'none', padding: 0, fontSize: 13, color: '#818CF8', cursor: 'pointer' }}>Use a different email</button>
-            </div>
+            <MagicLinkSentCard email={sentEmail} onReset={onReset} />
           )}
 
           {/* Reassurance */}

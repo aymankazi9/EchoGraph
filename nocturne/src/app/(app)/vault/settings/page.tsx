@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase-server'
 import { getUserTier } from '@/lib/tiers/server'
 import { Separator } from '@/components/ui/separator'
 import { AccountSection } from '@/components/settings/account-section'
+import { AppearanceSection } from '@/components/settings/appearance-section'
 import { PreferencesSection } from '@/components/settings/preferences-section'
 import { StorageSection } from '@/components/settings/storage-section'
 import { SecuritySection } from '@/components/settings/security-section'
@@ -80,6 +81,10 @@ export default async function SettingsPage() {
           createdAt={profile.created_at ?? user.created_at}
           tier={userTier}
         />
+
+        <Separator className="bg-border-subtle" />
+
+        <AppearanceSection tier={userTier} />
 
         <Separator className="bg-border-subtle" />
 

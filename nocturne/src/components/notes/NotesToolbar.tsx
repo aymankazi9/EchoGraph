@@ -19,6 +19,7 @@
 import { createPortal } from 'react-dom'
 import { useState, useEffect, useRef } from 'react'
 import type { Editor } from '@tiptap/react'
+import { MathPopover, insertMath } from './math-extension'
 
 // ─── Shared atoms ─────────────────────────────────────────────────────────────
 
@@ -365,6 +366,75 @@ function HighlightBtn({ editor }: { editor: Editor }) {
   )
 }
 
+// ─── Math insertion button ────────────────────────────────────────────────────
+// Opens a KaTeX input popover with an Inline / Display mode toggle.
+
+function MathBtn({ editor }: { editor: Editor }) {
+  const [open, setOpen]       = useState(false)
+  const [display, setDisplay] = useState(false)
+  const buttonRef             = useRef<HTMLButtonElement>(null)
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setOpen((v) => !v)
+  }
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        title="Insert equation (Σ)"
+        onMouseDown={handleToggle}
+        style={{
+          width: 28, height: 28,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: 'none', borderRadius: 5, cursor: 'pointer',
+          background: open ? 'rgba(99,102,241,0.15)' : 'transparent',
+          color:      open ? '#A5B4FC' : '#5B6478',
+          transition: 'background 0.1s, color 0.1s',
+          fontSize: 14, fontStyle: 'italic', fontFamily: 'Georgia, serif',
+          flexShrink: 0,
+        }}
+      >
+        Σ
+      </button>
+
+      {open && (
+        <MathPopover
+          latex=""
+          displayMode={display}
+          anchorRef={buttonRef}
+          onConfirm={(latex) => {
+            if (latex.trim()) insertMath(editor, latex.trim(), display)
+            setOpen(false)
+          }}
+          onCancel={() => setOpen(false)}
+        >
+          {/* Inline / Display toggle */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+            {(['Inline', 'Display'] as const).map((label, i) => (
+              <button
+                key={label}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); setDisplay(i === 1) }}
+                style={{
+                  fontSize: 11, padding: '3px 9px', borderRadius: 5, cursor: 'pointer',
+                  background: (i === 1) === display ? 'rgba(99,102,241,0.18)' : 'transparent',
+                  color:      (i === 1) === display ? '#A5B4FC' : '#5B6478',
+                  border:     (i === 1) === display ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </MathPopover>
+      )}
+    </>
+  )
+}
+
 // ─── Fixed toolbar ─────────────────────────────────────────────────────────────
 
 // Re-renders on every editor transaction so isActive() / can() stay in sync.
@@ -439,6 +509,9 @@ export function NotesToolbar({ editor }: { editor: Editor | null }) {
 
       {/* ── Highlight ─────────────────────────────────────────────────────── */}
       <HighlightBtn editor={editor} />
+
+      {/* ── Math ──────────────────────────────────────────────────────────── */}
+      <MathBtn editor={editor} />
 
       {/* Push undo/redo to the right */}
       <div style={{ flex: 1 }} />

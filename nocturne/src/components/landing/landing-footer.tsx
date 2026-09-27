@@ -148,7 +148,7 @@ export function LandingFooter() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          {/* <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
             <a
               href="https://github.com/nocturne"
               target="_blank"
@@ -187,7 +187,7 @@ export function LandingFooter() {
             >
               X / Twitter
             </a>
-          </div>
+          </div> */}
         </div>
       </div>
     </footer>

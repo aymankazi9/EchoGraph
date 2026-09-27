@@ -3,12 +3,19 @@ import { createServerClient } from '@/lib/supabase-server'
 import { getUserTier } from '@/lib/tiers/server'
 import { SessionClient } from './SessionClient'
 
+const VALID_TABS = ['lecture', 'study', 'quiz', 'notes', 'ask'] as const
+type ValidTab = (typeof VALID_TABS)[number]
+
 export default async function SessionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string; fcid?: string }>
 }) {
   const { id: sessionId } = await params
+  const { tab: tabParam, fcid } = await searchParams
+  const initialTab = tabParam && VALID_TABS.includes(tabParam as ValidTab) ? (tabParam as ValidTab) : undefined
   const supabase = await createServerClient()
 
   const {
@@ -18,7 +25,7 @@ export default async function SessionPage({
 
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
-    .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, course_tag')
+    .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, course_id, courses(name, exam_date)')
     .eq('id', sessionId)
     .eq('user_id', user.id)
     .single()
@@ -73,16 +80,29 @@ export default async function SessionPage({
     .map((r) => fileMap.get(r.file_id as string))
     .filter((f): f is FileRow => f != null)
 
+  // Handwritten image/PDF uploads — ordered; OCR runs client-side on first load.
+  type HandwrittenFileRow = { id: string; storage_path: string; orderIndex: number }
+  const handwrittenFiles: HandwrittenFileRow[] = (sfRows ?? [])
+    .filter((r) => r.role === 'handwritten')
+    .map((r) => {
+      const f = fileMap.get(r.file_id as string)
+      return f ? { id: f.id, storage_path: f.storage_path, orderIndex: r.order_index as number } : null
+    })
+    .filter((f): f is HandwrittenFileRow => f != null)
+
   return (
     <SessionClient
       userId={user.id}
-      session={session}
+      session={session as unknown as Parameters<typeof SessionClient>[0]['session']}
       pdfFile={pdfFile}
       slideFiles={slideFiles}
       audioFiles={audioFiles}
+      handwrittenFiles={handwrittenFiles}
       initialUserField={userProfile?.field ?? null}
       domainPromptDismissed={userProfile?.domain_prompt_dismissed ?? false}
       userTier={userTier}
+      initialTab={initialTab}
+      initialFlashcardId={fcid}
     />
   )
 }

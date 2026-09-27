@@ -28,6 +28,10 @@ interface Props {
   sessionTitle: string
   sessionId: string
   userId: string
+  /** ISO date string "YYYY-MM-DD" from courses.exam_date, or null if unset. */
+  examDate: string | null
+  /** Deep-link: jump to this flashcard ID when the queue is first built. Consumed once. */
+  initialFlashcardId?: string
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -58,17 +62,80 @@ function isNeedsWork(fc: Flashcard, reviewMap: Record<string, LatestReview>): bo
   return !r || r.rating === 'again' || r.rating === 'hard'
 }
 
-function getFiltered(
+// ── Exam-date helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Returns fractional days until the exam starts (midnight local time on examDate).
+ * Negative means the exam date has passed. Infinity when no exam date is set.
+ */
+function daysUntilExam(examDate: string | null): number {
+  if (!examDate) return Infinity
+  // Append T00:00:00 so the Date constructor uses local midnight, not UTC midnight.
+  const examMs = new Date(examDate + 'T00:00:00').getTime()
+  return (examMs - Date.now()) / 86400000
+}
+
+/**
+ * Formats a millisecond countdown into a compact string for the urgency banner.
+ * Shows h+m when ≥ 1 hour remaining, m+s when < 1 hour.
+ */
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return 'Exam time!'
+  const totalSec = Math.floor(ms / 1000)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`
+  return `${m}m ${String(s).padStart(2, '0')}s`
+}
+
+// ── Queue building ─────────────────────────────────────────────────────────────
+//
+// Normal mode (exam > 7 days away or no exam):
+//   Reviewed cards sorted by dueAt ascending (most overdue first).
+//   New/unreviewed cards placed at the end.
+//
+// Pre-exam mode (exam ≤ 7 days away):
+//   Red Zone cards before Likely, regardless of due date.
+//   Within each zone, same dueAt ascending order.
+//
+// The sort is stable — cards with identical due dates keep their original
+// relative order.  The sort runs once when the queue is snapshotted; it does
+// not re-sort live during a session.
+
+function buildQueue(
   cards: Flashcard[],
   filter: Filter,
   reviewMap: Record<string, LatestReview>,
+  examDate: string | null,
 ): Flashcard[] {
-  switch (filter) {
-    case 'red':        return cards.filter(fc => fc.zone === 'red')
-    case 'likely':     return cards.filter(fc => fc.zone === 'likely')
-    case 'needs_work': return cards.filter(fc => isNeedsWork(fc, reviewMap))
-    default:           return cards
-  }
+  const filtered = (() => {
+    switch (filter) {
+      case 'red':        return cards.filter(fc => fc.zone === 'red')
+      case 'likely':     return cards.filter(fc => fc.zone === 'likely')
+      case 'needs_work': return cards.filter(fc => isNeedsWork(fc, reviewMap))
+      default:           return cards
+    }
+  })()
+
+  const days = daysUntilExam(examDate)
+  const preExam = days > 0 && days <= 7  // positive = exam hasn't happened
+
+  return [...filtered].sort((a, b) => {
+    // Pre-exam: Red Zone always before Likely.
+    if (preExam && a.zone !== b.zone) {
+      return a.zone === 'red' ? -1 : 1
+    }
+
+    // Within the same zone (or normal mode): order by dueAt ascending.
+    // New cards (no review entry) go to the end — they have no urgency signal.
+    const aReview = reviewMap[a.id]
+    const bReview = reviewMap[b.id]
+    if (!aReview && !bReview) return 0
+    if (!aReview) return 1
+    if (!bReview) return -1
+    return new Date(aReview.dueAt).getTime() - new Date(bReview.dueAt).getTime()
+  })
 }
 
 // ── Donut Ring ─────────────────────────────────────────────────────────────────
@@ -149,7 +216,7 @@ function MasteryBar({ intervalDays }: { intervalDays: number | undefined }) {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export function FlashcardPanel({ sessionTitle, sessionId, userId }: Props) {
+export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, initialFlashcardId }: Props) {
   const flashcards = useSessionStore((s) => s.flashcards)
   const loadFlashcards = useSessionStore((s) => s.loadFlashcards)
   const notify = useNotificationStore((s) => s.notify)
@@ -187,6 +254,44 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // stable within a session
 
+  // ── Exam Urgency Mode ───────────────────────────────────────────────────────
+  //
+  // Auto-activates when exam_date is within 48 hours (fractional days ≤ 2).
+  // Manually toggleable at any time. In this mode:
+  //   • Only Red Zone cards are queued (Likely Zone hidden).
+  //   • The card face shows Q+A simultaneously — no flip needed.
+  //   • A live countdown banner replaces the static pre-exam message.
+
+  const [urgencyMode, setUrgencyMode]   = useState(false)
+  const [countdownMs, setCountdownMs]   = useState<number | null>(null)
+
+  // Ref so the keyboard handler always sees the current value without needing
+  // it in the effect's dependency array.
+  const urgencyModeRef = useRef(urgencyMode)
+  urgencyModeRef.current = urgencyMode
+
+  // Guard: auto-activate only once per session mount, never re-trigger.
+  const autoActivatedRef = useRef(false)
+
+  useEffect(() => {
+    if (autoActivatedRef.current || !examDate) return
+    const days = daysUntilExam(examDate)
+    if (days > 0 && days <= 2) {
+      autoActivatedRef.current = true
+      setUrgencyMode(true)
+    }
+  }, [examDate])
+
+  // Live countdown — ticks every second while urgency mode is active.
+  useEffect(() => {
+    if (!urgencyMode || !examDate) { setCountdownMs(null); return }
+    const examMs = new Date(examDate + 'T00:00:00').getTime()
+    const tick = () => setCountdownMs(Math.max(0, examMs - Date.now()))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [urgencyMode, examDate])
+
   // ── Study queue — snapshot on filter change so queue is stable mid-session ──
 
   const [filter, setFilter] = useState<Filter>('all')
@@ -194,18 +299,35 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId }: Props) {
   const [cardIdx, setCardIdx] = useState(0)
   const [flipped, setFlipped] = useState(false)
 
-  // Snapshot queue when filter changes (or when reviews first load)
+  // Snapshot queue when filter changes (or when reviews first load).
+  // Both reviewMap and examDate are captured via refs so the effect dependency
+  // list stays stable — the queue is intentionally a snapshot, not live.
   const reviewMapRef = useRef(reviewMap)
   reviewMapRef.current = reviewMap
+  const examDateRef = useRef(examDate)
+  examDateRef.current = examDate
+
+  // Consumed once on first queue build — jumps to the deep-linked card then nulled out.
+  const initialFlashcardIdRef = useRef(initialFlashcardId ?? null)
+
+  // In urgency mode the effective filter is always 'red', overriding user selection.
+  const effectiveFilter: Filter = urgencyMode ? 'red' : filter
 
   useEffect(() => {
     if (!reviewsLoaded) return
-    setStudyQueue(getFiltered(flashcards, filter, reviewMapRef.current))
-    setCardIdx(0)
+    const queue = buildQueue(flashcards, effectiveFilter, reviewMapRef.current, examDateRef.current)
+    setStudyQueue(queue)
+    if (initialFlashcardIdRef.current) {
+      const idx = queue.findIndex((fc) => fc.id === initialFlashcardIdRef.current)
+      setCardIdx(idx >= 0 ? idx : 0)
+      initialFlashcardIdRef.current = null  // consume once — filter changes reset to 0 thereafter
+    } else {
+      setCardIdx(0)
+    }
     setFlipped(false)
     setSessionRatings({})
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, reviewsLoaded]) // intentionally excludes reviewMap — queue is stable mid-session
+  }, [effectiveFilter, reviewsLoaded]) // intentionally excludes reviewMap and examDate — queue is stable mid-session
 
   // ── Session tracking ────────────────────────────────────────────────────────
 
@@ -229,12 +351,13 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId }: Props) {
   } | null>(null)
   const [savingCard, setSavingCard] = useState(false)
 
-  // ── Keyboard: space to flip ─────────────────────────────────────────────────
+  // ── Keyboard: space to flip (disabled in urgency mode) ─────────────────────
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (e.code === 'Space') { e.preventDefault(); setFlipped(f => !f) }
+      // In urgency mode there is no flip — both sides are always visible.
+      if (e.code === 'Space' && !urgencyModeRef.current) { e.preventDefault(); setFlipped(f => !f) }
       if (e.code === 'ArrowLeft')  setCardIdx(i => Math.max(0, i - 1))
       if (e.code === 'ArrowRight') setCardIdx(i => Math.min(activeQueue.length - 1, i + 1))
     }
@@ -531,44 +654,173 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId }: Props) {
         gap: 0,
         paddingRight: 0,
       }}>
-        {/* Section header */}
+        {/* Section header — includes the Cram Mode toggle */}
         <div style={{ padding: '0 0 12px 0' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#3F485C', letterSpacing: '0.06em', textTransform: 'uppercase' }}>What to study</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#3F485C', letterSpacing: '0.06em', textTransform: 'uppercase' }}>What to study</span>
+            <button
+              type="button"
+              onClick={() => setUrgencyMode((m) => !m)}
+              title={urgencyMode ? 'Exit Exam Urgency Mode' : 'Enter Exam Urgency Mode — Red Zone only, answers visible'}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                height: 22, padding: '0 8px', borderRadius: 6,
+                border: urgencyMode
+                  ? '1px solid rgba(251,191,36,0.45)'
+                  : '1px solid #1E1D2A',
+                background: urgencyMode
+                  ? 'rgba(251,191,36,0.1)'
+                  : 'transparent',
+                color: urgencyMode ? '#FCD34D' : '#3F485C',
+                fontSize: 10.5, fontWeight: 600, cursor: 'pointer',
+                letterSpacing: '0.01em',
+                transition: 'all 0.15s',
+              }}
+            >
+              {urgencyMode ? '🌙 Exit cram' : '⚡ Cram mode'}
+            </button>
+          </div>
         </div>
 
-        {/* Filter pills */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-          {(['all', 'red', 'likely', 'needs_work'] as Filter[]).map(f => {
-            const labels: Record<Filter, string> = { all: 'All', red: 'Red Zone', likely: 'Likely', needs_work: 'Needs work' }
-            const active = filter === f && !missedOnlyQueue
-            return (
-              <button
-                key={f}
-                type="button"
-                onClick={() => { setMissedOnlyQueue(null); setFilter(f) }}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  height: 26, padding: '0 10px', borderRadius: 9999,
-                  border: active ? '1px solid rgba(99,102,241,0.5)' : '1px solid #1E1D2A',
-                  background: active ? 'rgba(99,102,241,0.12)' : '#0C0C13',
-                  color: active ? '#A5B4FC' : '#4B5563',
-                  fontSize: 12, cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {labels[f]}
-                <span style={{
-                  fontSize: 10, fontWeight: 600,
-                  color: active ? '#818CF8' : '#2D3748',
-                  background: active ? 'rgba(99,102,241,0.2)' : '#111',
-                  borderRadius: 9999, padding: '1px 5px',
-                }}>
-                  {filterCounts[f]}
+        {/* Urgency mode countdown banner — replaces the standard pre-exam banner */}
+        {urgencyMode && (
+          <div style={{
+            marginBottom: 14,
+            padding: '10px 12px',
+            borderRadius: 9,
+            border: '1px solid rgba(251,191,36,0.45)',
+            background: 'rgba(251,191,36,0.07)',
+            display: 'flex', flexDirection: 'column', gap: 5,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 13, lineHeight: 1 }}>🌙</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#FCD34D', letterSpacing: '0.01em' }}>
+                  Exam Urgency Mode
                 </span>
-              </button>
-            )
-          })}
-        </div>
+              </div>
+              {examDate && countdownMs !== null && countdownMs > 0 && (
+                <span style={{
+                  fontFamily: 'var(--font-mono, monospace)',
+                  fontSize: 12, fontWeight: 700,
+                  color: countdownMs < 3_600_000 ? '#FDA4AF' : '#FCD34D',
+                  flexShrink: 0,
+                }}>
+                  {formatCountdown(countdownMs)}
+                </span>
+              )}
+              {examDate && countdownMs === 0 && (
+                <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 700, color: '#FDA4AF' }}>
+                  Exam time!
+                </span>
+              )}
+            </div>
+            <p style={{ fontSize: 11, color: '#FBBF24', margin: 0, lineHeight: 1.4, opacity: 0.8 }}>
+              Red Zone only · answers visible · ← → to navigate
+            </p>
+          </div>
+        )}
+
+        {/* Standard pre-exam proximity banner (shown only outside urgency mode) */}
+        {!urgencyMode && examDate && (() => {
+          const days = daysUntilExam(examDate)
+          if (days <= 0 || days > 7) return null  // past or too far out
+
+          const nightBefore = days <= 2
+          const displayDate = new Date(examDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          const daysLabel   = days < 1 ? 'today' : days < 2 ? 'tomorrow' : `in ${Math.ceil(days)} day${Math.ceil(days) !== 1 ? 's' : ''}`
+
+          return (
+            <div style={{
+              marginBottom: 14,
+              padding: '9px 11px',
+              borderRadius: 9,
+              border: nightBefore
+                ? '1px solid rgba(251,191,36,0.4)'
+                : '1px solid rgba(251,113,133,0.25)',
+              background: nightBefore
+                ? 'rgba(251,191,36,0.07)'
+                : 'rgba(251,113,133,0.05)',
+              display: 'flex', flexDirection: 'column', gap: 3,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{ fontSize: 13, lineHeight: 1 }}>
+                  {nightBefore ? '🌙' : '📅'}
+                </span>
+                <span style={{
+                  fontSize: 12, fontWeight: 700,
+                  color: nightBefore ? '#FCD34D' : '#FDA4AF',
+                  letterSpacing: '0.01em',
+                }}>
+                  {nightBefore ? 'Night before exam' : 'Pre-exam mode'}
+                </span>
+              </div>
+              <p style={{ fontSize: 11.5, color: nightBefore ? '#FBBF24' : '#F87171', margin: 0, lineHeight: 1.45, opacity: 0.8 }}>
+                {nightBefore
+                  ? `Exam on ${displayDate} — Red Zone cards first.`
+                  : `Exam ${daysLabel} · Red Zone prioritized.`}
+              </p>
+            </div>
+          )
+        })()}
+
+        {/* Filter pills — in urgency mode only Red Zone is shown (locked) */}
+        {urgencyMode ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 16 }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              height: 26, padding: '0 10px', borderRadius: 9999,
+              border: '1px solid rgba(251,113,133,0.45)',
+              background: 'rgba(251,113,133,0.1)',
+              color: '#FDA4AF',
+              fontSize: 12, fontWeight: 500,
+            }}>
+              Red Zone
+              <span style={{
+                fontSize: 10, fontWeight: 600,
+                color: '#FDA4AF',
+                background: 'rgba(251,113,133,0.18)',
+                borderRadius: 9999, padding: '1px 5px',
+              }}>
+                {filterCounts.red}
+              </span>
+            </span>
+            <span style={{ fontSize: 11, color: '#3F485C' }}>only</span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+            {(['all', 'red', 'likely', 'needs_work'] as Filter[]).map(f => {
+              const labels: Record<Filter, string> = { all: 'All', red: 'Red Zone', likely: 'Likely', needs_work: 'Needs work' }
+              const active = filter === f && !missedOnlyQueue
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => { setMissedOnlyQueue(null); setFilter(f) }}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    height: 26, padding: '0 10px', borderRadius: 9999,
+                    border: active ? '1px solid rgba(99,102,241,0.5)' : '1px solid #1E1D2A',
+                    background: active ? 'rgba(99,102,241,0.12)' : '#0C0C13',
+                    color: active ? '#A5B4FC' : '#4B5563',
+                    fontSize: 12, cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {labels[f]}
+                  <span style={{
+                    fontSize: 10, fontWeight: 600,
+                    color: active ? '#818CF8' : '#2D3748',
+                    background: active ? 'rgba(99,102,241,0.2)' : '#111',
+                    borderRadius: 9999, padding: '1px 5px',
+                  }}>
+                    {filterCounts[f]}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {/* Scrollable card list */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, paddingRight: 8 }}>
@@ -681,47 +933,72 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId }: Props) {
               </span>
             </div>
 
-            {/* Flip card */}
-            <button
-              type="button"
-              onClick={() => setFlipped(f => !f)}
-              style={{
+            {/* Card face — urgency mode shows Q+A simultaneously; normal mode flips */}
+            {urgencyMode ? (
+              /* ── Urgency: Q and A always visible, no interaction required ── */
+              <div style={{
                 width: '100%',
                 minHeight: 200,
-                padding: '28px 24px',
+                padding: '24px',
                 borderRadius: 14,
-                cursor: 'pointer',
                 textAlign: 'left',
-                border: `1px solid ${card.zone === 'red' ? 'rgba(251,113,133,0.2)' : 'rgba(99,102,241,0.2)'}`,
+                border: `1px solid ${card.zone === 'red' ? 'rgba(251,113,133,0.22)' : 'rgba(99,102,241,0.2)'}`,
                 background: card.zone === 'red' ? 'rgba(251,113,133,0.04)' : 'rgba(99,102,241,0.04)',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 20,
+                display: 'flex', flexDirection: 'column', gap: 0,
                 marginBottom: 0,
-              }}
-            >
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={`${card.id}-${flipped ? 'back' : 'front'}`}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.0, 0.0, 0.2, 1.0] as [number, number, number, number] } }}
-                  exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
-                >
-                  {flipped ? (
-                    <div>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Answer</span>
-                      <p style={{ fontSize: 14, color: '#94A3B8', margin: 0, lineHeight: 1.65 }}>{card.back}</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Question</span>
-                      <p style={{ fontSize: 17, fontWeight: 600, color: '#E2E8F0', margin: 0, lineHeight: 1.4 }}>{card.front}</p>
-                    </div>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-              <span style={{ fontSize: 11, color: '#2D3748' }}>
-                {flipped ? 'Answer · click to see question' : 'tap to flip · space'}
-              </span>
-            </button>
+              }}>
+                <div>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Question</span>
+                  <p style={{ fontSize: 17, fontWeight: 600, color: '#E2E8F0', margin: '0 0 16px', lineHeight: 1.4 }}>{card.front}</p>
+                </div>
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 14 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Answer</span>
+                  <p style={{ fontSize: 14, color: '#94A3B8', margin: 0, lineHeight: 1.65 }}>{card.back}</p>
+                </div>
+              </div>
+            ) : (
+              /* ── Normal: flip card ─────────────────────────────────────── */
+              <button
+                type="button"
+                onClick={() => setFlipped(f => !f)}
+                style={{
+                  width: '100%',
+                  minHeight: 200,
+                  padding: '28px 24px',
+                  borderRadius: 14,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  border: `1px solid ${card.zone === 'red' ? 'rgba(251,113,133,0.2)' : 'rgba(99,102,241,0.2)'}`,
+                  background: card.zone === 'red' ? 'rgba(251,113,133,0.04)' : 'rgba(99,102,241,0.04)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 20,
+                  marginBottom: 0,
+                }}
+              >
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={`${card.id}-${flipped ? 'back' : 'front'}`}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.0, 0.0, 0.2, 1.0] as [number, number, number, number] } }}
+                    exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
+                  >
+                    {flipped ? (
+                      <div>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Answer</span>
+                        <p style={{ fontSize: 14, color: '#94A3B8', margin: 0, lineHeight: 1.65 }}>{card.back}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Question</span>
+                        <p style={{ fontSize: 17, fontWeight: 600, color: '#E2E8F0', margin: 0, lineHeight: 1.4 }}>{card.front}</p>
+                      </div>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+                <span style={{ fontSize: 11, color: '#2D3748' }}>
+                  {flipped ? 'Answer · click to see question' : 'tap to flip · space'}
+                </span>
+              </button>
+            )}
 
             {/* Navigation row */}
             <div style={{
