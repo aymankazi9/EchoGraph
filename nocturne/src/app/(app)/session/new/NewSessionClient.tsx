@@ -351,9 +351,15 @@ export function NewSessionClient({ userId, storageBytesUsed, storageCapBytes }: 
             const role       = lf.fileType === 'pdf' ? 'slide' : lf.fileType
             const orderIndex = roleCounters[role] ?? 0
             roleCounters[role] = orderIndex + 1
-            await supabase.from('session_files').insert({
+            const { error: sfErr } = await supabase.from('session_files').insert({
               session_id: sessionId, file_id: lf.id, role, order_index: orderIndex,
             })
+            if (sfErr) {
+              // Roll back the whole session — uploaded files remain in Library.
+              await supabase.from('sessions').delete().eq('id', sessionId)
+              await db.localSessions.delete(sessionId).catch(() => {})
+              throw new Error('Upload failed — please try again')
+            }
           }
           // Set any flags not already set by ingestFiles
           const flagUpdate: Record<string, boolean> = {}
@@ -370,7 +376,7 @@ export function NewSessionClient({ userId, storageBytesUsed, storageCapBytes }: 
         const hasAudio  = libraryFilesList.some((f) => f.fileType === 'audio')
         const hasGuide  = libraryFilesList.some((f) => f.fileType === 'guide')
 
-        await supabase.from('sessions').insert({
+        const { error: sessionErr } = await supabase.from('sessions').insert({
           id:              sessionId,
           user_id:         userId,
           title_encrypted: titleEncrypted,
@@ -379,6 +385,7 @@ export function NewSessionClient({ userId, storageBytesUsed, storageCapBytes }: 
           has_audio:       hasAudio,
           has_study_guide: hasGuide,
         })
+        if (sessionErr) throw new Error(`Failed to create session: ${sessionErr.message}`)
 
         await db.localSessions.add({
           id:           sessionId,
@@ -396,9 +403,15 @@ export function NewSessionClient({ userId, storageBytesUsed, storageCapBytes }: 
           const role       = lf.fileType === 'pdf' ? 'slide' : lf.fileType
           const orderIndex = roleCounters[role] ?? 0
           roleCounters[role] = orderIndex + 1
-          await supabase.from('session_files').insert({
+          const { error: sfErr } = await supabase.from('session_files').insert({
             session_id: sessionId, file_id: lf.id, role, order_index: orderIndex,
           })
+          if (sfErr) {
+            // Session is empty or partially linked — tear it down entirely.
+            await supabase.from('sessions').delete().eq('id', sessionId)
+            await db.localSessions.delete(sessionId).catch(() => {})
+            throw new Error('Upload failed — please try again')
+          }
         }
 
         await supabase.from('sessions').update({ status: 'ready' }).eq('id', sessionId)

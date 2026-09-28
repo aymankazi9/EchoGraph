@@ -180,7 +180,7 @@ export async function ingestFiles(
   const titleBase = files.find((f) => f.type === 'pdf')?.name ?? files[0]?.name ?? 'Untitled'
   const titleEncrypted = await encryptText(mk, titleBase.replace(/\.[^.]+$/, ''))
 
-  await supabase.from('sessions').insert({
+  const { error: sessionErr } = await supabase.from('sessions').insert({
     id: sessionId,
     user_id: userId,
     title_encrypted: titleEncrypted,
@@ -189,6 +189,7 @@ export async function ingestFiles(
     has_audio: files.some((f) => f.type === 'audio'),
     has_study_guide: files.some((f) => f.type === 'guide'),
   })
+  if (sessionErr) throw new Error(`Failed to create session: ${sessionErr.message}`)
 
   await db.localSessions.add({
     id: sessionId,
@@ -202,114 +203,142 @@ export async function ingestFiles(
   })
 
   // ── Per-file pipeline ─────────────────────────────────────────────────────
+  // Wrapped in try/catch so any mid-ingest failure tears down the session row
+  // rather than leaving it stuck in 'ingesting' state as a ghost. Files already
+  // in storage/Library before the failure remain intact — they're usable
+  // independently per E1 decoupling and the user can re-ingest from Library.
 
-  const roleCounters: Record<string, number> = {}
+  try {
+    const roleCounters: Record<string, number> = {}
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i]
-    const fp = progress[i]
-    const fileId = fp.fileId
-    let stepOffset = 0
-    let dataToEncrypt = file.data
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const fp = progress[i]
+      const fileId = fp.fileId
+      let stepOffset = 0
+      let dataToEncrypt = file.data
 
-    // Step A: transcode audio
-    if (file.type === 'audio') {
-      setStep(i, 0, { status: 'active', pct: 0 })
+      // Step A: transcode audio
+      if (file.type === 'audio') {
+        setStep(i, 0, { status: 'active', pct: 0 })
+        try {
+          dataToEncrypt = await transcodeAudio(file.data, file.mimeType, (pct) => {
+            setStep(i, 0, { pct })
+          })
+          setStep(i, 0, { status: 'done', pct: 100 })
+        } catch (err) {
+          setStep(i, 0, { status: 'error' })
+          throw err
+        }
+        stepOffset = 1
+      }
+
+      // Step B: encrypt
+      const encStep = stepOffset
+      setStep(i, encStep, { status: 'active', pct: 0 })
+      let bin: ArrayBuffer
+      let baseIVB64: string
       try {
-        dataToEncrypt = await transcodeAudio(file.data, file.mimeType, (pct) => {
-          setStep(i, 0, { pct })
-        })
-        setStep(i, 0, { status: 'done', pct: 100 })
+        ;({ bin, baseIVB64 } = await encryptData(dataToEncrypt, mk, (pct) => {
+          setStep(i, encStep, { pct })
+        }))
+        setStep(i, encStep, { status: 'done', pct: 100 })
       } catch (err) {
-        setStep(i, 0, { status: 'error' })
+        setStep(i, encStep, { status: 'error' })
         throw err
       }
-      stepOffset = 1
-    }
 
-    // Step B: encrypt
-    const encStep = stepOffset
-    setStep(i, encStep, { status: 'active', pct: 0 })
-    let bin: ArrayBuffer
-    let baseIVB64: string
-    try {
-      ;({ bin, baseIVB64 } = await encryptData(dataToEncrypt, mk, (pct) => {
-        setStep(i, encStep, { pct })
-      }))
-      setStep(i, encStep, { status: 'done', pct: 100 })
-    } catch (err) {
-      setStep(i, encStep, { status: 'error' })
-      throw err
-    }
+      // Encrypt filename — never store in plaintext
+      const filenameEncrypted = await encryptText(mk, file.name)
+      // New uploads use a session-independent path so the same blob can be
+      // attached to multiple sessions via the session_files junction table.
+      const storagePath = `${userId}/sources/${fileId}.bin`
 
-    // Encrypt filename — never store in plaintext
-    const filenameEncrypted = await encryptText(mk, file.name)
-    // New uploads use a session-independent path so the same blob can be
-    // attached to multiple sessions via the session_files junction table.
-    const storagePath = `${userId}/sources/${fileId}.bin`
-
-    // Write-ahead buffer — persisted before upload begins
-    await db.pendingUploads.add({
-      id: fileId,
-      sessionId,
-      fileType: file.type,
-      storagePath,
-      sizeBytes: file.sizeBytes,
-      mimeHint: file.mimeType.split('/')[0] ?? file.mimeType,
-      ivB64: baseIVB64,
-      filenameEncrypted,
-      status: 'pending',
-      binData: bin,
-      createdAt: Date.now(),
-    })
-
-    // Step C: upload
-    const uploadStep = stepOffset + 1
-    setStep(i, uploadStep, { status: 'active', pct: 0 })
-    try {
-      await db.pendingUploads.update(fileId, { status: 'uploading' })
-      await uploadBin(supabase, storagePath, bin, (pct) => {
-        setStep(i, uploadStep, { pct })
+      // Write-ahead buffer — persisted before upload begins
+      await db.pendingUploads.add({
+        id: fileId,
+        sessionId,
+        fileType: file.type,
+        storagePath,
+        sizeBytes: file.sizeBytes,
+        mimeHint: file.mimeType.split('/')[0] ?? file.mimeType,
+        ivB64: baseIVB64,
+        filenameEncrypted,
+        status: 'pending',
+        binData: bin,
+        createdAt: Date.now(),
       })
-      setStep(i, uploadStep, { status: 'done', pct: 100 })
-      await db.pendingUploads.update(fileId, { status: 'done', binData: undefined })
-    } catch (err) {
-      setStep(i, uploadStep, { status: 'error' })
-      await db.pendingUploads.update(fileId, { status: 'error', errorMessage: String(err) })
-      throw err
+
+      // Step C: upload
+      const uploadStep = stepOffset + 1
+      setStep(i, uploadStep, { status: 'active', pct: 0 })
+      try {
+        await db.pendingUploads.update(fileId, { status: 'uploading' })
+        await uploadBin(supabase, storagePath, bin, (pct) => {
+          setStep(i, uploadStep, { pct })
+        })
+        setStep(i, uploadStep, { status: 'done', pct: 100 })
+        await db.pendingUploads.update(fileId, { status: 'done', binData: undefined })
+      } catch (err) {
+        setStep(i, uploadStep, { status: 'error' })
+        await db.pendingUploads.update(fileId, { status: 'error', errorMessage: String(err) })
+        throw err
+      }
+
+      // Metadata row in Supabase — session_id intentionally omitted; the
+      // session_files junction table is the canonical session↔file link.
+      // If this insert fails the storage blob has no DB record — delete it to
+      // prevent orphaned quota, then abort (outer catch tears down the session).
+      const { error: filesErr } = await supabase.from('files').insert({
+        id: fileId,
+        user_id: userId,
+        file_type: file.type,
+        source: file.source ?? 'upload',
+        storage_path: storagePath,
+        size_bytes: file.sizeBytes,
+        mime_hint: file.mimeType.split('/')[0] ?? file.mimeType,
+        iv: baseIVB64,
+        filename_encrypted: filenameEncrypted,
+        uploaded_at: new Date().toISOString(),
+      })
+      if (filesErr) {
+        await db.pendingUploads.update(fileId, { status: 'error', errorMessage: filesErr.message })
+        await supabase.storage.from('nocturne-files').remove([storagePath])
+        throw new Error('Upload failed — please try again')
+      }
+
+      // Link file to the session with an explicit role + insertion order.
+      // If this insert fails the files row has no session link — delete both the
+      // files row and the storage blob, then abort (outer catch tears down session).
+      const role = file.type === 'pdf' ? 'slide' : file.type
+      const orderIndex = roleCounters[role] ?? 0
+      roleCounters[role] = orderIndex + 1
+      const { error: sfErr } = await supabase.from('session_files').insert({
+        session_id: sessionId,
+        file_id: fileId,
+        role,
+        order_index: orderIndex,
+      })
+      if (sfErr) {
+        await db.pendingUploads.update(fileId, { status: 'error', errorMessage: sfErr.message })
+        await supabase.from('files').delete().eq('id', fileId)
+        await supabase.storage.from('nocturne-files').remove([storagePath])
+        throw new Error('Upload failed — please try again')
+      }
     }
 
-    // Metadata row in Supabase — session_id intentionally omitted; the
-    // session_files junction table is the canonical session↔file link.
-    await supabase.from('files').insert({
-      id: fileId,
-      user_id: userId,
-      file_type: file.type,
-      source: file.source ?? 'upload',
-      storage_path: storagePath,
-      size_bytes: file.sizeBytes,
-      mime_hint: file.mimeType.split('/')[0] ?? file.mimeType,
-      iv: baseIVB64,
-      filename_encrypted: filenameEncrypted,
-      uploaded_at: new Date().toISOString(),
-    })
+    // ── Finalize ─────────────────────────────────────────────────────────────
 
-    // Link file to the session with an explicit role + insertion order
-    const role = file.type === 'pdf' ? 'slide' : file.type
-    const orderIndex = roleCounters[role] ?? 0
-    roleCounters[role] = orderIndex + 1
-    await supabase.from('session_files').insert({
-      session_id: sessionId,
-      file_id: fileId,
-      role,
-      order_index: orderIndex,
-    })
+    await supabase.from('sessions').update({ status: 'ready' }).eq('id', sessionId)
+    await db.localSessions.update(sessionId, { status: 'ready' })
+  } catch (err) {
+    // Best-effort session teardown — prevents ghost sessions in the DB.
+    // Per-file artifacts that were already cleaned up above are not re-touched;
+    // any files that completed before the failure remain in Library by design.
+    await supabase.from('sessions').delete().eq('id', sessionId)
+    await db.localSessions.delete(sessionId).catch(() => {})
+    throw err
   }
-
-  // ── Finalize ───────────────────────────────────────────────────────────────
-
-  await supabase.from('sessions').update({ status: 'ready' }).eq('id', sessionId)
-  await db.localSessions.update(sessionId, { status: 'ready' })
 }
 
 // ─── Add files to an existing session (no INSERT, only UPDATE) ────────────────
