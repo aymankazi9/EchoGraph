@@ -18,7 +18,7 @@ export interface LocalSession {
 export interface PendingUpload {
   id: string // fileId (uuid)
   sessionId: string
-  fileType: 'pdf' | 'audio' | 'guide'
+  fileType: 'pdf' | 'audio' | 'guide' | 'handwritten'
   storagePath: string // legacy: /{userId}/{sessionId}/{fileId}.bin  |  new: /{userId}/sources/{fileId}.bin
   sizeBytes: number // original plaintext byte count
   mimeHint: string // original MIME type
