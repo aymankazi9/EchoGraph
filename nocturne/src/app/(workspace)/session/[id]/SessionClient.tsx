@@ -156,6 +156,10 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   // Holds the decrypted plain-text of the current note once the Notes tab is opened.
   // Updated by NotesEditor via onContentChange; read synchronously by SessionSearchBar.
   const notesTextRef = useRef<string>('')
+  // True while this component instance is mounted. Set to false in the unmount
+  // cleanup so any async work still in flight (scoring, data load, enhance API call)
+  // can bail before writing stale data from a previous session into the global store.
+  const isMountedRef = useRef(true)
   const supabase = createClient()
 
   const jumpToWord = useSessionStore((s) => s.jumpToWord)
@@ -187,12 +191,23 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
   // ── Vault guard + seed session metadata ─────────────────────────────────
   useEffect(() => {
+    // Re-arm synchronously before calling init() so the guard inside init()
+    // always sees true on the real mount, regardless of where this effect falls
+    // in the declaration order relative to the unmount-cleanup effect.
+    isMountedRef.current = true
     async function init() {
+      // TEMP DIAG: entry — vault state and ref value before any guard
+      console.log('[init] entry | vaultUnlocked:', isVaultUnlocked(), '| isMountedRef.current:', isMountedRef.current)
       if (!isVaultUnlocked()) {
         const restored = await vaultRestoreFromCache()
         if (!restored) { router.replace('/unlock'); return }
       }
 
+      // TEMP DIAG: pre-guard — ref value at the exact moment of the isMountedRef check
+      console.log('[init] pre-guard | isMountedRef.current:', isMountedRef.current)
+      if (!isMountedRef.current) return
+      // TEMP DIAG: guard passed — about to call initSessionMeta
+      console.log('[init] calling initSessionMeta | has_slides:', session.has_slides)
       initSessionMeta({
         hasSlides: session.has_slides,
         hasAudio: session.has_audio,
@@ -204,8 +219,8 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
       if (!mk) return
 
       decryptText(mk, session.title_encrypted)
-        .then(setSessionTitle)
-        .catch(() => setSessionTitle('Session'))
+        .then((t) => { if (isMountedRef.current) setSessionTitle(t) })
+        .catch(() => { if (isMountedRef.current) setSessionTitle('Session') })
     }
     void init()
   }, [router, session.title_encrypted]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -312,7 +327,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             slideIndex: w.slide_index as number | null,
           })),
         )
-        loadTranscriptWords(words)
+        if (isMountedRef.current) loadTranscriptWords(words)
       }
 
       // Sync map is loaded by the dedicated audioFile.id effect below,
@@ -339,7 +354,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             slideIndices: (k.slide_indices as number[]) ?? [],
           })),
         )
-        loadKeywords(loaded)
+        if (isMountedRef.current) loadKeywords(loaded)
       }
 
       const { data: densityRows } = await supabase
@@ -358,8 +373,8 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               ? 'red'
               : null
         })
-        if (Object.keys(rec).length > 0) loadSlideDensity(rec)
-        if (Object.keys(zones).length > 0) loadSlideZones(zones)
+        if (Object.keys(rec).length > 0 && isMountedRef.current) loadSlideDensity(rec)
+        if (Object.keys(zones).length > 0 && isMountedRef.current) loadSlideZones(zones)
       }
 
       const { data: fcRows } = await supabase
@@ -382,7 +397,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             }
           }),
         )
-        loadFlashcards(cards)
+        if (isMountedRef.current) loadFlashcards(cards)
       }
     }
 
@@ -425,12 +440,12 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         try {
           const mapJson = await decryptText(mk!, row.map_encrypted as string)
           const { segments } = JSON.parse(mapJson) as { segments: SyncSegment[] }
-          loadSyncMap(segments)
+          if (isMountedRef.current) loadSyncMap(segments)
         } catch {
-          loadSyncMap([])  // corrupt sync map — non-fatal
+          if (isMountedRef.current) loadSyncMap([])  // corrupt sync map — non-fatal
         }
       } else {
-        loadSyncMap([])
+        if (isMountedRef.current) loadSyncMap([])
       }
     }
 
@@ -440,8 +455,12 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   }, [audioFile?.id, liveSessionStatus])
 
   // ── Reset store on unmount ───────────────────────────────────────────────
+  // Cleanup-only: sets isMountedRef.current = false and clears the store on
+  // unmount. The re-arm (isMountedRef.current = true) lives in the init effect
+  // above so arm and guard are in the same effect, immune to cross-effect
+  // declaration ordering.
   useEffect(() => {
-    return () => { reset() }
+    return () => { isMountedRef.current = false; reset() }
   }, [reset])
 
   // ── Track first audio play per session per day (for user_activity) ───────
@@ -562,7 +581,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
       // ── Slide density DB writes ────────────────────────────────────────────
       // TEMP DIAG (2): about to write slide density
       console.log('[diag:2] starting slide-density write | densityRecord keys =', Object.keys(densityRecord).length)
-      loadSlideDensity(densityRecord)
+      if (isMountedRef.current) loadSlideDensity(densityRecord)
       if (Object.keys(densityRecord).length > 0) {
         await Promise.all(
           Object.entries(densityRecord).map(([pageStr, score]) => {
@@ -575,7 +594,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               .eq('global_slide_index', pageNumber)
           }),
         )
-        loadSlideZones(redZoneMap)
+        if (isMountedRef.current) loadSlideZones(redZoneMap)
       }
       // TEMP DIAG (3): slide-density write done
       console.log('[diag:3] slide-density write complete')
@@ -690,7 +709,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         lectureConfidence: kw.lectureConfidence,
         slideIndices: kw.slideIndices,
       }))
-      loadKeywords(loadedKws)
+      if (isMountedRef.current) loadKeywords(loadedKws)
 
       // TEMP DIAG (6): reached flashcard write phase
       console.log('[diag:6] reached flashcard writes | cards.length =', cards.length)
@@ -763,7 +782,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           await supabase.from('flashcards').insert(insertFcRows)
         }
 
-        loadFlashcards(cards)
+        if (isMountedRef.current) loadFlashcards(cards)
 
         // Enhance flashcard backs with Claude — Midnight+ only.
         // Dusk users keep the auto-generated backs; no server call is made.
@@ -777,6 +796,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             mk,
             supabase,
             loadFlashcards,
+            isAlive: () => isMountedRef.current,
           })
         }
       }
@@ -1042,7 +1062,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         // Only set status AFTER addFilesToExistingSession fully succeeds so a failed
         // save never leaves the session in a state that looks like it has audio.
         await supabase.from('sessions').update({ has_audio: true, status: 'transcribed' }).eq('id', session.id)
-        useSessionStore.getState().setHasAudio(true)
+        if (isMountedRef.current) useSessionStore.getState().setHasAudio(true)
 
         // Append the new take to the client-side list so the audio timeline
         // renders immediately (the SSR audioFiles prop is immutable).
@@ -1067,7 +1087,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             fileId,
             (segments) => {
               // Populate the store directly from the computed segments — no DB round-trip.
-              loadSyncMap(segments)
+              if (isMountedRef.current) loadSyncMap(segments)
               setLiveSessionStatus('synced')
             },
           )
@@ -1158,7 +1178,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
       setSyncProgress,
       audioFile.id,
       (segments) => {
-        loadSyncMap(segments)
+        if (isMountedRef.current) loadSyncMap(segments)
         setLiveSessionStatus('synced')
       },
     )

@@ -38,8 +38,10 @@ export async function enhanceFlashcards(params: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>
   loadFlashcards: (cards: Flashcard[]) => void
+  /** Returns false once the calling component has unmounted — skip the store write. */
+  isAlive?: () => boolean
 }): Promise<void> {
-  const { sessionId, scored, cards, slides, words, mk, supabase, loadFlashcards } = params
+  const { sessionId, scored, cards, slides, words, mk, supabase, loadFlashcards, isAlive } = params
 
   if (cards.length === 0) return
 
@@ -75,7 +77,11 @@ export async function enhanceFlashcards(params: {
     return generated ? { ...card, back: generated } : card
   })
 
-  // Update store so study tab reflects the improved cards
+  // Update store so study tab reflects the improved cards.
+  // Skip if the component that owns this session has since unmounted — writing
+  // enhanced cards from a previous session into the store would contaminate
+  // whatever the user navigated to (the primary cross-session privacy bug).
+  if (isAlive && !isAlive()) return
   loadFlashcards(enhanced)
 
   // Re-encrypt and upsert enhanced backs to DB
