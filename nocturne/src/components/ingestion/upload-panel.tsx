@@ -14,9 +14,10 @@ import type { FileType } from '@/lib/upload'
 interface Props {
   sessionId: string
   userId: string
+  onSuccess?: (files: { id: string; storage_path: string; type: FileType }[]) => void
 }
 
-export function UploadPanel({ sessionId, userId }: Props) {
+export function UploadPanel({ sessionId, userId, onSuccess }: Props) {
   const closeUploadPanel = useSessionStore((s) => s.closeUploadPanel)
   const setHasSlides = useSessionStore((s) => s.setHasSlides)
   const setHasAudio = useSessionStore((s) => s.setHasAudio)
@@ -69,12 +70,14 @@ export function UploadPanel({ sessionId, userId }: Props) {
         ),
       ]
 
-      await addFilesToExistingSession(supabase, ingestionFiles, userId, sessionId, setProgress)
+      const created = await addFilesToExistingSession(supabase, ingestionFiles, userId, sessionId, setProgress)
 
       // Update store so the guided empty state hides
       if (selectedFiles.pdf) setHasSlides(true)
       if (selectedFiles.audio) setHasAudio(true)
       if (selectedFiles.guide) setHasStudyGuide(true)
+
+      onSuccess?.(created)
 
       useNotificationStore.getState().notify({
         type: 'success',

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { AnimatePresence } from 'framer-motion'
 import { Mic, Square } from 'lucide-react'
 import { isVaultUnlocked, getMasterKey, vaultRestoreFromCache } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
@@ -13,6 +14,7 @@ import { enhanceFlashcards } from '@/lib/scoring/flashcard-enhancer'
 import { GuideUpload, type GuidePayload } from '@/components/study-guide/guide-upload'
 import { startLiveTranscription, type LiveStatus } from '@/lib/live-transcription'
 import { addFilesToExistingSession } from '@/lib/upload'
+import { UploadPanel } from '@/components/ingestion/upload-panel'
 import { assertCanRecordLive } from '@/app/actions/record-live'
 import { useSessionStore, getAudioEl } from '@/store/session-store'
 import { useNotificationStore } from '@/store/notification-store'
@@ -188,6 +190,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   const isPlaying = useSessionStore((s) => s.isPlaying)
   const slideDensityMap = useSessionStore((s) => s.slideDensityMap)
   const slideZoneMap = useSessionStore((s) => s.slideZoneMap)
+  const isUploadPanelOpen = useSessionStore((s) => s.isUploadPanelOpen)
 
   // ── Vault guard + seed session metadata ─────────────────────────────────
   useEffect(() => {
@@ -1210,7 +1213,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   // ── Layout ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="relative flex flex-col h-full overflow-hidden">
 
       {/* ── Top bar ───────────────────────────────────────────────────────── */}
       <div style={{ height: 54, flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: '1px solid #16151E', background: '#0B0B11', gap: 12 }}>
@@ -1843,6 +1846,26 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           onClose={() => setPublishDeckOpen(false)}
         />
       )}
+
+      {/* ── Upload files panel ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {isUploadPanelOpen && (
+          <UploadPanel
+            sessionId={session.id}
+            userId={userId}
+            onSuccess={(created) => {
+              const audioTakes = created
+                .filter((f) => f.type === 'audio')
+                .map((f) => ({ id: f.id, storage_path: f.storage_path }))
+              if (audioTakes.length > 0) {
+                const nextIdx = audioFiles.length + extraAudioFiles.length + audioTakes.length - 1
+                setExtraAudioFiles((prev) => [...prev, ...audioTakes])
+                setSelectedTakeIdx(nextIdx)
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

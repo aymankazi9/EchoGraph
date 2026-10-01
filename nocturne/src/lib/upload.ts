@@ -349,7 +349,7 @@ export async function addFilesToExistingSession(
   userId: string,
   sessionId: string,
   onProgress: OnProgress,
-): Promise<void> {
+): Promise<{ id: string; storage_path: string; type: FileType }[]> {
   const mk = getMasterKey()
   if (!mk) throw new Error('Vault is locked. Please unlock before uploading files.')
 
@@ -368,7 +368,27 @@ export async function addFilesToExistingSession(
     update()
   }
 
+  // Pre-seed roleCounters from the DB's current max order_index per role so
+  // a second upload to a session that already has files doesn't collide on the
+  // (session_id, role, order_index) unique constraint.
+  const distinctRoles = [...new Set(files.map((f) => (f.type === 'pdf' ? 'slide' : f.type) as string))]
   const roleCounters: Record<string, number> = {}
+  await Promise.all(
+    distinctRoles.map(async (role) => {
+      const { data } = await supabase
+        .from('session_files')
+        .select('order_index')
+        .eq('session_id', sessionId)
+        .eq('role', role)
+        .order('order_index', { ascending: false })
+        .limit(1)
+      roleCounters[role] = data?.[0]?.order_index != null
+        ? (data[0].order_index as number) + 1
+        : 0
+    }),
+  )
+
+  const createdFiles: { id: string; storage_path: string; type: FileType }[] = []
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
@@ -484,6 +504,8 @@ export async function addFilesToExistingSession(
       await supabase.storage.from('nocturne-files').remove([storagePath])
       throw new Error(`Failed to link file to session: ${sfErr.message}`)
     }
+
+    createdFiles.push({ id: fileId, storage_path: storagePath, type: file.type })
   }
 
   // Update session flags — only set to true, never overwrite an existing true with false
@@ -493,4 +515,5 @@ export async function addFilesToExistingSession(
   if (files.some((f) => f.type === 'guide')) flagUpdate.has_study_guide = true
   await supabase.from('sessions').update(flagUpdate).eq('id', sessionId)
   await db.localSessions.update(sessionId, { status: 'ready' })
+  return createdFiles
 }
