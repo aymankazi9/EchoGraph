@@ -644,7 +644,12 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             slide_indices: kw.slideIndices,
           })),
         )
-        await supabase.from('keywords').upsert(updateRows, { onConflict: 'id' })
+        const { error: kwUpdateErr } = await supabase.from('keywords').upsert(updateRows, { onConflict: 'id' })
+        if (kwUpdateErr) {
+          console.error('[keywords] upsert failed:', kwUpdateErr.message)
+          useNotificationStore.getState().notify({ type: 'error', message: `Failed to save keywords: ${kwUpdateErr.message}`, duration: 6000 })
+          return
+        }
       }
 
       // Insert new keywords (terms with no existing row)
@@ -754,19 +759,44 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         }
 
         if (fcsToUpdate.length > 0) {
+          // Determine which existing flashcards have an enhanced back so the
+          // rescore upsert doesn't clobber them with a freshly-generated fallback.
+          // Those rows omit back_encrypted from the patch; enhanced_at is not in
+          // the row at all, so it is also preserved (upsert only updates supplied columns).
+          const { data: enhancedFcRows } = await supabase
+            .from('flashcards')
+            .select('id')
+            .in('id', fcsToUpdate.map((c) => c.id))
+            .not('enhanced_at', 'is', null)
+          const enhancedFcIds = new Set((enhancedFcRows ?? []).map((r) => r.id as string))
+
           const updateFcRows = await Promise.all(
-            fcsToUpdate.map(async (c) => ({
-              id: c.id,
-              session_id: session.id,
-              user_id: uid,
-              keyword_id: normToKwId.get(normalizeTerm(c.keywordTerm))!,
-              front_encrypted: await encryptText(mk, c.front),
-              back_encrypted: await encryptText(mk, c.back),
-              slide_index: c.slideIndex,
-              zone: c.zone,
-            })),
+            fcsToUpdate.map(async (c) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const row: Record<string, any> = {
+                id: c.id,
+                session_id: session.id,
+                user_id: uid,
+                keyword_id: normToKwId.get(normalizeTerm(c.keywordTerm))!,
+                front_encrypted: await encryptText(mk, c.front),
+                slide_index: c.slideIndex,
+                zone: c.zone,
+              }
+              // Only write back_encrypted for un-enhanced cards.
+              // Enhanced cards keep their Claude-improved back; enhanceFlashcards
+              // will also restore it into the store on this same score run.
+              if (!enhancedFcIds.has(c.id)) {
+                row.back_encrypted = await encryptText(mk, c.back)
+              }
+              return row
+            }),
           )
-          await supabase.from('flashcards').upsert(updateFcRows, { onConflict: 'id' })
+          const { error: fcUpdateErr } = await supabase.from('flashcards').upsert(updateFcRows, { onConflict: 'id' })
+          if (fcUpdateErr) {
+            console.error('[flashcards] upsert failed:', fcUpdateErr.message)
+            useNotificationStore.getState().notify({ type: 'error', message: `Failed to save flashcards: ${fcUpdateErr.message}`, duration: 6000 })
+            return
+          }
         }
 
         if (fcsToInsert.length > 0) {
@@ -782,10 +812,18 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               zone: c.zone,
             })),
           )
-          await supabase.from('flashcards').insert(insertFcRows)
+          const { error: fcInsertErr } = await supabase.from('flashcards').insert(insertFcRows)
+          if (fcInsertErr) {
+            console.error('[flashcards] insert failed:', fcInsertErr.message)
+            useNotificationStore.getState().notify({ type: 'error', message: `Failed to save flashcards: ${fcInsertErr.message}`, duration: 6000 })
+            return
+          }
         }
 
+        // All DB writes confirmed — safe to populate the store
         if (isMountedRef.current) loadFlashcards(cards)
+        // TEMP DIAG: IDs of cards just loaded into store — cross-reference with DB flashcards table
+        console.log('[extract:cards-loaded] isMounted =', isMountedRef.current, '| count =', cards.length, '| first 5 ids =', cards.slice(0, 5).map(c => c.id))
 
         // Enhance flashcard backs with Claude — Midnight+ only.
         // Dusk users keep the auto-generated backs; no server call is made.
@@ -873,6 +911,25 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           const guideText = [typedGuideText, handwrittenOcrText].filter(Boolean).join('\n\n') || null
           const hasGuide = !!guideText?.trim()
           guideType = hasGuide ? 'real_guide' : 'synthetic'
+
+          // TEMP DIAG: inputs to /api/extract/keywords — confirm race condition hypothesis
+          const _diagSlideTextLen = slides.reduce((n, s) => n + s.text.length, 0)
+          console.log(
+            '[extract:pre-fetch] slides.length =', slides.length,
+            '| slideTextLen =', _diagSlideTextLen,
+            '| transcriptText.length =', transcriptText.length,
+            '| guideText =', guideText === null ? null : `len:${guideText.length}`,
+          )
+          if (slides.length > 0) {
+            console.log('[extract:pre-fetch] slide[0] first 200 chars =', slides[0].text.slice(0, 200))
+          }
+
+          // Empty-content guard: don't call the LLM with nothing to extract from.
+          // Fires when the status-change trigger races ahead of PdfViewer's
+          // extractSlideText run — slides.length === 0 because the DB rows don't
+          // exist yet. Return quietly; onSlidesExtracted will retry once slides
+          // are written. No toast: this is internal, not a user-facing action.
+          if (slides.length === 0 && !transcriptText && !guideText) return
 
           const resp = await fetch('/api/extract/keywords', {
             method: 'POST',
@@ -1150,10 +1207,21 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   // maybeAutoScore is intentionally excluded from deps — it changes whenever
   // isScoring changes, which would cause a scoring→complete→re-run loop.
   // The ref guard inside maybeAutoScore makes this safe.
+  //
+  // Slide-rows guard: only fire after confirming slide rows exist in the DB.
+  // A brand-new session on first visit has status='ready' but PdfViewer may not
+  // have run extractSlideText yet — that case is covered by onSlidesExtracted.
+  // This path is for re-visits where slides were extracted on a previous visit.
   useEffect(() => {
     if (!session.has_slides) return
     if (!['ready', 'synced'].includes(liveSessionStatus)) return
-    void maybeAutoScore()  // async — fire-and-forget; errors are caught inside
+    void (async () => {
+      const { count } = await supabase
+        .from('slides')
+        .select('id', { count: 'exact', head: true })
+        .eq('session_id', session.id)
+      if ((count ?? 0) > 0) void maybeAutoScore()
+    })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveSessionStatus, session.has_slides])
 

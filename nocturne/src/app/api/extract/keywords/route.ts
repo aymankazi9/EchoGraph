@@ -40,16 +40,18 @@ function buildPrompt(
     'Extract 60–80 terms from the materials below.',
     '',
     'Prioritise (in order):',
-    '  • Named laws, theorems, principles, and equations (e.g. "fick\'s law", "nernst equation", "law of mass action")',
-    '  • Field-specific technical vocabulary that would appear in a textbook glossary (e.g. "depolarisation", "allosteric inhibition", "covalent bond")',
-    '  • Named processes, mechanisms, pathways, and structures (e.g. "krebs cycle", "sodium-potassium pump", "nodes of ranvier")',
-    '  • Multi-word technical phrases where the combination carries specific meaning (e.g. "action potential", "resting membrane potential", "oxidative phosphorylation")',
+    '  • Named laws, theorems, principles, and equations (e.g. "bayes\' theorem", "ohm\'s law", "mens rea")',
+    '  • Field-specific technical vocabulary that would appear in a textbook glossary (e.g. "opportunity cost", "due process", "covalent bond")',
+    '  • Named processes, mechanisms, pathways, and structures (e.g. "krebs cycle", "separation of powers", "big-o notation")',
+    '  • Multi-word technical phrases where the combination carries specific meaning (e.g. "monetary policy", "harmonic oscillator", "standard deviation")',
+    '',
+    '(The example terms above are vocabulary guidance only — they illustrate the type and specificity of term to look for across any subject. Do not extract them unless they explicitly appear in the supplied material below.)',
     '',
     'Rules:',
-    '1. Prefer the most complete, specific form of a phrase — "ideal gas law" over "gas", "sliding filament theory" over "contraction".',
+    '1. Prefer the most complete, specific form of a phrase — "ideal gas law" over "gas", "opportunity cost" over "cost".',
     '2. Omit generic standalone common nouns that have no specific technical meaning in isolation:',
     '   BAD: "gas", "energy", "system", "process", "factor", "structure", "function", "level", "type"',
-    '   GOOD: "gas exchange", "activation energy", "transport system", "second messenger"',
+    '   GOOD: "opportunity cost", "separation of powers", "big-o notation", "ideal gas law"',
     '   If a word would not appear as a bolded term in a college textbook on its own, drop it.',
     '3. Tag each term with exactly one source value:',
     guideText
@@ -64,6 +66,8 @@ function buildPrompt(
     '4. Consolidate near-duplicates and abbreviation/expansion pairs into the more complete/specific form.',
     '5. Omit single-letter abbreviations, acronyms without expansion, and slide headers.',
     '6. Use lowercase for all terms.',
+    '7. Only return terms that are explicitly present in the supplied slides or transcript. Do not invent or infer terms the material does not mention.',
+    '8. If the slides and transcript contain no extractable content, return exactly { "keywords": [] } — do not fabricate terms.',
     '',
     'Return exactly this JSON and nothing else:',
     '{ "keywords": [{ "term": "...", "source": "guide" | "inferred" | "both" }] }',
@@ -150,11 +154,29 @@ export async function POST(request: NextRequest) {
 
   const { sessionId, guideText, transcriptText, slides } = body
 
+  // TEMP DIAG (server terminal): exact inputs received — confirms what the client actually sent
+  console.log(
+    '[extract/keywords:recv] sessionId =', sessionId,
+    '| slides =', slides?.length ?? 0,
+    '| slideTextLen =', slides?.reduce((n: number, s: SlideInput) => n + s.text.length, 0) ?? 0,
+    '| transcriptLen =', transcriptText?.length ?? 0,
+    '| guideText =', guideText === null ? null : `len:${guideText.length}`,
+  )
+
   if (!sessionId) return NextResponse.json({ error: 'sessionId required' }, { status: 400 })
 
   const { data: sessionRow } = await supabase
     .from('sessions').select('id').eq('id', sessionId).eq('user_id', user.id).maybeSingle()
   if (!sessionRow) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  // Reject immediately when all three inputs are empty — the client-side guard
+  // should have prevented this call, but this is the server-authoritative check.
+  if (!slides?.length && !transcriptText?.trim() && !guideText?.trim()) {
+    return NextResponse.json(
+      { error: 'No extractable content — slides, transcript, and guide are all empty' },
+      { status: 400 },
+    )
+  }
 
   const totalWords =
     (transcriptText?.split(/\s+/).length ?? 0) +
@@ -174,8 +196,13 @@ export async function POST(request: NextRequest) {
     const transcriptCapped = transcriptText.split(/\s+/).slice(0, 60_000).join(' ')
 
     const prompt = buildPrompt(guideText, slideBlock, transcriptCapped)
+    // TEMP DIAG (server terminal): full prompt — proves whether bio examples appear and
+    // whether any slide/transcript content reached Claude
+    console.log('[extract/keywords:prompt]\n---BEGIN PROMPT---\n' + prompt + '\n---END PROMPT---')
     try {
       allKeywords = await callClaude(prompt)
+      // TEMP DIAG (server terminal): raw model output before dedup/filtering
+      console.log('[extract/keywords:raw-claude] count =', allKeywords.length, '| first 20 =', JSON.stringify(allKeywords.slice(0, 20)))
     } catch (e) {
       console.error('[extract/keywords] Claude error:', e)
       return NextResponse.json({ error: 'Extraction failed' }, { status: 502 })

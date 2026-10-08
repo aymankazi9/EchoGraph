@@ -566,7 +566,9 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
         return
       }
 
-      // Insert flashcard row linked to the new keyword
+      // Insert flashcard row linked to the new keyword.
+      // enhanced_at is set immediately so the enhancer never overwrites a
+      // user-authored back with Claude's output.
       const { data: fcRow, error: fcErr } = await supabase
         .from('flashcards')
         .insert({
@@ -577,6 +579,7 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
           back_encrypted: backEnc,
           slide_index: null,
           zone,
+          enhanced_at: new Date().toISOString(),
         })
         .select('id')
         .single()
