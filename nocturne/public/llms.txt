@@ -1,0 +1,37 @@
+# Nocturne
+
+> AI-powered study intelligence that identifies what your professor emphasized most — encrypted client-side, free to start.
+
+Nocturne is a web application for university students. It accepts lecture slides (PDF), audio recordings, and study guides, then uses AI to surface the Red Zone: the specific keywords a professor emphasized most, ranked by exam likelihood. All content is zero-knowledge encrypted in the browser before it reaches Nocturne's servers.
+
+## What it does
+
+- **Red Zone scoring**: measures slide dwell time and keyword repetition to rank terms by exam likelihood.
+- **AI flashcards**: generates front/back pairs for every scored keyword; backs are improved by Claude.
+- **Spaced repetition**: SM-2 variant with Again / Hard / Good / Easy ratings, stored due dates, and mastery states.
+- **Exam Urgency Mode**: auto-activates within 48 hours of an exam; locks review to Red Zone only with a live countdown.
+- **AI notes**: generates structured notes from slides and transcript; WYSIWYG editor with math support and AI fact-check.
+- **AI quiz**: multiple-choice questions with lecture-grounded distractors.
+- **Ask AI**: per-session, per-course, and vault-wide AI chat using your own lecture content as context.
+- **Anki import/export**: bring in an existing .apkg deck; export Red Zone cards as a tagged .apkg.
+- **Handwritten notes OCR**: upload images or a handwritten PDF; Claude transcribes them as an additional guide source.
+- **Study streaks**: daily activity tracking with milestone badges.
+- **Community rooms**: anonymized keyword-frequency pool for students in the same course.
+
+## Tiers
+
+- **Dusk (free)**: full core pipeline — Red Zone scoring, AI flashcards, spaced repetition, Anki import/export, 500 MB encrypted storage.
+- **Midnight**: adds live recording, AI notes with fact-check, study streaks, mastery tracking, community rooms.
+- **Eclipse**: adds AI quiz, per-session/course/vault Ask, 20 GB storage.
+
+## Encryption
+
+All content is AES-256-GCM encrypted in the browser before upload. The encryption key is derived from the user's passphrase via PBKDF2-SHA-256 (310,000 iterations). The master key never leaves the device in plaintext; Nocturne's servers store only opaque ciphertext blobs.
+
+## Links
+
+- Homepage: https://appnocturne.com
+- Changelog: https://appnocturne.com/changelog
+- Security: https://appnocturne.com/security
+- Privacy: https://appnocturne.com/privacy
+- Contact: hello@nocturne.app

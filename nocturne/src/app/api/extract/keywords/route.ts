@@ -4,6 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { callAnthropic } from '@/lib/anthropic/call'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -25,6 +27,7 @@ interface RequestBody {
 export interface ExtractedKeyword {
   term: string
   source: 'guide' | 'inferred' | 'both'
+  kind: 'definition' | 'equation' | 'process' | 'structure' | 'principle'
 }
 
 // ── Prompt builder ─────────────────────────────────────────────────────────────
@@ -34,44 +37,62 @@ function buildPrompt(
   slideBlock: string,
   transcriptBlock: string,
 ): string {
-  const parts: string[] = [
+  const sourceRule = guideText
+    ? [
+        '3. Tag each term with source — choose exactly one:',
+        '   "guide"    — present in the study guide only',
+        '   "inferred" — identified from lecture content (slides/transcript) independently',
+        '   "both"     — present in the study guide AND independently emphasized in the lecture',
+      ].join('\n')
+    : '3. Tag every term with source: "inferred" (the only valid value when no study guide is supplied).'
+
+  const parts = [
     'You are an experienced TA preparing a study list for a college-level exam.',
-    'Your job is to identify the specific terms a student must know to pass — not to summarise the lecture.',
-    'Extract 60–80 terms from the materials below.',
+    'Your job is to identify the specific terms a student must know — not to summarise the lecture.',
+    '',
+    'Extract every term the material warrants.',
+    'A short or thin lecture produces a short list; a dense lecture may produce many.',
+    'Do not pad to reach a number and do not cap to stay under one.',
     '',
     'Prioritise (in order):',
     '  • Named laws, theorems, principles, and equations (e.g. "bayes\' theorem", "ohm\'s law", "mens rea")',
-    '  • Field-specific technical vocabulary that would appear in a textbook glossary (e.g. "opportunity cost", "due process", "covalent bond")',
-    '  • Named processes, mechanisms, pathways, and structures (e.g. "krebs cycle", "separation of powers", "big-o notation")',
-    '  • Multi-word technical phrases where the combination carries specific meaning (e.g. "monetary policy", "harmonic oscillator", "standard deviation")',
+    '  • Field-specific technical vocabulary that would appear in a textbook glossary',
+    '  • Named processes, mechanisms, pathways, and structures (e.g. "krebs cycle", "big-o notation")',
+    '  • Multi-word technical phrases where the combination carries specific meaning',
     '',
-    '(The example terms above are vocabulary guidance only — they illustrate the type and specificity of term to look for across any subject. Do not extract them unless they explicitly appear in the supplied material below.)',
+    '(The example terms above illustrate the type and specificity to look for across any subject.',
+    'Do not extract them unless they explicitly appear in the supplied material below.)',
+    '',
+    'Skip — do not extract:',
+    '  • Announcements, logistics, and administrative text ("exam next week", "office hours", "submit on Canvas")',
+    '  • Slide titles, section headers, and running headers',
+    '  • Generic standalone nouns with no technical meaning in isolation:',
+    '    "system", "process", "factor", "structure", "function", "level", "type", "concept",',
+    '    "approach", "method", "result", "data", "example", "question", "value", "model", "case"',
+    '  • Example-specific numbers, dates, or incidental proper nouns — extract the named concept, not the example',
+    '    (e.g. "In 1905, Einstein derived..." → extract "special relativity" not "1905" or "Einstein")',
+    '  • Terms the professor explicitly marks as not testable',
     '',
     'Rules:',
-    '1. Prefer the most complete, specific form of a phrase — "ideal gas law" over "gas", "opportunity cost" over "cost".',
-    '2. Omit generic standalone common nouns that have no specific technical meaning in isolation:',
-    '   BAD: "gas", "energy", "system", "process", "factor", "structure", "function", "level", "type"',
-    '   GOOD: "opportunity cost", "separation of powers", "big-o notation", "ideal gas law"',
-    '   If a word would not appear as a bolded term in a college textbook on its own, drop it.',
-    '3. Tag each term with exactly one source value:',
-    guideText
-      ? '   - "guide": explicitly listed as a key term/concept in the study guide'
-      : '',
-    guideText
-      ? '   - "inferred": identified as important from lecture content (slides/transcript) independently — not from the guide'
-      : '   - "inferred": identified as important from lecture content (slides/transcript)',
-    guideText
-      ? '   - "both": present in the study guide AND independently emphasized in the lecture'
-      : '',
-    '4. Consolidate near-duplicates and abbreviation/expansion pairs into the more complete/specific form.',
-    '5. Omit single-letter abbreviations, acronyms without expansion, and slide headers.',
-    '6. Use lowercase for all terms.',
-    '7. Only return terms that are explicitly present in the supplied slides or transcript. Do not invent or infer terms the material does not mention.',
-    '8. If the slides and transcript contain no extractable content, return exactly { "keywords": [] } — do not fabricate terms.',
+    '1. Prefer the most complete, specific form: "ideal gas law" not "gas law", "opportunity cost" not "cost".',
+    '2. Merge synonyms and abbreviations into one canonical term using the more complete or widely recognised form.',
+    '   Examples: "Na⁺/K⁺ ATPase" and "sodium-potassium pump" → "sodium-potassium ATPase"',
+    '             "mRNA" alone is too generic — keep it only if the lecture treats it as a standalone concept.',
+    sourceRule,
+    '4. Tag each term with kind — choose exactly one:',
+    '   "definition"  — a named thing with a precise meaning (e.g. "opportunity cost", "mens rea", "due process")',
+    '   "equation"    — a named equation, law, or formula (e.g. "bayes\' theorem", "hooke\'s law", "ohm\'s law")',
+    '   "process"     — a named sequence of steps or mechanism (e.g. "krebs cycle", "meiosis", "binary search")',
+    '   "structure"   — a named physical or conceptual structure (e.g. "mitochondria", "separation of powers")',
+    '   "principle"   — a named rule or governing idea that is not itself an equation (e.g. "parsimony", "law of demand")',
+    '5. Use lowercase for all terms.',
+    '6. Only return terms explicitly present in the supplied slides or transcript.',
+    '   Do not invent or infer terms the material does not mention.',
+    '7. If the slides and transcript contain no extractable content, return exactly { "keywords": [] }.',
     '',
     'Return exactly this JSON and nothing else:',
-    '{ "keywords": [{ "term": "...", "source": "guide" | "inferred" | "both" }] }',
-  ].filter((l) => l !== null) as string[]
+    '{ "keywords": [{ "term": "...", "source": "guide"|"inferred"|"both", "kind": "definition"|"equation"|"process"|"structure"|"principle" }] }',
+  ]
 
   if (guideText) {
     parts.push('', '--- STUDY GUIDE ---', guideText.slice(0, 8000))
@@ -88,27 +109,25 @@ function buildPrompt(
 
 // ── Single Claude call ─────────────────────────────────────────────────────────
 
-async function callClaude(prompt: string): Promise<ExtractedKeyword[]> {
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
-      system:
-        'You are a precise study-term extractor for university lectures. ' +
-        'Return only valid JSON — no markdown fences, no explanation.',
-      messages: [{ role: 'user', content: prompt }],
-    }),
+async function callClaude(
+  prompt: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ctx: { userId: string; sessionId: string; supabase: SupabaseClient<any> },
+): Promise<ExtractedKeyword[]> {
+  const data = await callAnthropic({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 4096,
+    temperature: 0,
+    system:
+      'You are a precise study-term extractor for university lectures. ' +
+      'Return only valid JSON — no markdown fences, no explanation.',
+    messages: [{ role: 'user', content: prompt }],
+    route: 'extract/keywords',
+    userId: ctx.userId,
+    sessionId: ctx.sessionId,
+    supabase: ctx.supabase,
   })
 
-  if (!resp.ok) throw new Error(`Anthropic ${resp.status}: ${await resp.text()}`)
-
-  const data = await resp.json() as { content: { type: string; text: string }[] }
   const raw = data.content?.find((b) => b.type === 'text')?.text ?? ''
   const parsed = JSON.parse(raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, ''))
   return (parsed.keywords ?? []) as ExtractedKeyword[]
@@ -125,8 +144,8 @@ function dedup(keywords: ExtractedKeyword[]): ExtractedKeyword[] {
     if (!existing) {
       seen.set(key, kw)
     } else if (kw.source === 'both' || (kw.source === 'guide' && existing.source === 'inferred')) {
-      // Upgrade source if a later chunk has stronger evidence
-      seen.set(key, kw)
+      // Upgrade source if a later chunk has stronger evidence; preserve kind
+      seen.set(key, { ...kw, kind: kw.kind ?? existing.kind })
     }
   }
   return [...seen.values()]
@@ -154,23 +173,12 @@ export async function POST(request: NextRequest) {
 
   const { sessionId, guideText, transcriptText, slides } = body
 
-  // TEMP DIAG (server terminal): exact inputs received — confirms what the client actually sent
-  console.log(
-    '[extract/keywords:recv] sessionId =', sessionId,
-    '| slides =', slides?.length ?? 0,
-    '| slideTextLen =', slides?.reduce((n: number, s: SlideInput) => n + s.text.length, 0) ?? 0,
-    '| transcriptLen =', transcriptText?.length ?? 0,
-    '| guideText =', guideText === null ? null : `len:${guideText.length}`,
-  )
-
   if (!sessionId) return NextResponse.json({ error: 'sessionId required' }, { status: 400 })
 
   const { data: sessionRow } = await supabase
     .from('sessions').select('id').eq('id', sessionId).eq('user_id', user.id).maybeSingle()
   if (!sessionRow) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Reject immediately when all three inputs are empty — the client-side guard
-  // should have prevented this call, but this is the server-authoritative check.
   if (!slides?.length && !transcriptText?.trim() && !guideText?.trim()) {
     return NextResponse.json(
       { error: 'No extractable content — slides, transcript, and guide are all empty' },
@@ -183,6 +191,7 @@ export async function POST(request: NextRequest) {
     slides.reduce((s, sl) => s + sl.text.split(/\s+/).length, 0) +
     (guideText?.split(/\s+/).length ?? 0)
 
+  const ctx = { userId: user.id, sessionId, supabase }
   let allKeywords: ExtractedKeyword[] = []
 
   if (totalWords <= CHUNK_WORD_THRESHOLD) {
@@ -196,13 +205,8 @@ export async function POST(request: NextRequest) {
     const transcriptCapped = transcriptText.split(/\s+/).slice(0, 60_000).join(' ')
 
     const prompt = buildPrompt(guideText, slideBlock, transcriptCapped)
-    // TEMP DIAG (server terminal): full prompt — proves whether bio examples appear and
-    // whether any slide/transcript content reached Claude
-    console.log('[extract/keywords:prompt]\n---BEGIN PROMPT---\n' + prompt + '\n---END PROMPT---')
     try {
-      allKeywords = await callClaude(prompt)
-      // TEMP DIAG (server terminal): raw model output before dedup/filtering
-      console.log('[extract/keywords:raw-claude] count =', allKeywords.length, '| first 20 =', JSON.stringify(allKeywords.slice(0, 20)))
+      allKeywords = await callClaude(prompt, ctx)
     } catch (e) {
       console.error('[extract/keywords] Claude error:', e)
       return NextResponse.json({ error: 'Extraction failed' }, { status: 502 })
@@ -226,7 +230,7 @@ export async function POST(request: NextRequest) {
 
       const prompt = buildPrompt(guideText, slideBlock, transcriptChunk)
       try {
-        const chunkKws = await callClaude(prompt)
+        const chunkKws = await callClaude(prompt, ctx)
         allKeywords.push(...chunkKws)
       } catch (e) {
         console.error(`[extract/keywords] chunk ${i} error:`, e)
@@ -234,16 +238,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Final dedup merge across chunks
-    if (allKeywords.length > 80) {
+    // Final dedup merge across chunks when there is meaningful overlap
+    if (allKeywords.length > 120) {
       try {
         const mergePrompt = [
-          'Below are keyword lists from different chunks of the same lecture. Merge them into a single deduplicated list of 60–80 terms, preferring more specific/complete phrases. Consolidate semantically equivalent terms.',
-          'Return exactly: { "keywords": [{ "term": "...", "source": "guide" | "inferred" | "both" }] }',
+          'The following keyword lists come from different chunks of the same lecture.',
+          'Merge them into a single deduplicated list.',
+          'Prefer more specific or complete phrases when merging near-duplicates.',
+          'Preserve the kind field from the most specific matching entry.',
+          'Return exactly: { "keywords": [{ "term": "...", "source": "guide"|"inferred"|"both", "kind": "definition"|"equation"|"process"|"structure"|"principle" }] }',
           '',
           JSON.stringify(allKeywords),
         ].join('\n')
-        allKeywords = await callClaude(mergePrompt)
+        allKeywords = await callClaude(mergePrompt, ctx)
       } catch {
         // Fall back to local string dedup
       }

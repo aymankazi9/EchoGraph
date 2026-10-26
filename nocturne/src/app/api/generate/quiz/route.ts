@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { hasAccess, type Tier } from '@/lib/tiers/features'
+import { callAnthropic } from '@/lib/anthropic/call'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL     = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -46,6 +48,8 @@ interface GeneratedQuestion {
 async function generateBatch(
   batch: QuizCard[],
   deckTerms: string[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ctx: { userId: string; sessionId: string | null; supabase: SupabaseClient<any> },
 ): Promise<GeneratedQuestion[]> {
   // Deck context: other terms the LLM can draw on for plausible distractors.
   const deckContext = deckTerms.slice(0, MAX_DECK_TERMS).join(', ')
@@ -67,24 +71,17 @@ async function generateBatch(
     `CARDS:\n${cardList}\n\n` +
     `Return: {"results":[{"id":"...","question":"...","distractors":["...","...","..."]}]}`
 
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 3072,
-      system,
-      messages: [{ role: 'user', content: userMsg }],
-    }),
+  const data = await callAnthropic({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 3072,
+    system,
+    messages: [{ role: 'user', content: userMsg }],
+    route: 'generate/quiz',
+    userId: ctx.userId,
+    sessionId: ctx.sessionId,
+    supabase: ctx.supabase,
   })
 
-  if (!resp.ok) throw new Error(`Anthropic ${resp.status}`)
-
-  const data = await resp.json() as { content: { type: string; text: string }[] }
   const raw = data.content?.find((b) => b.type === 'text')?.text ?? ''
   const cleaned = raw.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim()
 
@@ -149,13 +146,15 @@ export async function POST(request: NextRequest) {
   // — used as distractor context for every batch.
   const deckTerms = cards.map((c) => c.front)
 
+  const ctx = { userId: user.id, sessionId: sessionId ?? null, supabase }
+
   const results: GeneratedQuestion[] = []
   for (let i = 0; i < selected.length; i += BATCH_SIZE) {
     const batch = selected.slice(i, i + BATCH_SIZE)
     try {
       const batchResults = await generateBatch(batch, deckTerms.filter(
         (t) => !batch.some((c) => c.front === t),
-      ))
+      ), ctx)
       results.push(...batchResults)
     } catch (e) {
       console.error('[generate/quiz] batch error:', i, e)

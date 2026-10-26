@@ -5,6 +5,7 @@ import { PageFade } from '@/components/marketing/page-fade'
 
 export const metadata: Metadata = {
   title: 'Confirm subscription — Nocturne',
+  robots: { index: false, follow: false },
 }
 
 type ConfirmResult =

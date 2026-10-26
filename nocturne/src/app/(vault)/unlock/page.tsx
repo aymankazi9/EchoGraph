@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase-server'
 import { UnlockForm } from './UnlockForm'
 
+export const metadata = { title: 'Unlock Vault — Nocturne', robots: { index: false, follow: false } }
+
 export default async function UnlockPage({
   searchParams,
 }: {

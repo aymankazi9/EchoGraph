@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { hasAccess, type Tier } from '@/lib/tiers/features'
+import { callAnthropic } from '@/lib/anthropic/call'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -369,28 +370,23 @@ export async function POST(request: NextRequest) {
       ? `Context:\n${context}\n\nQuestion: ${question}`
       : `Question: ${question}`
 
-    const llmResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
+    let llmData: { content: AnthropicMessage[] }
+    try {
+      llmData = await callAnthropic({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         system: systemPrompt,
         messages: [...historyMessages, { role: 'user', content: userContent }],
-      }),
-    })
-
-    if (!llmResponse.ok) {
-      const errText = await llmResponse.text()
-      console.error('[ask/course] Anthropic error:', llmResponse.status, errText)
+        route: 'ask/course',
+        userId: user.id,
+        sessionId: null,
+        supabase,
+      })
+    } catch (e) {
+      console.error('[ask/course] Anthropic error:', e)
       return NextResponse.json({ error: 'LLM request failed' }, { status: 502 })
     }
 
-    const llmData = await llmResponse.json() as { content: AnthropicMessage[] }
     const answer = llmData.content?.find((b) => b.type === 'text')?.text ?? ''
 
     // Course-mode answers embed [Lecture N, Slide M] citations inline in the text.
@@ -444,28 +440,23 @@ export async function POST(request: NextRequest) {
     ? `Context:\n${context}\n\nQuestion: ${question}`
     : `Question: ${question}`
 
-  const llmResponse = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
+  let llmData: { content: AnthropicMessage[] }
+  try {
+    llmData = await callAnthropic({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: systemPrompt,
       messages: [...historyMessages, { role: 'user', content: userContent }],
-    }),
-  })
-
-  if (!llmResponse.ok) {
-    const errText = await llmResponse.text()
-    console.error('[ask] Anthropic error:', llmResponse.status, errText)
+      route: 'ask/session',
+      userId: user.id,
+      sessionId,
+      supabase,
+    })
+  } catch (e) {
+    console.error('[ask] Anthropic error:', e)
     return NextResponse.json({ error: 'LLM request failed' }, { status: 502 })
   }
 
-  const llmData = await llmResponse.json() as { content: AnthropicMessage[] }
   const answer = llmData.content?.find((b) => b.type === 'text')?.text ?? ''
 
   // Extract cited slide numbers from [Slide N] references in the answer

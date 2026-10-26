@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase-server'
 import { getUserTier } from '@/lib/tiers/server'
 import { MomentumClient } from './MomentumClient'
 
-export const metadata = { title: 'Momentum · Nocturne' }
+export const metadata = { title: 'Momentum · Nocturne', robots: { index: false, follow: false } }
 
 export default async function MomentumPage() {
   const supabase = await createServerClient()

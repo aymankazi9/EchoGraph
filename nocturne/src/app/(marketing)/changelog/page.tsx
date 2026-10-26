@@ -4,8 +4,18 @@ import { PageFade } from '@/components/marketing/page-fade'
 
 export const metadata: Metadata = {
   title: 'Changelog — Nocturne',
-  description: 'What\'s new in Nocturne.',
+  description: "What's new in Nocturne — release notes, improvements, and fixes.",
   alternates: { canonical: '/changelog' },
+  openGraph: {
+    title: 'Changelog — Nocturne',
+    description: "What's new in Nocturne — release notes, improvements, and fixes.",
+    url: 'https://appnocturne.com/changelog',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Changelog — Nocturne',
+    description: "What's new in Nocturne — release notes, improvements, and fixes.",
+  },
 }
 
 const entries = [

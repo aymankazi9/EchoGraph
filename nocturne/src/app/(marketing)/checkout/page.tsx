@@ -13,6 +13,8 @@ import { createServerClient } from '@/lib/supabase-server'
 import { priceIdForTier } from '@/lib/tiers/priceMap'
 import type { Tier } from '@/lib/tiers/features'
 
+export const metadata = { title: 'Checkout — Nocturne', robots: { index: false, follow: false } }
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-06-24.dahlia',
 })

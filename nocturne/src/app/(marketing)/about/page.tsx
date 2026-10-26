@@ -7,6 +7,16 @@ export const metadata: Metadata = {
   title: 'About — Nocturne',
   description: 'Why we built Nocturne — a study intelligence system for students in high-stakes fields.',
   alternates: { canonical: '/about' },
+  openGraph: {
+    title: 'About — Nocturne',
+    description: 'Why we built Nocturne — a study intelligence system for students in high-stakes fields.',
+    url: 'https://appnocturne.com/about',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'About — Nocturne',
+    description: 'Why we built Nocturne — a study intelligence system for students in high-stakes fields.',
+  },
 }
 
 const features = [

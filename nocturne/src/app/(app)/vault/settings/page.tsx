@@ -6,6 +6,8 @@ import { AccountSection } from '@/components/settings/account-section'
 import { AppearanceSection } from '@/components/settings/appearance-section'
 import { PreferencesSection } from '@/components/settings/preferences-section'
 import { StorageSection } from '@/components/settings/storage-section'
+
+export const metadata = { title: 'Settings — Nocturne', robots: { index: false, follow: false } }
 import { SecuritySection } from '@/components/settings/security-section'
 import { DangerZone } from '@/components/settings/danger-zone'
 

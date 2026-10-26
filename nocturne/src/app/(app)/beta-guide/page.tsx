@@ -2,7 +2,7 @@ import { IS_BETA_MODE } from '@/lib/beta'
 import { notFound } from 'next/navigation'
 import { BetaGuideContent } from '@/components/beta-guide/beta-guide-content'
 
-export const metadata = { title: 'Beta Guide — Nocturne' }
+export const metadata = { title: 'Beta Guide — Nocturne', robots: { index: false, follow: false } }
 
 export default function BetaGuidePage() {
   // This page is only meaningful during beta — redirect to 404 once beta ends.

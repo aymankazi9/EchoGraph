@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase-server'
 import { getUserTier } from '@/lib/tiers/server'
 import { CommunityClient } from './CommunityClient'
 
-export const metadata = { title: 'Community · Nocturne' }
+export const metadata = { title: 'Community · Nocturne', robots: { index: false, follow: false } }
 
 export default async function CommunityPage() {
   const supabase = await createServerClient()

@@ -3,7 +3,18 @@ import { StubPage } from '@/components/marketing/stub-page'
 
 export const metadata: Metadata = {
   title: 'Roadmap — Nocturne',
+  description: "What we're building next — Scholar tier, mobile apps, and more.",
   alternates: { canonical: '/roadmap' },
+  openGraph: {
+    title: 'Roadmap — Nocturne',
+    description: "What we're building next — Scholar tier, mobile apps, and more.",
+    url: 'https://appnocturne.com/roadmap',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Roadmap — Nocturne',
+    description: "What we're building next — Scholar tier, mobile apps, and more.",
+  },
 }
 
 export default function RoadmapPage() {

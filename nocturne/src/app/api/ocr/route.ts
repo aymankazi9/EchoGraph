@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { callAnthropic } from '@/lib/anthropic/call'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -64,14 +65,9 @@ export async function POST(request: NextRequest) {
         ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: file.base64 } }
         : { type: 'image' as const, source: { type: 'base64' as const, media_type: file.mimeType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif', data: file.base64 } }
 
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
+      let data: { content: { type: string; text: string }[] }
+      try {
+        data = await callAnthropic({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 4096,
           system:
@@ -87,16 +83,17 @@ export async function POST(request: NextRequest) {
               ],
             },
           ],
-        }),
-      })
-
-      if (!resp.ok) {
-        console.error(`[ocr] Claude error for file ${file.index}: ${resp.status}`)
+          route: 'ocr',
+          userId: user.id,
+          sessionId,
+          supabase,
+        })
+      } catch (e) {
+        console.error(`[ocr] Claude error for file ${file.index}:`, e)
         results.push({ index: file.index, text: '' })
         continue
       }
 
-      const data = await resp.json() as { content: { type: string; text: string }[] }
       const text = data.content?.find((b) => b.type === 'text')?.text ?? ''
       results.push({ index: file.index, text })
     } catch (e) {

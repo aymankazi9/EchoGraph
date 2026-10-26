@@ -30,15 +30,55 @@ export interface PendingUpload {
   createdAt: number
 }
 
+// ── Crash-recovery checkpoint (version 2) ─────────────────────────────────────
+//
+// live-transcription.ts writes one meta row per recording and one chunk row per
+// MediaRecorder timeslice.  Chunks are AES-GCM encrypted with the master key so
+// audio never sits in plaintext in IndexedDB.  On the next session load,
+// SessionClient checks for unfinished checkpoints and offers recovery.
+//
+// Lifecycle:
+//   recording starts → writeCheckpointMeta → recordingChunkMeta row created
+//   every 5s         → writeCheckpointChunk → recordingChunks row appended
+//   save succeeds    → clearCheckpoint → both tables cleaned
+//   save fails       → checkpoint retained for retry / in-app recovery
+
+export interface RecordingChunkMeta {
+  fileId: string    // PK — same as the session_files id used throughout the pipeline
+  sessionId: string
+  userId: string
+  startedAt: number // epoch ms — when MediaRecorder.start() was called
+  mimeType: string  // e.g. 'audio/webm;codecs=opus'
+  chunkCount: number
+}
+
+export interface RecordingChunk {
+  id: string        // "${fileId}_${chunkIndex}" — deterministic, avoids duplicates on retry
+  fileId: string    // index — for bulk retrieval and delete
+  chunkIndex: number
+  ct: ArrayBuffer   // AES-GCM ciphertext
+  ivB64: string     // base64 IV
+}
+
 class NocturneDB extends Dexie {
   localSessions!: Dexie.Table<LocalSession, string>
   pendingUploads!: Dexie.Table<PendingUpload, string>
+  recordingChunkMeta!: Dexie.Table<RecordingChunkMeta, string>
+  recordingChunks!: Dexie.Table<RecordingChunk, string>
 
   constructor() {
     super('nocturne-v1')
     this.version(1).stores({
       localSessions: 'id, userId, status',
       pendingUploads: 'id, sessionId, status',
+    })
+    // Version 2: crash-recovery checkpoint tables.
+    // Existing v1 tables are unchanged — Dexie migrates automatically.
+    this.version(2).stores({
+      localSessions: 'id, userId, status',
+      pendingUploads: 'id, sessionId, status',
+      recordingChunkMeta: 'fileId, sessionId',
+      recordingChunks: 'id, fileId',
     })
   }
 }

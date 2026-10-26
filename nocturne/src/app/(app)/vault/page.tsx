@@ -5,6 +5,8 @@ import { VaultDashboardClient } from '@/components/dashboard/vault-dashboard-cli
 import type { ContinueSessionData } from '@/components/dashboard/continue-card'
 import type { VaultStats } from '@/components/dashboard/stat-tiles'
 
+export const metadata = { title: 'Vault — Nocturne', robots: { index: false, follow: false } }
+
 // Streak from consecutive user_activity dates (same algorithm as momentum-ribbon).
 function computeCurrentStreak(dates: string[]): number {
   if (dates.length === 0) return 0

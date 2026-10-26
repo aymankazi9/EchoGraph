@@ -31,16 +31,27 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
+    url: 'https://appnocturne.com',
     title: "Nocturne — AI Study App That Predicts What's On Your Exam",
     description:
       'Not a note-taker. Nocturne ranks lecture content by exam likelihood using AI emphasis detection — encrypted client-side, free to start.',
     siteName: 'Nocturne',
+    images: [
+      {
+        url: '/og.png',
+        width: 1200,
+        height: 630,
+        alt: 'Nocturne — AI-powered Red Zone exam scoring',
+      },
+    ],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
+    site: '@appnocturne',
     title: "Nocturne — AI Study App That Predicts What's On Your Exam",
     description:
       'AI-powered Red Zone scoring finds what your professor actually emphasized. Zero-knowledge encrypted. Free forever.',
+    images: ['/og.png'],
   },
   icons: {
     icon: '/icon.svg',

@@ -4,6 +4,8 @@ import { getUserTier } from '@/lib/tiers/server'
 import { STORAGE_CAPS_BYTES } from '@/lib/tiers/features'
 import { NewSessionClient } from './NewSessionClient'
 
+export const metadata = { title: 'New Session — Nocturne', robots: { index: false, follow: false } }
+
 export default async function NewSessionPage() {
   const supabase = await createServerClient()
   const {

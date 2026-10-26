@@ -15,6 +15,7 @@ import { NewsletterSection } from '@/components/landing/newsletter-section'
 import { LandingFooter } from '@/components/landing/landing-footer'
 import { RevealSetup } from '@/components/landing/reveal-setup'
 import { BetaRequestSection } from '@/components/landing/beta-request-section'
+import { StructuredData } from '@/components/landing/structured-data'
 
 // Server component — reads env directly. Both flags must be kept in sync.
 const betaMode = process.env.BETA_MODE === 'true'
@@ -22,6 +23,7 @@ const betaMode = process.env.BETA_MODE === 'true'
 export default function LandingPage() {
   return (
     <div style={{ position: 'relative', background: '#09090F' }}>
+      <StructuredData />
       <RevealSetup />
       <LandingNav />
       <span id="top" />

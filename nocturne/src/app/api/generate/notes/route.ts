@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { hasAccess, type Tier } from '@/lib/tiers/features'
+import { callAnthropic } from '@/lib/anthropic/call'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -79,14 +80,9 @@ export async function POST(request: NextRequest) {
   if (slideBlocks) { parts.push('', 'SLIDE CONTENT:', slideBlocks) }
   if (truncatedTranscript) { parts.push('', 'LECTURE TRANSCRIPT (excerpt):', truncatedTranscript) }
 
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
+  let data: { content: { type: string; text: string }[] }
+  try {
+    data = await callAnthropic({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       system:
@@ -94,16 +90,16 @@ export async function POST(request: NextRequest) {
         'Write clear, student-friendly markdown organized by topic. ' +
         'Only use the provided lecture context. Do not add information not in the materials.',
       messages: [{ role: 'user', content: parts.join('\n') }],
-    }),
-  })
-
-  if (!resp.ok) {
-    const errText = await resp.text()
-    console.error('[generate/notes] Anthropic error:', resp.status, errText)
+      route: 'generate/notes',
+      userId: user.id,
+      sessionId,
+      supabase,
+    })
+  } catch (e) {
+    console.error('[generate/notes] Anthropic error:', e)
     return NextResponse.json({ error: 'LLM request failed' }, { status: 502 })
   }
 
-  const data = await resp.json() as { content: { type: string; text: string }[] }
   const notes = data.content?.find((b) => b.type === 'text')?.text ?? ''
 
   return NextResponse.json({ notes })

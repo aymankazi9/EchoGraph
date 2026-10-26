@@ -3,6 +3,8 @@ import { createServerClient } from '@/lib/supabase-server'
 import { getUserTier } from '@/lib/tiers/server'
 import { SessionClient } from './SessionClient'
 
+export const metadata = { title: 'Session — Nocturne', robots: { index: false, follow: false } }
+
 const VALID_TABS = ['lecture', 'study', 'quiz', 'notes', 'ask'] as const
 type ValidTab = (typeof VALID_TABS)[number]
 

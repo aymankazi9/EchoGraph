@@ -2,6 +2,8 @@ import { createServerClient } from '@/lib/supabase-server'
 import { SetupForm } from './SetupForm'
 import { redirect } from 'next/navigation'
 
+export const metadata = { title: 'Set Up Your Vault — Nocturne', robots: { index: false, follow: false } }
+
 export default async function SetupPage() {
   const supabase = await createServerClient()
   const {

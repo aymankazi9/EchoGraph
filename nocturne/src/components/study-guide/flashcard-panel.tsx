@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useSessionStore } from '@/store/session-store'
 import { useNotificationStore } from '@/store/notification-store'
@@ -10,7 +10,33 @@ import { computeNextReview, computeMastery, type Rating } from '@/lib/scoring/sr
 import { getMasterKey } from '@/lib/crypto/vault'
 import { encryptText } from '@/lib/crypto/encrypt'
 import { normalizeTerm } from '@/lib/rescore/keyword-diff'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 import type { Flashcard } from '@/store/session-store'
+
+// ── Inline math renderer ───────────────────────────────────────────────────────
+// Splits `text` on $…$ spans and renders each as KaTeX inline HTML.
+// Falls back to the raw string if katex throws (malformed LaTeX).
+function MathText({ text }: { text: string }) {
+  const parts = text.split(/(\$[^$]+\$)/g)
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
+          const formula = part.slice(1, -1)
+          try {
+            const html = katex.renderToString(formula, { throwOnError: false, displayMode: false })
+            // eslint-disable-next-line react/no-danger
+            return <span key={i} dangerouslySetInnerHTML={{ __html: html }} />
+          } catch {
+            return <span key={i}>{part}</span>
+          }
+        }
+        return <span key={i}>{part}</span>
+      })}
+    </>
+  )
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -351,6 +377,19 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
   } | null>(null)
   const [savingCard, setSavingCard] = useState(false)
 
+  // ── Edit card form ──────────────────────────────────────────────────────────
+  const [editCardForm, setEditCardForm] = useState<{
+    id: string; front: string; back: string; zone: 'red' | 'likely'
+  } | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  // ── Delete confirmation ─────────────────────────────────────────────────────
+  const [deletingCardId, setDeletingCardId]   = useState<string | null>(null)
+  const [deletingCard, setDeletingCard]       = useState(false)
+
+  // ── Sidebar hover tracking ──────────────────────────────────────────────────
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null)
+
   // ── Keyboard: space to flip (disabled in urgency mode) ─────────────────────
 
   useEffect(() => {
@@ -617,6 +656,111 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
     }
   }, [newCardForm, savingCard, sessionId, userId, supabase, flashcards, loadFlashcards, filter, notify])
 
+  // ── Delete card ─────────────────────────────────────────────────────────────
+
+  const handleDeleteCard = useCallback(async (fcId: string) => {
+    setDeletingCard(true)
+    try {
+      // Fetch keyword_id before deleting so we can clean up the keywords row too.
+      const { data: fcRow } = await supabase
+        .from('flashcards').select('keyword_id').eq('id', fcId).single()
+
+      await supabase.from('flashcards').delete().eq('id', fcId)
+      if (fcRow?.keyword_id) {
+        await supabase.from('keywords').delete().eq('id', fcRow.keyword_id)
+      }
+
+      // Adjust cardIdx before mutating the queues so we don't flicker to a
+      // completion screen momentarily before the queue length catches up.
+      const currentQueue = missedOnlyQueue ?? studyQueue
+      const deletedIdx   = currentQueue.findIndex(fc => fc.id === fcId)
+      if (deletedIdx >= 0) {
+        const newLen = currentQueue.length - 1
+        let newIdx = cardIdx
+        if (deletedIdx < cardIdx)       newIdx = cardIdx - 1
+        else if (deletedIdx === cardIdx) newIdx = Math.max(0, Math.min(cardIdx, newLen - 1))
+        setCardIdx(newIdx)
+      }
+
+      loadFlashcards(flashcards.filter(fc => fc.id !== fcId))
+      setStudyQueue(prev => prev.filter(fc => fc.id !== fcId))
+      setMissedOnlyQueue(prev => prev ? prev.filter(fc => fc.id !== fcId) : null)
+      setDeletingCardId(null)
+
+      notify({ type: 'success', message: 'Card deleted', duration: 2000 })
+    } catch {
+      notify({ type: 'error', message: 'Failed to delete card', duration: 4000 })
+    } finally {
+      setDeletingCard(false)
+    }
+  }, [supabase, flashcards, loadFlashcards, studyQueue, missedOnlyQueue, cardIdx, notify]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Edit card submit ─────────────────────────────────────────────────────────
+
+  const handleEditCardSubmit = useCallback(async () => {
+    if (!editCardForm || savingEdit) return
+    const { id, front, back, zone } = editCardForm
+    if (!front.trim() || !back.trim()) return
+
+    setSavingEdit(true)
+    try {
+      const mk = getMasterKey()
+      if (!mk) {
+        notify({ type: 'error', message: 'Vault locked — unlock to edit cards', duration: 4000 })
+        return
+      }
+
+      const frontTrimmed = front.trim()
+      const backTrimmed  = back.trim()
+
+      const [termEnc, frontEnc, backEnc] = await Promise.all([
+        encryptText(mk, frontTrimmed),
+        encryptText(mk, frontTrimmed),
+        encryptText(mk, backTrimmed),
+      ])
+
+      // Look up the keyword_id so we can keep the keyword row in sync.
+      const { data: fcRow } = await supabase
+        .from('flashcards').select('keyword_id').eq('id', id).single()
+
+      if (fcRow?.keyword_id) {
+        await supabase.from('keywords').update({
+          term_encrypted: termEnc,
+          normalized_term: normalizeTerm(frontTrimmed),
+          zone,
+        }).eq('id', fcRow.keyword_id)
+      }
+
+      const { error } = await supabase.from('flashcards').update({
+        front_encrypted: frontEnc,
+        back_encrypted:  backEnc,
+        zone,
+        // Mark as enhanced so the auto-enhancer never overwrites user edits.
+        enhanced_at: new Date().toISOString(),
+      }).eq('id', id)
+
+      if (error) throw error
+
+      const updatedCard: Flashcard = {
+        ...flashcards.find(fc => fc.id === id)!,
+        keywordTerm: frontTrimmed,
+        front: frontTrimmed,
+        back: backTrimmed,
+        zone,
+      }
+      loadFlashcards(flashcards.map(fc => fc.id === id ? updatedCard : fc))
+      setStudyQueue(prev => prev.map(fc => fc.id === id ? updatedCard : fc))
+      setMissedOnlyQueue(prev => prev ? prev.map(fc => fc.id === id ? updatedCard : fc) : null)
+
+      setEditCardForm(null)
+      notify({ type: 'success', message: 'Card updated', duration: 2000 })
+    } catch {
+      notify({ type: 'error', message: 'Failed to update card', duration: 4000 })
+    } finally {
+      setSavingEdit(false)
+    }
+  }, [editCardForm, savingEdit, supabase, flashcards, loadFlashcards, notify]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Derived stats ───────────────────────────────────────────────────────────
 
   const masteryStats = useMemo(() => {
@@ -832,33 +976,151 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
           ) : activeQueue.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: '#3F485C', fontSize: 13 }}>No cards in this filter.</div>
           ) : activeQueue.map((fc, idx) => {
-            const isActive = idx === cardIdx && !isComplete
-            const mastery = computeMastery(reviewMap[fc.id]?.intervalDays)
-            const zoneColor = fc.zone === 'red' ? '#EF4444' : '#6366F1'
-            return (
-              <button
-                key={fc.id}
-                type="button"
-                onClick={() => { setCardIdx(idx); setFlipped(false) }}
-                style={{
-                  display: 'block',
-                  textAlign: 'left',
-                  padding: '10px 10px 10px 12px',
-                  borderRadius: 10,
-                  border: isActive ? '1px solid #23222F' : '1px solid transparent',
-                  background: isActive ? '#111020' : 'transparent',
-                  cursor: 'pointer',
-                  borderLeft: `3px solid ${isActive ? zoneColor : 'transparent'}`,
-                  transition: 'all 0.12s',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: isActive ? '#E2E8F0' : '#94A3B8', lineHeight: 1.3, wordBreak: 'break-word' }}>
-                    {fc.keywordTerm}
+            const isActive    = idx === cardIdx && !isComplete
+            const mastery     = computeMastery(reviewMap[fc.id]?.intervalDays) // kept for reference
+            const zoneColor   = fc.zone === 'red' ? '#EF4444' : '#6366F1'
+            const isHovered   = hoveredCardId === fc.id
+            const showIcons   = (isActive || isHovered) && deletingCardId !== fc.id
+            const isConfirming = deletingCardId === fc.id
+
+            // ── Inline delete confirmation ───────────────────────────────────
+            if (isConfirming) {
+              return (
+                <div
+                  key={fc.id}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(251,113,133,0.3)',
+                    background: 'rgba(251,113,133,0.05)',
+                    display: 'flex', flexDirection: 'column', gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: '#94A3B8', lineHeight: 1.45 }}>
+                    Delete{' '}
+                    <span style={{ color: '#E2E8F0', fontWeight: 500 }}>{fc.keywordTerm}</span>
+                    {'?'}
                   </span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCard(fc.id)}
+                      disabled={deletingCard}
+                      style={{
+                        flex: 1, height: 28, borderRadius: 7,
+                        border: '1px solid rgba(251,113,133,0.4)',
+                        background: deletingCard ? 'transparent' : 'rgba(251,113,133,0.12)',
+                        color: '#FB7185', fontSize: 11.5, fontWeight: 600,
+                        cursor: deletingCard ? 'not-allowed' : 'pointer',
+                        opacity: deletingCard ? 0.5 : 1,
+                      }}
+                    >
+                      {deletingCard ? 'Deleting…' : 'Delete'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeletingCardId(null)}
+                      disabled={deletingCard}
+                      style={{
+                        flex: 1, height: 28, borderRadius: 7,
+                        border: '1px solid #1E1D2A', background: 'transparent',
+                        color: '#4B5563', fontSize: 11.5, cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-                <MasteryBar intervalDays={reviewMap[fc.id]?.intervalDays} />
-              </button>
+              )
+            }
+
+            // ── Normal card row ──────────────────────────────────────────────
+            return (
+              <div
+                key={fc.id}
+                style={{ position: 'relative' }}
+                onMouseEnter={() => setHoveredCardId(fc.id)}
+                onMouseLeave={() => setHoveredCardId(null)}
+              >
+                <button
+                  type="button"
+                  onClick={() => { setCardIdx(idx); setFlipped(false) }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 10px 10px 12px',
+                    borderRadius: 10,
+                    border: isActive ? '1px solid #23222F' : '1px solid transparent',
+                    background: isActive ? '#111020' : 'transparent',
+                    cursor: 'pointer',
+                    borderLeft: `3px solid ${isActive ? zoneColor : 'transparent'}`,
+                    transition: 'all 0.12s',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
+                    <span style={{
+                      fontSize: 13, fontWeight: 500,
+                      color: isActive ? '#E2E8F0' : '#94A3B8',
+                      lineHeight: 1.3, wordBreak: 'break-word',
+                      // Reserve space so the term doesn't slide under the icon buttons
+                      paddingRight: showIcons ? 48 : 0,
+                    }}>
+                      {fc.keywordTerm}
+                    </span>
+                  </div>
+                  <MasteryBar intervalDays={reviewMap[fc.id]?.intervalDays} />
+                </button>
+
+                {/* Edit / delete icons — appear on hover or when card is active */}
+                {showIcons && (
+                  <div style={{
+                    position: 'absolute', top: 8, right: 8,
+                    display: 'flex', gap: 3,
+                    // Sit above the card button in the stacking context
+                    zIndex: 1,
+                  }}>
+                    <button
+                      type="button"
+                      title="Edit card"
+                      onClick={() => {
+                        setNewCardForm(null)
+                        setEditCardForm({ id: fc.id, front: fc.front, back: fc.back, zone: fc.zone })
+                      }}
+                      style={{
+                        width: 22, height: 22, borderRadius: 5,
+                        border: '1px solid #1E1D2A', background: '#0C0C13',
+                        color: '#3F485C', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', cursor: 'pointer',
+                        transition: 'color 0.1s, border-color 0.1s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#818CF8'; e.currentTarget.style.borderColor = '#2D2B45' }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#3F485C'; e.currentTarget.style.borderColor = '#1E1D2A' }}
+                    >
+                      <Pencil size={10} strokeWidth={1.8} />
+                    </button>
+                    <button
+                      type="button"
+                      title="Delete card"
+                      onClick={() => {
+                        setEditCardForm(null)
+                        setDeletingCardId(fc.id)
+                      }}
+                      style={{
+                        width: 22, height: 22, borderRadius: 5,
+                        border: '1px solid #1E1D2A', background: '#0C0C13',
+                        color: '#3F485C', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', cursor: 'pointer',
+                        transition: 'color 0.1s, border-color 0.1s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#FB7185'; e.currentTarget.style.borderColor = 'rgba(251,113,133,0.35)' }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#3F485C'; e.currentTarget.style.borderColor = '#1E1D2A' }}
+                    >
+                      <Trash2 size={10} strokeWidth={1.8} />
+                    </button>
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>
@@ -872,8 +1134,8 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
         flexDirection: 'column',
         padding: '0 32px',
       }}>
-        {/* New card button — always visible at top of middle pane */}
-        {reviewsLoaded && !newCardForm && (
+        {/* New card button — hidden while either form is open */}
+        {reviewsLoaded && !newCardForm && !editCardForm && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
             <button
               type="button"
@@ -891,8 +1153,17 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
           </div>
         )}
 
-        {/* New card form — replaces card player when open */}
-        {newCardForm ? (
+        {/* Edit card form — replaces card player; opened from sidebar icon */}
+        {editCardForm ? (
+          <NewCardForm
+            form={editCardForm}
+            saving={savingEdit}
+            onChange={(f) => setEditCardForm({ id: editCardForm.id, ...f })}
+            onSubmit={handleEditCardSubmit}
+            onCancel={() => setEditCardForm(null)}
+            mode="edit"
+          />
+        ) : newCardForm ? (
           <NewCardForm
             form={newCardForm}
             saving={savingCard}
@@ -956,7 +1227,7 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                 </div>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 14 }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Answer</span>
-                  <p style={{ fontSize: 14, color: '#94A3B8', margin: 0, lineHeight: 1.65 }}>{card.back}</p>
+                  <p style={{ fontSize: 14, color: '#94A3B8', margin: 0, lineHeight: 1.65 }}><MathText text={card.back} /></p>
                 </div>
               </div>
             ) : (
@@ -987,7 +1258,7 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                     {flipped ? (
                       <div>
                         <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Answer</span>
-                        <p style={{ fontSize: 14, color: '#94A3B8', margin: 0, lineHeight: 1.65 }}>{card.back}</p>
+                        <p style={{ fontSize: 14, color: '#94A3B8', margin: 0, lineHeight: 1.65 }}><MathText text={card.back} /></p>
                       </div>
                     ) : (
                       <div>
@@ -1152,12 +1423,14 @@ function NewCardForm({
   onChange,
   onSubmit,
   onCancel,
+  mode = 'new',
 }: {
   form: { front: string; back: string; zone: 'red' | 'likely' }
   saving: boolean
   onChange: (f: { front: string; back: string; zone: 'red' | 'likely' }) => void
   onSubmit: () => void
   onCancel: () => void
+  mode?: 'new' | 'edit'
 }) {
   const canSubmit = form.front.trim().length > 0 && form.back.trim().length > 0 && !saving
 
@@ -1189,7 +1462,9 @@ function NewCardForm({
   return (
     <div style={{ width: '100%', maxWidth: 560, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#E2E8F0' }}>New card</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#E2E8F0' }}>
+          {mode === 'edit' ? 'Edit card' : 'New card'}
+        </span>
         <button
           type="button"
           onClick={onCancel}
@@ -1269,7 +1544,7 @@ function NewCardForm({
               transition: 'all 0.12s',
             }}
           >
-            {saving ? 'Saving…' : 'Add card'}
+            {saving ? 'Saving…' : mode === 'edit' ? 'Save changes' : 'Add card'}
           </button>
           <button
             type="button"

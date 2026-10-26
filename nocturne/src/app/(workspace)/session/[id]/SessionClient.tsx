@@ -12,8 +12,15 @@ import { scoreKeywords, computeSlideDensity } from '@/lib/scoring/keyword-scorer
 import { generateFlashcards } from '@/lib/scoring/flashcard-generator'
 import { enhanceFlashcards } from '@/lib/scoring/flashcard-enhancer'
 import { GuideUpload, type GuidePayload } from '@/components/study-guide/guide-upload'
-import { startLiveTranscription, type LiveStatus } from '@/lib/live-transcription'
+import { startLiveTranscription, type LiveStatus, type LiveWord } from '@/lib/live-transcription'
+import { RecordingBar } from '@/components/recording/recording-bar'
 import { addFilesToExistingSession } from '@/lib/upload'
+import {
+  clearCheckpoint,
+  listUnfinishedCheckpoints,
+  assembleCheckpoint,
+  type CheckpointMeta,
+} from '@/lib/recording/recording-checkpoint'
 import { UploadPanel } from '@/components/ingestion/upload-panel'
 import { assertCanRecordLive } from '@/app/actions/record-live'
 import { useSessionStore, getAudioEl } from '@/store/session-store'
@@ -26,6 +33,8 @@ import { AudioPlayer } from '@/components/audio/audio-player'
 import { PdfViewer, type PdfViewerHandle, type SlideEntry } from '@/components/pdf/pdf-viewer'
 import { SlideNavStrip } from '@/components/pdf/slide-nav-strip'
 import { FlashcardPanel } from '@/components/study-guide/flashcard-panel'
+import { EnhancementOverlay, EnhancementTimeoutBanner } from '@/components/study-guide/enhancement-overlay'
+import { useEnhancementStore } from '@/store/enhancement-store'
 import { QuizPanel } from '@/components/study-guide/quiz-panel'
 import { NotesEditor } from '@/components/notes/notes-editor'
 import { AskPanel } from '@/components/ask/ask-panel'
@@ -124,6 +133,8 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   // isScoring state is kept for UI (disabled buttons, spinner); this ref is
   // purely for race prevention and is never used in JSX.
   const isScoringRef = useRef(false)
+  // Guard for startEnhancement — prevents concurrent auto-start calls.
+  const isEnhancingRef = useRef(false)
   // Live session status — refreshed from DB on mount so a stale SSR prop
   // (e.g. 'ingesting' at render time, already 'ready' in DB) doesn't permanently
   // block auto-score or the data load-back.
@@ -137,6 +148,19 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   // Pre-assigned UUID for the current recording take.
   // Set at recording start so transcript_words and the final files row share the same id.
   const liveFileIdRef = useRef<string | null>(null)
+  // Holds the blob + fileId of a failed save so the user can retry or download.
+  // transcript_words rows are intentionally kept on failure — the retry reuses the
+  // same fileId so they link to the audio file once the save eventually succeeds.
+  const failedBlobRef = useRef<{ blob: Blob; fileId: string } | null>(null)
+  // Crash-recovery checkpoints found on mount — IDB entries from a previous
+  // interrupted recording. Set here; UI will offer recovery when implemented.
+  const [pendingCheckpoints, setPendingCheckpoints] = useState<CheckpointMeta[]>([])
+  // Live recording telemetry — driven by throttled callbacks in live-transcription.ts
+  const [liveLevel, setLiveLevel]                   = useState(0)
+  const [liveLagSec, setLiveLagSec]                 = useState(0)
+  const [liveSilenceDetected, setLiveSilenceDetected] = useState(false)
+  const [liveEstimatedBytes, setLiveEstimatedBytes] = useState(0)
+
   // Takes saved this client session that aren't in the SSR audioFiles prop yet.
   // Appended on a successful live save so the audio timeline renders immediately.
   const [extraAudioFiles, setExtraAudioFiles] = useState<{ id: string; storage_path: string }[]>([])
@@ -199,18 +223,12 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
     // in the declaration order relative to the unmount-cleanup effect.
     isMountedRef.current = true
     async function init() {
-      // TEMP DIAG: entry — vault state and ref value before any guard
-      console.log('[init] entry | vaultUnlocked:', isVaultUnlocked(), '| isMountedRef.current:', isMountedRef.current)
       if (!isVaultUnlocked()) {
         const restored = await vaultRestoreFromCache()
         if (!restored) { router.replace('/unlock'); return }
       }
 
-      // TEMP DIAG: pre-guard — ref value at the exact moment of the isMountedRef check
-      console.log('[init] pre-guard | isMountedRef.current:', isMountedRef.current)
       if (!isMountedRef.current) return
-      // TEMP DIAG: guard passed — about to call initSessionMeta
-      console.log('[init] calling initSessionMeta | has_slides:', session.has_slides)
       initSessionMeta({
         hasSlides: session.has_slides,
         hasAudio: session.has_audio,
@@ -220,6 +238,11 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
       const mk = getMasterKey()
       if (!mk) return
+
+      // Check for crash-recovery checkpoints from a previous interrupted recording
+      listUnfinishedCheckpoints(session.id)
+        .then((cps) => { if (cps.length > 0 && isMountedRef.current) setPendingCheckpoints(cps) })
+        .catch(() => { /* non-fatal */ })
 
       decryptText(mk, session.title_encrypted)
         .then((t) => { if (isMountedRef.current) setSessionTitle(t) })
@@ -457,14 +480,78 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioFile?.id, liveSessionStatus])
 
-  // ── Reset store on unmount ───────────────────────────────────────────────
+  // ── Reset store on unmount + auto-save any live recording ───────────────
   // Cleanup-only: sets isMountedRef.current = false and clears the store on
   // unmount. The re-arm (isMountedRef.current = true) lives in the init effect
   // above so arm and guard are in the same effect, immune to cross-effect
   // declaration ordering.
+  //
+  // If a recording is in progress when this component unmounts (e.g. the user
+  // clicked the back button), we auto-stop and save the take.  The save must
+  // not depend on React state — all values are captured from stable refs/props
+  // or re-derived (createClient(), getMasterKey()).  Sync is intentionally
+  // skipped; the user can run it on next visit.
   useEffect(() => {
-    return () => { isMountedRef.current = false; reset() }
-  }, [reset])
+    return () => {
+      isMountedRef.current = false
+      reset()
+
+      const stopFn = stopLiveRef.current
+      const fileId = liveFileIdRef.current
+      if (!stopFn || !fileId) return
+
+      const stableUserId    = userId
+      const stableSessionId = session.id
+
+      void (async () => {
+        try {
+          const blob = await stopFn()
+          if (!blob) return
+
+          const mk = getMasterKey()
+          if (!mk) return
+
+          const supabaseClient = createClient()
+          const buf = await blob.arrayBuffer()
+          await addFilesToExistingSession(
+            supabaseClient,
+            [{
+              id: fileId,
+              data: buf,
+              name: 'live-recording.webm',
+              mimeType: blob.type || 'audio/webm',
+              type: 'audio',
+              source: 'recording',
+              sizeBytes: buf.byteLength,
+            }],
+            stableUserId,
+            stableSessionId,
+            () => {},
+          )
+          await supabaseClient.from('sessions')
+            .update({ has_audio: true, status: 'transcribed' })
+            .eq('id', stableSessionId)
+          await clearCheckpoint(fileId)
+        } catch {
+          // Silent — the IDB checkpoint allows recovery on next visit
+        }
+      })()
+    }
+  }, [reset]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── beforeunload guard while recording ──────────────────────────────────
+  // Triggers the browser's native "Leave site?" dialog when the user tries to
+  // close the tab or navigate to a different origin during a recording.
+  // Same-origin navigation is covered by the auto-save above.
+  useEffect(() => {
+    if (!isRecording) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isRecording])
 
   // ── Track first audio play per session per day (for user_activity) ───────
   useEffect(() => {
@@ -578,12 +665,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
       const { scored, cards, densityRecord, redZoneMap, existingByNorm, removedIds, legacyIds, uid, guideType, slides, currentWords } = params
 
-      // TEMP DIAG (1): scored keyword count
-      console.log('[diag:1] scored.length =', scored.length)
-
       // ── Slide density DB writes ────────────────────────────────────────────
-      // TEMP DIAG (2): about to write slide density
-      console.log('[diag:2] starting slide-density write | densityRecord keys =', Object.keys(densityRecord).length)
       if (isMountedRef.current) loadSlideDensity(densityRecord)
       if (Object.keys(densityRecord).length > 0) {
         await Promise.all(
@@ -599,9 +681,6 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         )
         if (isMountedRef.current) loadSlideZones(redZoneMap)
       }
-      // TEMP DIAG (3): slide-density write done
-      console.log('[diag:3] slide-density write complete')
-
       if (scored.length === 0) {
         useNotificationStore.getState().notify({ type: 'error', message: 'Scoring produced no keywords — slides may lack scorable content', duration: 5000 })
         return
@@ -642,6 +721,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             emphasis_score: kw.emphasisScore,
             lecture_confidence: kw.lectureConfidence,
             slide_indices: kw.slideIndices,
+            kind: kw.kind ?? null,
           })),
         )
         const { error: kwUpdateErr } = await supabase.from('keywords').upsert(updateRows, { onConflict: 'id' })
@@ -669,17 +749,13 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             emphasis_score: kw.emphasisScore,
             lecture_confidence: kw.lectureConfidence,
             slide_indices: kw.slideIndices,
+            kind: kw.kind ?? null,
           })),
         )
-        // TEMP DIAG (4): row count and session ID immediately before the insert
-        console.log('[diag:4] insertRows.length =', insertRows.length, '| session_id =', session.id)
         const { data: insertedKwRows, error: kwInsertErr } = await supabase
           .from('keywords')
           .insert(insertRows)
           .select('id, normalized_term')
-
-        // TEMP DIAG (5): full error object if present, or confirmation it's null
-        console.log('[diag:5] kwInsertErr =', kwInsertErr ? JSON.stringify(kwInsertErr) : null)
 
         if (kwInsertErr) {
           // PG error 23505 = unique_violation. If it names our partial unique index
@@ -716,11 +792,9 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         emphasisScore: kw.emphasisScore,
         lectureConfidence: kw.lectureConfidence,
         slideIndices: kw.slideIndices,
+        kind: kw.kind,
       }))
       if (isMountedRef.current) loadKeywords(loadedKws)
-
-      // TEMP DIAG (6): reached flashcard write phase
-      console.log('[diag:6] reached flashcard writes | cards.length =', cards.length)
 
       // ── Flashcard upsert keyed by keyword_id ──────────────────────────────
       if (cards.length > 0) {
@@ -822,8 +896,6 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
         // All DB writes confirmed — safe to populate the store
         if (isMountedRef.current) loadFlashcards(cards)
-        // TEMP DIAG: IDs of cards just loaded into store — cross-reference with DB flashcards table
-        console.log('[extract:cards-loaded] isMounted =', isMountedRef.current, '| count =', cards.length, '| first 5 ids =', cards.slice(0, 5).map(c => c.id))
 
         // Enhance flashcard backs with Claude — Midnight+ only.
         // Dusk users keep the auto-generated backs; no server call is made.
@@ -838,6 +910,9 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             supabase,
             loadFlashcards,
             isAlive: () => isMountedRef.current,
+            onStart: (total) => useEnhancementStore.getState().startRun(session.id, total),
+            onBatchCompleted: (count) => useEnhancementStore.getState().batchCompleted(count),
+            onEnd: () => useEnhancementStore.getState().endRun(),
           })
         }
       }
@@ -912,18 +987,6 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           const hasGuide = !!guideText?.trim()
           guideType = hasGuide ? 'real_guide' : 'synthetic'
 
-          // TEMP DIAG: inputs to /api/extract/keywords — confirm race condition hypothesis
-          const _diagSlideTextLen = slides.reduce((n, s) => n + s.text.length, 0)
-          console.log(
-            '[extract:pre-fetch] slides.length =', slides.length,
-            '| slideTextLen =', _diagSlideTextLen,
-            '| transcriptText.length =', transcriptText.length,
-            '| guideText =', guideText === null ? null : `len:${guideText.length}`,
-          )
-          if (slides.length > 0) {
-            console.log('[extract:pre-fetch] slide[0] first 200 chars =', slides[0].text.slice(0, 200))
-          }
-
           // Empty-content guard: don't call the LLM with nothing to extract from.
           // Fires when the status-change trigger races ahead of PdfViewer's
           // extractSlideText run — slides.length === 0 because the DB rows don't
@@ -944,7 +1007,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           }
 
           const { keywords: extracted } = await resp.json() as {
-            keywords: { term: string; source: 'guide' | 'inferred' | 'both' }[]
+            keywords: { term: string; source: 'guide' | 'inferred' | 'both'; kind?: string }[]
           }
 
           if (!extracted?.length) {
@@ -958,11 +1021,9 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             source: (kw.source === 'guide' ? 'real_guide'
               : kw.source === 'both' ? 'both'
               : 'synthetic') as InputKeyword['source'],
+            kind: kw.kind,
           }))
         }
-
-        // TEMP DIAG: LLM extraction result before scoreKeywords
-        console.log('[diag:llm] inputKws.length =', inputKws.length, '| first 5 =', inputKws.slice(0, 5))
 
         const currentSyncMap = useSessionStore.getState().syncMap
         const scored = scoreKeywords(inputKws, transcriptText, slides, currentSyncMap)
@@ -1042,7 +1103,8 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   // ── Live recording ────────────────────────────────────────────────────────
   const handleStartRecording = useCallback(async () => {
     const mk = getMasterKey()
-    if (!mk || isRecording) return
+    // Also gate on any non-idle phase — prevents double-start during model_loading etc.
+    if (!mk || isRecording || liveStatus.phase !== 'idle') return
 
     // Server-authoritative tier check before requesting mic access or spinning
     // up the Whisper worker.  A Dusk user must not produce a single transcribed
@@ -1062,21 +1124,39 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
     const fileId = crypto.randomUUID()
     liveFileIdRef.current = fileId
 
+    // Reset telemetry before each take
+    setLiveLevel(0)
+    setLiveLagSec(0)
+    setLiveSilenceDetected(false)
+    setLiveEstimatedBytes(0)
+
     setIsRecording(true)
     setLiveStatus({ phase: 'requesting_mic' })
-    stopLiveRef.current = startLiveTranscription(
+    stopLiveRef.current = startLiveTranscription({
       supabase,
-      session.id,
+      sessionId: session.id,
+      userId,
       mk,
       fileId,
-      (words) => {
+      onWords: (words) => {
+        // Guard: don't update the store after unmount — DB writes inside
+        // live-transcription.ts continue regardless, so no transcript data is lost.
+        if (!isMountedRef.current) return
         // Filter out the model-warmup chunk (chunkStartMs = -99999, so startMs < 0)
         const valid = words.filter((w) => w.startMs >= 0)
         if (valid.length > 0) addTranscriptWords(valid.map((w) => ({ ...w, slideIndex: null })))
       },
-      setLiveStatus,
-    )
-  }, [isRecording, supabase, session.id, addTranscriptWords])
+      onStatus: setLiveStatus,
+      onDriftDetected: () => {
+        // liveStatus.drifted flag is set by live-transcription.ts; UI warning deferred
+      },
+      onLevel:            setLiveLevel,
+      onLag:              setLiveLagSec,
+      onSilenceDetected: () => { if (isMountedRef.current) setLiveSilenceDetected(true) },
+      onSizeEstimate:     setLiveEstimatedBytes,
+      // onChunkComplete not needed in SessionClient — RecordingBar doesn't need chunk count
+    })
+  }, [isRecording, liveStatus.phase, supabase, session.id, userId, addTranscriptWords])
 
   const handleStopRecording = useCallback(async () => {
     if (!stopLiveRef.current) return
@@ -1089,12 +1169,15 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
     setLiveStatus({ phase: 'saving' })
 
+    // Declared outside try so the catch block can retain it on failure
+    let blobForRetry: Blob | null = null
+
     try {
-      const blob = await stopFn()
-      if (blob && fileId) {
+      blobForRetry = await stopFn()
+      if (blobForRetry && fileId) {
         const mk = getMasterKey()
         if (!mk) throw new Error('Vault locked')
-        const buf = await blob.arrayBuffer()
+        const buf = await blobForRetry.arrayBuffer()
 
         // Pass the pre-assigned fileId so the files row uses the same id that
         // was already written to transcript_words.file_id during recording.
@@ -1108,7 +1191,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             id: fileId,
             data: buf,
             name: 'live-recording.webm',
-            mimeType: blob.type || 'audio/webm',
+            mimeType: blobForRetry.type || 'audio/webm',
             type: 'audio',
             source: 'recording',
             sizeBytes: buf.byteLength,
@@ -1124,12 +1207,25 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         await supabase.from('sessions').update({ has_audio: true, status: 'transcribed' }).eq('id', session.id)
         if (isMountedRef.current) useSessionStore.getState().setHasAudio(true)
 
+        // Clear the crash-recovery checkpoint — save confirmed
+        await clearCheckpoint(fileId).catch(() => { /* non-fatal */ })
+
         // Append the new take to the client-side list so the audio timeline
         // renders immediately (the SSR audioFiles prop is immutable).
         const newTake = { id: fileId, storage_path: `${userId}/recordings/${fileId}.bin` }
         const nextTakeIdx = audioFiles.length + extraAudioFiles.length
         setExtraAudioFiles((prev) => [...prev, newTake])
         setSelectedTakeIdx(nextTakeIdx)
+
+        // Flash the 'saved' phase for 1.5s so the RecordingBar can show "Recording saved",
+        // then clear recording state.  Uses setTimeout rather than an effect so the 1.5s
+        // delay is tied to the save completing, not to a React render cycle.
+        // setState calls after unmount are no-ops in React 18+.
+        setLiveStatus({ phase: 'saved' })
+        setTimeout(() => {
+          setIsRecording(false)
+          setLiveStatus({ phase: 'idle' })
+        }, 1500)
 
         useNotificationStore.getState().notify({ type: 'success', message: 'Recording saved', duration: 3000 })
 
@@ -1155,12 +1251,138 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
       }
     } catch (e) {
       console.error('[SessionClient] live save error:', e)
+      // Retain the blob so the user can retry or download.
+      // transcript_words rows are NOT deleted — the retry reuses the same fileId
+      // so they link to the audio file once the save eventually succeeds.
+      if (blobForRetry && fileId) {
+        failedBlobRef.current = { blob: blobForRetry, fileId }
+      }
       useNotificationStore.getState().notify({ type: 'error', message: 'Failed to save recording', duration: 4000 })
-    } finally {
+      // On failure: clear recording state immediately (no saved flash — didn't save)
       setIsRecording(false)
       setLiveStatus({ phase: 'idle' })
     }
+    // On success path: setLiveStatus({ phase: 'saved' }) + setTimeout above handles cleanup.
+    // On failure path: setIsRecording(false) + setLiveStatus({ phase: 'idle' }) in catch block.
   }, [supabase, session.id, session.has_slides, userId, audioFiles.length, extraAudioFiles.length, loadSyncMap]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Immediately stops the recording, ignores the blob, and deletes the live
+   * transcript_words rows (they have no audio file parent since we never saved).
+   * Clears the IDB checkpoint so no recovery dialog appears on reload.
+   */
+  const handleDiscardRecording = useCallback(async () => {
+    const stopFn = stopLiveRef.current
+    stopLiveRef.current = null
+    const fileId = liveFileIdRef.current
+    liveFileIdRef.current = null
+
+    setIsRecording(false)
+    setLiveStatus({ phase: 'idle' })
+
+    try {
+      await stopFn?.()  // flush in-flight chunks; we discard the blob
+      if (fileId) {
+        await supabase.from('transcript_words').delete().eq('file_id', fileId)
+        await clearCheckpoint(fileId).catch(() => {})
+      }
+      useNotificationStore.getState().notify({ type: 'success', message: 'Recording discarded', duration: 3000 })
+    } catch (e) {
+      console.error('[SessionClient] discard error:', e)
+    }
+  }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Failed-save recovery callbacks (logic only — no UI yet) ─────────────
+  // These are wired up but not yet surfaced in JSX. The UI for retry / download /
+  // discard will be added in a follow-up when visual changes are ready.
+
+  /** Re-attempts the save using the retained blob from a failed handleStopRecording. */
+  const retryFailedSave = useCallback(async () => {
+    const failed = failedBlobRef.current
+    if (!failed) return
+    const mk = getMasterKey()
+    if (!mk) return
+
+    try {
+      const buf = await failed.blob.arrayBuffer()
+      await addFilesToExistingSession(
+        supabase,
+        [{
+          id: failed.fileId,
+          data: buf,
+          name: 'live-recording.webm',
+          mimeType: failed.blob.type || 'audio/webm',
+          type: 'audio',
+          source: 'recording',
+          sizeBytes: buf.byteLength,
+        }],
+        userId,
+        session.id,
+        () => {},
+      )
+      await supabase.from('sessions').update({ has_audio: true, status: 'transcribed' }).eq('id', session.id)
+      await clearCheckpoint(failed.fileId).catch(() => {})
+      failedBlobRef.current = null
+      if (isMountedRef.current) useSessionStore.getState().setHasAudio(true)
+
+      const newTake = { id: failed.fileId, storage_path: `${userId}/recordings/${failed.fileId}.bin` }
+      setExtraAudioFiles((prev) => [...prev, newTake])
+
+      useNotificationStore.getState().notify({ type: 'success', message: 'Recording saved', duration: 3000 })
+    } catch (e) {
+      console.error('[SessionClient] retry save error:', e)
+      useNotificationStore.getState().notify({ type: 'error', message: 'Retry failed — use Download to keep your recording', duration: 5000 })
+    }
+  }, [supabase, session.id, userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Offers the retained recording as a local file download. */
+  const downloadFailedRecording = useCallback(() => {
+    const failed = failedBlobRef.current
+    if (!failed) return
+    const url = URL.createObjectURL(failed.blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `recording-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.webm`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [])
+
+  /**
+   * Discards a failed recording: deletes the live transcript_words rows (they
+   * have no parent audio file) and clears the IDB checkpoint.
+   * Does NOT delete words from a successfully-saved take.
+   */
+  const discardFailedSave = useCallback(async () => {
+    const failed = failedBlobRef.current
+    if (!failed) return
+    try {
+      await supabase.from('transcript_words').delete().eq('file_id', failed.fileId)
+      await clearCheckpoint(failed.fileId).catch(() => {})
+      failedBlobRef.current = null
+      useNotificationStore.getState().notify({ type: 'success', message: 'Recording discarded', duration: 3000 })
+    } catch (e) {
+      console.error('[SessionClient] discard error:', e)
+    }
+  }, [supabase])
+
+  /**
+   * Assembles an IDB crash-recovery checkpoint into a blob and runs the save path.
+   * Uses the same fileId as the original recording so transcript_words link correctly.
+   */
+  const recoverFromCheckpoint = useCallback(async (meta: CheckpointMeta) => {
+    const mk = getMasterKey()
+    if (!mk) return
+    try {
+      const blob = await assembleCheckpoint(meta.fileId, mk)
+      if (!blob) return
+      failedBlobRef.current = { blob, fileId: meta.fileId }
+      setPendingCheckpoints((prev) => prev.filter((c) => c.fileId !== meta.fileId))
+      await retryFailedSave()
+    } catch (e) {
+      console.error('[SessionClient] checkpoint recovery error:', e)
+      useNotificationStore.getState().notify({ type: 'error', message: 'Recovery failed — recording may be incomplete', duration: 5000 })
+    }
+  }, [retryFailedSave]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Single auto-score gate ────────────────────────────────────────────────
   // Both trigger sites (status change + PdfViewer slide extraction) funnel
@@ -1195,6 +1417,84 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
     handleScore({ type: 'extract', guideText: null })
   }, [handleScore, session.has_study_guide, session.guide_type, session.id]) // eslint-disable-line react-hooks/exhaustive-deps
   // supabase is captured from the render-scope closure (same pattern as loadData effect above)
+
+  // ── Auto-start enhancement ────────────────────────────────────────────────
+  // Called when flashcards are loaded with unenhanced backs (page reload, or
+  // after a failed run). Also called explicitly by the retry banner.
+  // Guards: isEnhancingRef prevents concurrent calls; store.isRunning prevents
+  // double-starts when executeRescore already fired enhanceFlashcards.
+  const startEnhancement = useCallback(async () => {
+    if (!hasAccess(userTier, 'midnight')) return
+    if (isEnhancingRef.current) return
+    const enhStore = useEnhancementStore.getState()
+    if (enhStore.isRunning && enhStore.sessionId === session.id) return
+
+    isEnhancingRef.current = true
+    try {
+      const mk = getMasterKey()
+      if (!mk) return
+
+      const { data: slideRows } = await supabase
+        .from('slides')
+        .select('global_slide_index, text_encrypted')
+        .eq('session_id', session.id)
+        .order('global_slide_index')
+
+      const slides = slideRows
+        ? await Promise.all(
+            slideRows.map(async (s) => ({
+              pageNumber: s.global_slide_index as number,
+              text: s.text_encrypted
+                ? await decryptText(mk, s.text_encrypted as string).catch(() => '')
+                : '',
+            })),
+          )
+        : []
+
+      const currentCards    = useSessionStore.getState().flashcards
+      const currentKeywords = useSessionStore.getState().keywords
+      const currentWords    = useSessionStore.getState().transcriptWords
+
+      if (currentCards.length === 0) return
+
+      // Cast StoredKeyword → ScoredKeyword — StoredKeyword is a structural
+      // superset (same fields plus id), so the cast is safe.
+      const scored = currentKeywords.map((kw) => ({
+        term: kw.term, source: kw.source, kind: kw.kind,
+        zone: kw.zone, mentionCount: kw.mentionCount,
+        dwellTimeMs: kw.dwellTimeMs, emphasisScore: kw.emphasisScore,
+        lectureConfidence: kw.lectureConfidence,
+        confidenceScore: kw.confidenceScore, slideIndices: kw.slideIndices,
+      })) as import('@/lib/scoring/keyword-scorer').ScoredKeyword[]
+
+      await enhanceFlashcards({
+        sessionId: session.id, scored, cards: currentCards,
+        slides, words: currentWords, mk, supabase, loadFlashcards,
+        isAlive: () => isMountedRef.current,
+        onStart: (total) => useEnhancementStore.getState().startRun(session.id, total),
+        onBatchCompleted: (count) => useEnhancementStore.getState().batchCompleted(count),
+        onEnd: () => useEnhancementStore.getState().endRun(),
+      })
+    } finally {
+      isEnhancingRef.current = false
+    }
+  }, [session.id, supabase, loadFlashcards, userTier]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fires when flashcards are loaded from DB (flashcards.length: 0 → N).
+  // enhanceFlashcards checks enhanced_at in DB and exits early if all cards
+  // are already enhanced, so no redundant Claude calls are made.
+  const startEnhancementRef = useRef(startEnhancement)
+  useEffect(() => { startEnhancementRef.current = startEnhancement }, [startEnhancement])
+
+  useEffect(() => {
+    if (!hasAccess(userTier, 'midnight')) return
+    if (flashcards.length === 0) return
+    const enhStore = useEnhancementStore.getState()
+    if (enhStore.isRunning && enhStore.sessionId === session.id) return
+    if (enhStore.dismissed && enhStore.sessionId === session.id) return
+    void startEnhancementRef.current()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flashcards.length, session.id, userTier])
 
   // ── Callback from PdfViewer after fresh slide extraction ─────────────────
   const handleSlidesExtracted = useCallback(() => {
@@ -1266,9 +1566,9 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
     return map
   }, [keywords])
 
-  // ── Live transcript — last 80 words from store ───────────────────────────
+  // ── Live transcript — last 15 words shown in recording bar ─────────────
   const recentLiveWords = useMemo(
-    () => (isRecording ? transcriptWords.slice(-80) : []),
+    () => (isRecording ? transcriptWords.slice(-15) : []),
     [isRecording, transcriptWords],
   )
 
@@ -1289,12 +1589,24 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 11 }}>
           <button
             type="button"
-            onClick={() => router.push('/vault')}
+            onClick={() => {
+              // App Router doesn't support nav interception; we guard this specific
+              // in-app back button. Cross-origin / tab-close is handled by beforeunload.
+              if (isRecording && !window.confirm('Recording in progress — navigate away? Your recording will be saved automatically.')) return
+              router.push('/vault')
+            }}
             style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, border: '1px solid #1E1E2E', background: '#0D0D14', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', cursor: 'pointer' }}
           >
             <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4 L6 9 L11 14" /></svg>
           </button>
-          <button type="button" onClick={() => router.push('/vault')} style={{ fontSize: 12.5, color: '#5B6478', background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap' }}>Vault</button>
+          <button
+            type="button"
+            onClick={() => {
+              if (isRecording && !window.confirm('Recording in progress — navigate away? Your recording will be saved automatically.')) return
+              router.push('/vault')
+            }}
+            style={{ fontSize: 12.5, color: '#5B6478', background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >Vault</button>
           <span style={{ color: '#2D2B45' }}>/</span>
           <SessionTitle sessionId={session.id} />
           {session.status === 'synced' && (
@@ -1305,6 +1617,27 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           )}
           {isScoring && (
             <span style={{ fontSize: 10.5, color: '#FBBF24', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Scoring…</span>
+          )}
+          {/* Recording indicator — visible on every tab; click jumps to Lecture */}
+          {isRecording && liveStatus.phase === 'recording' && (
+            <button
+              type="button"
+              onClick={() => setTab('lecture')}
+              title="Recording in progress — click to go to Lecture tab"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                height: 24, padding: '0 9px', borderRadius: 6,
+                border: '1px solid rgba(251,113,133,0.3)',
+                background: 'rgba(251,113,133,0.08)',
+                color: '#FB7185', fontSize: 11, fontWeight: 500,
+                cursor: 'pointer',
+                fontVariantNumeric: 'tabular-nums',
+                fontFamily: 'var(--font-mono), monospace',
+              }}
+            >
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#FB7185', flexShrink: 0, animation: 'rec-pulse 1.4s ease-in-out infinite' }} />
+              {'elapsedSec' in liveStatus ? `${Math.floor(liveStatus.elapsedSec / 60)}:${String(liveStatus.elapsedSec % 60).padStart(2, '0')}` : '0:00'}
+            </button>
           )}
         </div>
 
@@ -1391,6 +1724,13 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
       {/* STUDY mode */}
       {tab === 'study' && (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          {hasAccess(userTier, 'midnight') && (
+            <EnhancementTimeoutBanner
+              sessionId={session.id}
+              onRetry={() => { useEnhancementStore.getState().retryRun(); void startEnhancement() }}
+            />
+          )}
         <div className="flex-1 min-h-0 overflow-y-auto p-6 flex flex-col">
           {!hasAccess(userTier, 'midnight') ? (
             <LockedFeature
@@ -1447,23 +1787,44 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             </div>
           )}
         </div>
+          {hasAccess(userTier, 'midnight') && (
+            <EnhancementOverlay
+              sessionId={session.id}
+              onDismiss={() => useEnhancementStore.getState().dismiss()}
+            />
+          )}
+        </div>
       )}
 
       {/* QUIZ mode */}
       {tab === 'quiz' && (
-        <div className="flex-1 min-h-0 overflow-y-auto p-6 flex flex-col">
-          {!hasAccess(userTier, 'eclipse') ? (
-            <LockedFeature
-              requiredTier="eclipse"
-              feature="Quiz"
-              description="Generate multiple-choice questions from your flashcard deck — AI-crafted distractors grounded in your lecture content, scored separately from spaced repetition."
-            />
-          ) : (
-            <QuizPanel
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          {hasAccess(userTier, 'midnight') && (
+            <EnhancementTimeoutBanner
               sessionId={session.id}
-              userId={userId}
-              courseId={session.course_id ?? null}
-              courseName={session.courses?.name ?? null}
+              onRetry={() => { useEnhancementStore.getState().retryRun(); void startEnhancement() }}
+            />
+          )}
+          <div className="flex-1 min-h-0 overflow-y-auto p-6 flex flex-col">
+            {!hasAccess(userTier, 'eclipse') ? (
+              <LockedFeature
+                requiredTier="eclipse"
+                feature="Quiz"
+                description="Generate multiple-choice questions from your flashcard deck — AI-crafted distractors grounded in your lecture content, scored separately from spaced repetition."
+              />
+            ) : (
+              <QuizPanel
+                sessionId={session.id}
+                userId={userId}
+                courseId={session.course_id ?? null}
+                courseName={session.courses?.name ?? null}
+              />
+            )}
+          </div>
+          {hasAccess(userTier, 'midnight') && (
+            <EnhancementOverlay
+              sessionId={session.id}
+              onDismiss={() => useEnhancementStore.getState().dismiss()}
             />
           )}
         </div>
@@ -1783,57 +2144,22 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             </div>
           )}
 
-          {/* ── Live recording pane ─────────────────────────────────────────── */}
-          {tab === 'lecture' && isRecording && (
-            <div style={{ flexShrink: 0, borderTop: '1px solid #16151E', background: '#0A0A0F', display: 'flex', flexDirection: 'column', maxHeight: 140 }}>
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 22px 6px', flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#FB7185', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                  <span style={{ fontSize: 11.5, color: '#94A3B8' }}>
-                    {liveStatus.phase === 'requesting_mic' && 'Requesting microphone…'}
-                    {liveStatus.phase === 'model_loading' && `Loading Whisper model… ${liveStatus.progress}%`}
-                    {liveStatus.phase === 'recording' && `Recording · ${formatTime(liveStatus.elapsedSec * 1000)}`}
-                    {liveStatus.phase === 'saving' && 'Saving recording…'}
-                    {liveStatus.phase === 'error' && `Error: ${liveStatus.message}`}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleStopRecording}
-                  disabled={liveStatus.phase === 'saving'}
-                  style={{ height: 26, padding: '0 10px', borderRadius: 7, border: '1px solid rgba(251,113,133,0.35)', background: 'rgba(251,113,133,0.08)', color: '#FB7185', fontSize: 11.5, cursor: liveStatus.phase === 'saving' ? 'not-allowed' : 'pointer', opacity: liveStatus.phase === 'saving' ? 0.5 : 1 }}
-                >
-                  Stop & save
-                </button>
-              </div>
-
-              {/* Streaming words */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '2px 22px 10px', fontSize: 13, color: '#5B6478', lineHeight: 1.65 }}>
-                {recentLiveWords.length > 0
-                  ? recentLiveWords.map((w) => {
-                      const clean = w.word.toLowerCase().replace(/[^a-z0-9]/g, '')
-                      const zone = keywordZoneMap.get(clean)
-                      return (
-                        <span
-                          key={w.id}
-                          style={zone ? {
-                            color: zone === 'red' ? '#FDA4AF' : '#FDE68A',
-                            background: zone === 'red' ? 'rgba(251,113,133,0.1)' : 'rgba(251,191,36,0.08)',
-                            borderRadius: 3,
-                            padding: '0 2px',
-                          } : undefined}
-                        >
-                          {w.word}{' '}
-                        </span>
-                      )
-                    })
-                  : <span style={{ color: '#3F485C', fontStyle: 'italic' }}>Words will appear here as you speak…</span>
-                }
-              </div>
-            </div>
-          )}
         </div>
+      )}
+
+      {/* ── Recording bar — visible on every tab while recording is active ── */}
+      {(isRecording || liveStatus.phase !== 'idle') && (
+        <RecordingBar
+          liveStatus={liveStatus}
+          liveWords={recentLiveWords as LiveWord[]}
+          level={liveLevel}
+          lagSec={liveLagSec}
+          silenceDetected={liveSilenceDetected}
+          estimatedBytes={liveEstimatedBytes}
+          onStop={handleStopRecording}
+          onDiscard={handleDiscardRecording}
+          keywordZoneMap={keywordZoneMap}
+        />
       )}
 
       <KeyboardShortcutOverlay />

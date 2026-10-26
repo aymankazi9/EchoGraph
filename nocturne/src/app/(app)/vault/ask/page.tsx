@@ -5,7 +5,7 @@ import { hasAccess } from '@/lib/tiers/features'
 import { LockedFeature } from '@/components/paywall/locked-feature'
 import { VaultAskClient, type RawSession } from '@/components/vault-ask/vault-ask-client'
 
-export const metadata = { title: 'Vault Ask — Nocturne' }
+export const metadata = { title: 'Vault Ask — Nocturne', robots: { index: false, follow: false } }
 
 export default async function VaultAskPage() {
   const supabase = await createServerClient()

@@ -9,6 +9,8 @@ export interface InputKeyword {
   term: string
   // 'both' = appeared in user's study guide AND independently identified from lecture content
   source: 'real_guide' | 'synthetic' | 'anki' | 'both'
+  /** Semantic category set by the extraction LLM. Undefined for synthetic/anki keywords. */
+  kind?: string
 }
 
 export interface ScoredKeyword extends InputKeyword {
@@ -240,12 +242,6 @@ export function scoreKeywords(
 
   // Second pass: derived scores
   const scored: ScoredKeyword[] = []
-  // TEMP DIAG: collect full diagnostic entry for every dropped keyword
-  const dropped: {
-    term: string; source: string
-    confidenceScore: number; emphasisScore: number; lectureConfidence: number
-    dwellTimeMs: number; mentionCount: number
-  }[] = []
 
   for (const { kw, mentionCount, slideIndices, dwellTimeMs } of rawScores) {
     const emphasisScore = computeEmphasisScore(
@@ -294,15 +290,6 @@ export function scoreKeywords(
     // context. Quality control belongs in LLM extraction, not scoring.
     // confidenceScore is still computed and stored for within-zone ordering.
     if (confidenceScore < threshold && isSynthetic && !slidesOnlyMode) {
-      dropped.push({
-        term: kw.term,
-        source: kw.source,
-        confidenceScore,   // raw, not rounded — lets caller see 0 vs NaN vs tiny float
-        emphasisScore,
-        lectureConfidence,
-        dwellTimeMs,
-        mentionCount,
-      })
       continue  // drop low-signal synthetic
     }
 
@@ -318,33 +305,6 @@ export function scoreKeywords(
       confidenceScore: Math.round(confidenceScore * 1000) / 1000,
       slideIndices,
     })
-  }
-
-  // TEMP DIAG: entry vs. survival counts + dropped detail
-  // Only synthetic keywords can be dropped (threshold 0.15).
-  // Non-synthetic (guide/both/anki/real_guide) are never dropped regardless of score.
-  if (dropped.length > 0) {
-    const nanCount  = dropped.filter(d => isNaN(d.confidenceScore)).length
-    const zeroCount = dropped.filter(d => d.confidenceScore === 0).length
-    const sourceCounts = dropped.reduce<Record<string, number>>((acc, d) => {
-      acc[d.source] = (acc[d.source] ?? 0) + 1; return acc
-    }, {})
-    console.log(
-      '[diag:scorer] entered =', keywords.length,
-      '| survived =', scored.length,
-      '| dropped =', dropped.length,
-      '| NaN confidenceScore =', nanCount,
-      '| zero confidenceScore =', zeroCount,
-      '| dropped source breakdown =', sourceCounts,
-    )
-    console.log('[diag:scorer] dropped sample (first 10 of', dropped.length, '):',
-      dropped.slice(0, 10))
-  } else {
-    console.log(
-      '[diag:scorer] entered =', keywords.length,
-      '| survived =', scored.length,
-      '| dropped = 0',
-    )
   }
 
   // Sort: red zone first, then by confidence descending

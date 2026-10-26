@@ -8,6 +8,18 @@ export const metadata: Metadata = {
   description:
     'Nocturne ranks lecture keywords by exam likelihood — built for the dense terminology and USMLE-style recall that defines pre-med coursework. Free, encrypted, runs in your browser.',
   alternates: { canonical: '/for/pre-med' },
+  openGraph: {
+    title: 'Nocturne for Pre-Med — AI Exam-Likelihood Scoring for USMLE-Style Coursework',
+    description:
+      'Nocturne ranks lecture keywords by exam likelihood — built for the dense terminology and USMLE-style recall that defines pre-med coursework. Free, encrypted, runs in your browser.',
+    url: 'https://appnocturne.com/for/pre-med',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Nocturne for Pre-Med',
+    description:
+      'AI-powered Red Zone scoring for pre-med. Identifies which terms your professor emphasized most — across slides, audio, and your study guide.',
+  },
 }
 
 const WHY = [

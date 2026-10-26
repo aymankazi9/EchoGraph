@@ -4,8 +4,18 @@ import { PageFade } from '@/components/marketing/page-fade'
 
 export const metadata: Metadata = {
   title: 'Contact — Nocturne',
-  description: 'Get in touch with the Nocturne team.',
+  description: 'Get in touch with the Nocturne team for support, feedback, or security disclosures.',
   alternates: { canonical: '/contact' },
+  openGraph: {
+    title: 'Contact — Nocturne',
+    description: 'Get in touch with the Nocturne team for support, feedback, or security disclosures.',
+    url: 'https://appnocturne.com/contact',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Contact — Nocturne',
+    description: 'Get in touch with the Nocturne team for support, feedback, or security disclosures.',
+  },
 }
 
 // TODO: confirm final domain before launch — all @nocturne.app addresses below

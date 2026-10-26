@@ -7,6 +7,18 @@ export const metadata: Metadata = {
   description:
     'Law school exams test the cases your professor kept returning to. Nocturne measures verbal repetition and slide dwell time to surface the holdings and statutes that will show up.',
   alternates: { canonical: '/for/law' },
+  openGraph: {
+    title: 'Nocturne for Law — AI Ranking of Case Names, Statutes, and Holdings',
+    description:
+      'Law school exams test the cases your professor kept returning to. Nocturne measures verbal repetition and slide dwell time to surface the holdings that will show up.',
+    url: 'https://appnocturne.com/for/law',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Nocturne for Law School',
+    description:
+      'Nocturne measures how often your professor returned to each case or statute — and ranks them by exam likelihood.',
+  },
 }
 
 const WHY = [

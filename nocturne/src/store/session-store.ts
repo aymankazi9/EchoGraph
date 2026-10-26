@@ -44,6 +44,7 @@ export interface StoredKeyword {
   emphasisScore: number
   lectureConfidence: number
   slideIndices: number[]
+  kind?: string
 }
 
 interface State {

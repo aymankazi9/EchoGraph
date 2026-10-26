@@ -5,7 +5,7 @@ import { ManageSubscriptionButton } from '@/components/billing/manage-subscripti
 import type { Tier } from '@/lib/tiers/features'
 import { IS_BETA_MODE } from '@/lib/beta'
 
-export const metadata = { title: 'Billing — Nocturne' }
+export const metadata = { title: 'Billing — Nocturne', robots: { index: false, follow: false } }
 
 // ─── Display helpers ──────────────────────────────────────────────────────────
 

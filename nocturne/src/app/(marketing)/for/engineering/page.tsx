@@ -7,6 +7,18 @@ export const metadata: Metadata = {
   description:
     'Nocturne identifies which formulas, constants, and derivations your professor emphasized most — so you know what to drill before the circuits or thermodynamics exam.',
   alternates: { canonical: '/for/engineering' },
+  openGraph: {
+    title: 'Nocturne for Engineering — AI Keyword Ranking for Formula-Heavy Exams',
+    description:
+      'Nocturne identifies which formulas, constants, and derivations your professor emphasized most — so you know what to drill before the exam.',
+    url: 'https://appnocturne.com/for/engineering',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Nocturne for Engineering',
+    description:
+      'AI-powered ranking of formulas, constants, and derivations by how much your professor emphasized them.',
+  },
 }
 
 const WHY = [
