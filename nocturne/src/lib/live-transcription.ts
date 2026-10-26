@@ -8,6 +8,7 @@ import { encryptText } from '@/lib/crypto/encrypt'
 import {
   writeCheckpointMeta,
   writeCheckpointChunk,
+  clearCheckpoint,
 } from '@/lib/recording/recording-checkpoint'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -33,11 +34,21 @@ const SILENCE_FRAMES     = 40
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/**
+ * Non-fatal conditions that don't change the recording phase.
+ * Forward to the UI via `onWarning` — never via `onStatus`.
+ */
+export type LiveWarning =
+  | { kind: 'db_write_error'; message: string }
+  | { kind: 'checkpoint_failed' }
+  | { kind: 'quota_exceeded' }
+  | { kind: 'worker_error'; message: string }
+
 export type LiveStatus =
   | { phase: 'idle' }
   | { phase: 'requesting_mic' }
   | { phase: 'model_loading'; progress: number }
-  | { phase: 'recording'; elapsedSec: number; drifted?: true; quotaWarning?: true; dbWriteError?: string }
+  | { phase: 'recording'; elapsedSec: number; drifted?: true }
   | { phase: 'saving' }
   | { phase: 'saved' }
   | { phase: 'error'; message: string }
@@ -62,6 +73,8 @@ export interface LiveTranscriptionOptions {
   fileId: string
   onWords: (words: LiveWord[]) => void
   onStatus: (s: LiveStatus) => void
+  /** Non-fatal warning channel — DB write errors, checkpoint issues, worker errors. */
+  onWarning?: (w: LiveWarning) => void
   /** Called once if PCM clock drifts > DRIFT_THRESHOLD_SEC from wall clock. */
   onDriftDetected?: () => void
   /**
@@ -109,11 +122,19 @@ function pickMime(): string {
  *
  * Words arrive via `onWords` as each 12s chunk completes (~1-3s lag).
  * Status updates arrive via `onStatus` — forward to React state.
+ * Non-fatal warnings (DB errors, checkpoint failures) arrive via `onWarning`.
  */
 export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Promise<Blob | null> {
   const { supabase, sessionId, userId, mk, fileId, onWords, onStatus } = opts
 
+  // isStopping: graceful stop requested — no new audio pushed to Whisper.
+  // tornDown:   resources destroyed — discard ALL pending async callbacks.
+  //
+  // The two flags are independent:
+  //   normal stop → isStopping first, tornDown after drain completes
+  //   error path  → tornDown immediately (via teardownOnError), isStopping may be false
   let isStopping = false
+  let tornDown   = false
   let drainResolve: (() => void) | null = null
 
   // ── Resources ───────────────────────────────────────────────────────────────
@@ -146,9 +167,7 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
   let checkpointChunkIdx = 0
 
   // ── Status flags (sticky: included in all subsequent recording updates) ─────
-  let drifted      = false
-  let quotaWarning = false
-  let lastDbError: string | null = null
+  let drifted = false
 
   // ── Drift detection ─────────────────────────────────────────────────────────
   let recordingStartedMs:     number | null = null
@@ -161,13 +180,18 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
+  /** Wraps onStatus with a temporary phase-transition log. TODO: remove before 1.0. */
+  function emitStatus(s: LiveStatus) {
+    const detail = s.phase === 'error' ? ` — ${s.message}` : ''
+    console.log(`[live-transcription] phase → ${s.phase}${detail}`)
+    onStatus(s)
+  }
+
   function emitRecordingStatus(elapsedSec: number) {
-    onStatus({
+    emitStatus({
       phase: 'recording',
       elapsedSec,
-      ...(drifted       && { drifted: true as const }),
-      ...(quotaWarning  && { quotaWarning: true as const }),
-      ...(lastDbError   && { dbWriteError: lastDbError }),
+      ...(drifted && { drifted: true as const }),
     })
   }
 
@@ -191,14 +215,21 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
   // visibilitychange: re-acquire wake lock and resume AudioContext when tab regains focus.
   // Defined here so both doStop and teardownOnError can removeEventListener with the same ref.
   const handleVisibilityChange = () => {
-    if (document.visibilityState !== 'visible' || isStopping) return
+    if (document.visibilityState !== 'visible' || isStopping || tornDown) return
     if (!wakeLock) void acquireWakeLock()
     // Chrome throttles AudioContext in hidden tabs; resume it on regain
     if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
   }
 
-  /** Synchronous cleanup for error paths — no waiting, just kill everything. */
+  /**
+   * Synchronous cleanup for error paths — kills all resources immediately.
+   * Sets tornDown so every pending async callback is a no-op.
+   * Resolves any in-progress drain so doStop() doesn't hang if it was waiting.
+   */
   function teardownOnError() {
+    tornDown = true
+    drainResolve?.()   // unblock doStop drain if it was waiting
+    drainResolve = null
     clearInterval(elapsedTimer!)
     clearInterval(levelTimer!)
     elapsedTimer = null
@@ -291,6 +322,16 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
       await new Promise<void>((resolve) => { drainResolve = resolve })
     }
 
+    // If teardownOnError() fired during the drain (e.g. worker.onerror mid-drain),
+    // resources are already cleaned up. Return null — there's no blob to collect.
+    if (tornDown) {
+      worker?.terminate()
+      worker = null
+      return null
+    }
+    // Mark torn down so any stale queued messages after worker.terminate() are discarded.
+    tornDown = true
+
     worker?.terminate()
     worker = null
 
@@ -305,7 +346,7 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
     releaseWakeLock()
 
     // Collect MediaRecorder output
-    onStatus({ phase: 'saving' })
+    emitStatus({ phase: 'saving' })
     return new Promise<Blob | null>((resolve) => {
       if (!mediaRecorder) { resolve(null); return }
 
@@ -326,10 +367,12 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
 
   ;(async () => {
     try {
-      onStatus({ phase: 'requesting_mic' })
+      emitStatus({ phase: 'requesting_mic' })
 
       stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-      if (isStopping) { stream.getTracks().forEach((t) => t.stop()); return }
+      // Check both flags: tornDown = teardownOnError already fired;
+      //                   isStopping = user called stop() during mic permission prompt.
+      if (tornDown || isStopping) { stream.getTracks().forEach((t) => t.stop()); return }
 
       // MediaRecorder captures the raw stream for post-session storage.
       // Started immediately so no audio is missed during model load.
@@ -344,27 +387,29 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
         .then(() => { checkpointEnabled = true })
         .catch((err) => {
           console.warn('[live-transcription] checkpoint meta write failed, crash recovery unavailable:', err)
+          opts.onWarning?.({ kind: 'checkpoint_failed' })
         })
 
       mediaRecorder.ondataavailable = async (e) => {
-        if (e.data.size === 0) return
+        if (e.data.size === 0 || tornDown) return
         recordedChunks.push(e.data)
 
         if (!checkpointEnabled) return
         const idx = checkpointChunkIdx++
         try {
           const buf = await e.data.arrayBuffer()
+          if (tornDown) return
           await writeCheckpointChunk(fileId, idx, buf, mk)
+          if (tornDown) return
         } catch (err) {
           if (err instanceof DOMException && err.name === 'QuotaExceededError') {
             checkpointEnabled = false
-            quotaWarning = true
-            const elapsed = recordingStartedMs
-              ? Math.round((Date.now() - recordingStartedMs) / 1000)
-              : 0
-            emitRecordingStatus(elapsed)
+            console.warn('[live-transcription] checkpoint QuotaExceededError — crash recovery disabled')
+            opts.onWarning?.({ kind: 'quota_exceeded' })
+          } else {
+            console.warn('[live-transcription] checkpoint chunk write failed:', err)
+            opts.onWarning?.({ kind: 'checkpoint_failed' })
           }
-          console.warn('[live-transcription] checkpoint chunk write failed:', err)
         }
       }
 
@@ -391,7 +436,7 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
       // bufferSize 4096 @ 16kHz → fires every ~256ms
       const processor = ctx.createScriptProcessor(4096, 1, 1)
       processor.onaudioprocess = (e: AudioProcessingEvent) => {
-        if (isStopping) return
+        if (isStopping || tornDown) return
         pushSamples(new Float32Array(e.inputBuffer.getChannelData(0)))
       }
 
@@ -408,9 +453,16 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
 
       worker.onmessage = async (e: MessageEvent<WorkerMsg>) => {
         const msg = e.data
+        // TODO: remove before 1.0 — temporary ordering log.
+        console.log('[live-transcription] worker msg:', msg.type)
+
+        // tornDown is set by teardownOnError() or by doStop() after drain.
+        // Discard ALL messages once resources have been torn down — this is the
+        // primary guard against MODEL_READY starting timers after a crash.
+        if (tornDown) return
 
         if (msg.type === 'MODEL_LOADING') {
-          onStatus({ phase: 'model_loading', progress: Math.round(msg.progress) })
+          emitStatus({ phase: 'model_loading', progress: Math.round(msg.progress) })
 
         } else if (msg.type === 'MODEL_READY') {
           recordingStartedMs = Date.now()
@@ -418,15 +470,14 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
 
           // 1-s elapsed timer
           elapsedTimer = setInterval(() => {
-            if (!isStopping && recordingStartedMs) {
-              emitRecordingStatus(Math.round((Date.now() - recordingStartedMs) / 1000))
-            }
+            if (tornDown || !recordingStartedMs) return
+            emitRecordingStatus(Math.round((Date.now() - recordingStartedMs) / 1000))
           }, 1000)
 
           // Level / lag / size / silence sampler at 4/s
           const timeDomainBuf = new Float32Array(analyser!.fftSize)
           levelTimer = setInterval(() => {
-            if (isStopping || !analyser) return
+            if (tornDown || !analyser) return
 
             // ── Level ─────────────────────────────────────────────────────────
             analyser.getFloatTimeDomainData(timeDomainBuf)
@@ -474,14 +525,12 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
                 slide_index: null,
               })),
             )
+            if (tornDown) return
             const { error } = await supabase.from('transcript_words').insert(rows)
+            if (tornDown) return
             if (error) {
               console.error('[live-transcription] DB write error:', error.message)
-              // Forward to status so the UI can warn the user (non-fatal; recording continues)
-              lastDbError = error.message
-              if (!isStopping && recordingStartedMs) {
-                emitRecordingStatus(Math.round((Date.now() - recordingStartedMs) / 1000))
-              }
+              opts.onWarning?.({ kind: 'db_write_error', message: error.message })
             }
           }
 
@@ -495,18 +544,19 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
           }
 
         } else if (msg.type === 'ERROR') {
-          console.error('[live-transcription] worker error:', msg.message)
-          if (!isStopping) {
-            onStatus({ phase: 'error', message: msg.message })
-          }
+          // Worker reports a per-chunk transcription error — non-fatal; recording continues.
+          // Route to onWarning, not onStatus, so the recording phase is not disturbed.
+          console.error('[live-transcription] worker error msg:', msg.message)
+          opts.onWarning?.({ kind: 'worker_error', message: msg.message })
         }
       }
 
       worker.onerror = (e) => {
-        if (!isStopping) {
-          teardownOnError()
-          onStatus({ phase: 'error', message: e.message ?? 'Whisper worker crashed' })
-        }
+        if (tornDown) return  // teardownOnError already ran
+        const message = e.message ?? 'Whisper worker crashed'
+        console.error('[live-transcription] worker.onerror:', message)
+        teardownOnError()
+        emitStatus({ phase: 'error', message })
       }
 
       // Trigger model load immediately by sending an empty chunk.
@@ -517,10 +567,13 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
       // warmup chunk is discarded: its SEGMENT will have startMs < 0, filtered by onWords callers
 
     } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to start recording'
+      console.error('[live-transcription] setup error:', message)
       teardownOnError()
-      if (!isStopping) {
-        onStatus({ phase: 'error', message: e instanceof Error ? e.message : 'Failed to start recording' })
-      }
+      // Remove any checkpoint that was partially written before the error so
+      // the recovery prompt doesn't appear for a session that never recorded.
+      clearCheckpoint(fileId).catch(() => {})
+      emitStatus({ phase: 'error', message })
     }
   })()
 

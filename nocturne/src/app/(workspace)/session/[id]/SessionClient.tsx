@@ -160,6 +160,10 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   const [liveLagSec, setLiveLagSec]                 = useState(0)
   const [liveSilenceDetected, setLiveSilenceDetected] = useState(false)
   const [liveEstimatedBytes, setLiveEstimatedBytes] = useState(0)
+  // Non-fatal warnings forwarded via onWarning; kept separate so they never
+  // overwrite or depend on the recording phase.
+  const [liveDbWriteError, setLiveDbWriteError]   = useState<string | null>(null)
+  const [liveQuotaWarning, setLiveQuotaWarning]   = useState(false)
 
   // Takes saved this client session that aren't in the SSR audioFiles prop yet.
   // Appended on a successful live save so the audio timeline renders immediately.
@@ -796,10 +800,14 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
       }))
       if (isMountedRef.current) loadKeywords(loadedKws)
 
-      // ── Flashcard upsert keyed by keyword_id ──────────────────────────────
+      // ── Flashcard writes keyed by keyword_id ─────────────────────────────
+      // Split into UPDATE (existing row) and INSERT (new row) so we never run
+      // a partial-column upsert that Postgres would reject on NOT NULL back_encrypted.
       if (cards.length > 0) {
         // Fetch existing flashcards by keyword_id so we can reuse their DB IDs.
         // This preserves flashcard_reviews FK chains for unchanged terms.
+        // Also covers "stuck" sessions where keywords exist but flashcards don't —
+        // those cards all fall through to fcsToInsert.
         const { data: existingFcRows } = await supabase
           .from('flashcards')
           .select('id, keyword_id')
@@ -833,10 +841,9 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         }
 
         if (fcsToUpdate.length > 0) {
-          // Determine which existing flashcards have an enhanced back so the
-          // rescore upsert doesn't clobber them with a freshly-generated fallback.
-          // Those rows omit back_encrypted from the patch; enhanced_at is not in
-          // the row at all, so it is also preserved (upsert only updates supplied columns).
+          // Determine which existing flashcards have an enhanced back so we never
+          // overwrite Claude's improved text with the freshly-generated fallback.
+          // enhanced_at is also left untouched — update() only patches supplied columns.
           const { data: enhancedFcRows } = await supabase
             .from('flashcards')
             .select('id')
@@ -844,33 +851,39 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             .not('enhanced_at', 'is', null)
           const enhancedFcIds = new Set((enhancedFcRows ?? []).map((r) => r.id as string))
 
-          const updateFcRows = await Promise.all(
-            fcsToUpdate.map(async (c) => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const row: Record<string, any> = {
-                id: c.id,
-                session_id: session.id,
-                user_id: uid,
-                keyword_id: normToKwId.get(normalizeTerm(c.keywordTerm))!,
-                front_encrypted: await encryptText(mk, c.front),
-                slide_index: c.slideIndex,
-                zone: c.zone,
-              }
-              // Only write back_encrypted for un-enhanced cards.
-              // Enhanced cards keep their Claude-improved back; enhanceFlashcards
-              // will also restore it into the store on this same score run.
-              if (!enhancedFcIds.has(c.id)) {
-                row.back_encrypted = await encryptText(mk, c.back)
-              }
-              return row
-            }),
-          )
-          const { error: fcUpdateErr } = await supabase.from('flashcards').upsert(updateFcRows, { onConflict: 'id' })
-          if (fcUpdateErr) {
-            console.error('[flashcards] upsert failed:', fcUpdateErr.message)
-            useNotificationStore.getState().notify({ type: 'error', message: `Failed to save flashcards: ${fcUpdateErr.message}`, duration: 6000 })
-            return
+          // Individual UPDATE calls instead of upsert — upsert with a partial column
+          // list tries an INSERT on conflict which Postgres rejects on NOT NULL
+          // back_encrypted. Run MAX_FC_UPDATE at a time to stay within connection limits.
+          const MAX_FC_UPDATE = 8
+          const updateTasks = fcsToUpdate.map((c) => async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const patch: Record<string, any> = {
+              session_id: session.id,
+              user_id: uid,
+              keyword_id: normToKwId.get(normalizeTerm(c.keywordTerm))!,
+              front_encrypted: await encryptText(mk, c.front),
+              slide_index: c.slideIndex,
+              zone: c.zone,
+            }
+            // Only update back_encrypted for un-enhanced cards.
+            if (!enhancedFcIds.has(c.id)) {
+              patch.back_encrypted = await encryptText(mk, c.back)
+            }
+            return supabase.from('flashcards').update(patch).eq('id', c.id)
+          })
+
+          let updateFailed = false
+          for (let i = 0; i < updateTasks.length; i += MAX_FC_UPDATE) {
+            const results = await Promise.all(updateTasks.slice(i, i + MAX_FC_UPDATE).map((t) => t()))
+            const firstErr = results.find((r) => r.error)?.error
+            if (firstErr) {
+              console.error('[flashcards] update failed:', firstErr.message)
+              useNotificationStore.getState().notify({ type: 'error', message: `Couldn't save flashcards: ${firstErr.message}`, duration: 6000 })
+              updateFailed = true
+              break
+            }
           }
+          if (updateFailed) return
         }
 
         if (fcsToInsert.length > 0) {
@@ -889,7 +902,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           const { error: fcInsertErr } = await supabase.from('flashcards').insert(insertFcRows)
           if (fcInsertErr) {
             console.error('[flashcards] insert failed:', fcInsertErr.message)
-            useNotificationStore.getState().notify({ type: 'error', message: `Failed to save flashcards: ${fcInsertErr.message}`, duration: 6000 })
+            useNotificationStore.getState().notify({ type: 'error', message: `Couldn't save flashcards: ${fcInsertErr.message}`, duration: 6000 })
             return
           }
         }
@@ -1124,11 +1137,13 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
     const fileId = crypto.randomUUID()
     liveFileIdRef.current = fileId
 
-    // Reset telemetry before each take
+    // Reset telemetry and warnings before each take
     setLiveLevel(0)
     setLiveLagSec(0)
     setLiveSilenceDetected(false)
     setLiveEstimatedBytes(0)
+    setLiveDbWriteError(null)
+    setLiveQuotaWarning(false)
 
     setIsRecording(true)
     setLiveStatus({ phase: 'requesting_mic' })
@@ -1147,6 +1162,12 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         if (valid.length > 0) addTranscriptWords(valid.map((w) => ({ ...w, slideIndex: null })))
       },
       onStatus: setLiveStatus,
+      onWarning: (w) => {
+        if (!isMountedRef.current) return
+        if (w.kind === 'db_write_error') setLiveDbWriteError(w.message)
+        if (w.kind === 'quota_exceeded') setLiveQuotaWarning(true)
+        // checkpoint_failed and worker_error are console-only; no UI needed
+      },
       onDriftDetected: () => {
         // liveStatus.drifted flag is set by live-transcription.ts; UI warning deferred
       },
@@ -1401,20 +1422,42 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
     // Query DB directly — never trust the client store, which may not yet
     // reflect rows loaded by the concurrent load-back effect.
-    const { count, error } = await supabase
+    const { count: kwCount, error: kwError } = await supabase
       .from('keywords')
       .select('id', { count: 'exact', head: true })
       .eq('session_id', session.id)
 
-    if (error) {
+    if (kwError) {
       // Fail safe: if we can't confirm zero keywords, don't fire.
-      console.warn('[maybeAutoScore] keywords count query failed, skipping auto-score:', error.message)
+      console.warn('[maybeAutoScore] keywords count query failed, skipping auto-score:', kwError.message)
       return
     }
 
-    if ((count ?? 0) > 0) return  // session already scored — full stop
+    if ((kwCount ?? 0) === 0) {
+      // No keywords at all — run a full score.
+      handleScore({ type: 'extract', guideText: null })
+      return
+    }
 
-    handleScore({ type: 'extract', guideText: null })
+    // Keywords exist — check whether flashcards are also present.
+    // A session can have keywords but no flashcards when a previous scoring run
+    // wrote keywords but then failed on the flashcard write (e.g. the partial-column
+    // upsert NOT NULL violation). Re-scoring creates the missing flashcard rows
+    // without re-extracting keywords (diffKeywords will update-in-place).
+    const { count: fcCount, error: fcError } = await supabase
+      .from('flashcards')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', session.id)
+
+    if (fcError) {
+      console.warn('[maybeAutoScore] flashcards count query failed, skipping self-heal:', fcError.message)
+      return
+    }
+
+    if ((fcCount ?? 0) === 0) {
+      // Stuck session: keywords written, flashcards missing.
+      handleScore({ type: 'extract', guideText: null })
+    }
   }, [handleScore, session.has_study_guide, session.guide_type, session.id]) // eslint-disable-line react-hooks/exhaustive-deps
   // supabase is captured from the render-scope closure (same pattern as loadData effect above)
 
@@ -2156,6 +2199,8 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           lagSec={liveLagSec}
           silenceDetected={liveSilenceDetected}
           estimatedBytes={liveEstimatedBytes}
+          dbWriteError={liveDbWriteError}
+          quotaWarning={liveQuotaWarning}
           onStop={handleStopRecording}
           onDiscard={handleDiscardRecording}
           keywordZoneMap={keywordZoneMap}

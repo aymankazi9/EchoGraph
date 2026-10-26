@@ -34,6 +34,10 @@ interface RecordingBarProps {
   silenceDetected: boolean
   /** Running byte estimate from MediaRecorder blobs */
   estimatedBytes: number
+  /** Non-fatal transcript DB write error forwarded from onWarning; never changes the recording phase */
+  dbWriteError?:  string | null
+  /** IDB quota exceeded — crash recovery disabled; forwarded from onWarning */
+  quotaWarning?:  boolean
   onStop:         () => void
   onDiscard:      () => void
   keywordZoneMap?: Map<string, 'red' | 'likely'>
@@ -43,7 +47,8 @@ interface RecordingBarProps {
 
 export function RecordingBar({
   liveStatus, liveWords, level, lagSec, silenceDetected,
-  estimatedBytes, onStop, onDiscard, keywordZoneMap,
+  estimatedBytes, dbWriteError, quotaWarning,
+  onStop, onDiscard, keywordZoneMap,
 }: RecordingBarProps) {
   const { phase } = liveStatus
 
@@ -245,9 +250,9 @@ export function RecordingBar({
             )}
 
             {/* Transcript DB write error */}
-            {liveStatus.dbWriteError && (
+            {dbWriteError && (
               <span
-                title={liveStatus.dbWriteError}
+                title={dbWriteError}
                 style={{
                   fontSize: 10.5, color: '#FB7185', flexShrink: 0,
                   padding: '2px 7px', borderRadius: 5,
@@ -375,7 +380,7 @@ export function RecordingBar({
           </div>
 
           {/* Warning notices (silence, lag, quota) */}
-          {(silenceDetected || lagSec >= LAG_WARN_SEC || liveStatus.quotaWarning) && (
+          {(silenceDetected || lagSec >= LAG_WARN_SEC || quotaWarning) && (
             <div style={{ padding: '0 18px 8px', display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
               {silenceDetected && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#FBBF24' }}>
@@ -393,7 +398,7 @@ export function RecordingBar({
                   Transcription is behind — audio is still being captured
                 </div>
               )}
-              {liveStatus.quotaWarning && (
+              {quotaWarning && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#FBBF24' }}>
                   <svg width="11" height="11" viewBox="0 0 18 18" fill="none" stroke="#FBBF24" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                     <path d="M9 3 L16 15 H2 Z" /><path d="M9 8 V11.5 M9 13.5 V13.6" />
