@@ -41,6 +41,18 @@ async function getTranscriber() {
     'automatic-speech-recognition',
     'Xenova/whisper-base',
     {
+      // Whisper's decoder is sensitive to the default WASM quantization (q8) —
+      // Xenova/whisper-base's decoder_model_merged is missing a scale tensor
+      // for the embed_tokens dequantize node under q8, which throws
+      // "Can't create a session... Missing required scale" at model-load time.
+      // Forcing the decoder to fp32 (no quantization) avoids that broken path;
+      // the encoder keeps q8 for a smaller download. See transformers.js's
+      // per-module dtype guide — encoder-decoder models like Whisper are
+      // explicitly called out as quantization-sensitive.
+      dtype: {
+        encoder_model: 'q8',
+        decoder_model_merged: 'fp32',
+      },
       progress_callback: (p: { status: string; progress?: number; file?: string }) => {
         // Only forward actual download progress to avoid UI noise on cached loads.
         if (p.status === 'progress') {

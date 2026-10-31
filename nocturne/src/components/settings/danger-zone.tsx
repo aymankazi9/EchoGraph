@@ -25,7 +25,7 @@ export function DangerZone({ userId, pbkdf2Salt, encryptedMasterKey }: Props) {
 
   return (
     <div>
-      <p className="text-caption uppercase tracking-[0.07em] text-red-300 mb-4">Danger zone</p>
+      <p className="text-caption uppercase tracking-[0.07em] mb-4" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-severity)' }}>Danger zone</p>
 
       <div className="flex items-start justify-between py-3 gap-6">
         <div className="flex flex-col gap-0.5">
@@ -41,7 +41,8 @@ export function DangerZone({ userId, pbkdf2Salt, encryptedMasterKey }: Props) {
           <AlertDialogTrigger asChild>
             <button
               type="button"
-              className="shrink-0 h-9 px-4 rounded-btn text-body border border-red-500 text-red-300 hover:bg-red-500/10 transition-colors"
+              className="shrink-0 h-9 px-4 text-body transition-colors"
+              style={{ border: '1px solid var(--color-severity)', color: 'var(--color-severity)' }}
             >
               Delete account
             </button>
@@ -56,12 +57,13 @@ export function DangerZone({ userId, pbkdf2Salt, encryptedMasterKey }: Props) {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="h-9 px-4 rounded-btn text-body text-text-secondary border border-border-default hover:bg-bg-subtle bg-transparent">
+              <AlertDialogCancel className="h-9 px-4 text-body text-text-secondary border border-border-default hover:bg-bg-subtle bg-transparent">
                 Keep my account
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => setStep2Open(true)}
-                className="h-9 px-4 rounded-btn text-body border border-red-500 text-red-300 hover:bg-red-500/20 bg-transparent transition-colors"
+                className="h-9 px-4 text-body bg-transparent transition-colors"
+                style={{ border: '1px solid var(--color-severity)', color: 'var(--color-severity)' }}
               >
                 Yes, delete everything
               </AlertDialogAction>

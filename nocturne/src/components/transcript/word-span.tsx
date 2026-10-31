@@ -56,12 +56,12 @@ export function WordSpan({ id, word, startMs, endMs, keywordZone, keywordId }: P
         'text-body transition-colors duration-[80ms]',
         // Playhead highlight takes priority over keyword zone
         isActive
-          ? 'text-indigo-400 bg-indigo-500/20'
+          ? 'bg-bg-subtle text-text-primary'
           : isRed
-          ? 'text-rose-300 bg-rose-900/20 underline decoration-rose-900 hover:bg-rose-900/30'
+          ? 'text-[#FF3B30] underline decoration-[#FF3B30] hover:bg-[rgba(255,59,48,0.06)]'
           : isLikely
-          ? 'text-violet-300 bg-violet-900/15 hover:bg-violet-900/25'
-          : 'text-text-primary hover:text-indigo-400',
+          ? 'text-text-primary underline decoration-text-tertiary hover:bg-bg-subtle'
+          : 'text-text-primary hover:bg-bg-subtle',
       ]
         .filter(Boolean)
         .join(' ')}

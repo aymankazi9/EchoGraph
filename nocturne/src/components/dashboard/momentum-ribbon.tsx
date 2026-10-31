@@ -125,38 +125,39 @@ export function MomentumRibbon() {
   return (
     <Link
       href="/momentum"
-      data-btn-app
       style={{
         display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' as const,
-        marginTop: 20, padding: '13px 18px', borderRadius: 14,
-        border: '1px solid rgba(251,191,36,0.22)',
-        background: 'linear-gradient(110deg, rgba(251,191,36,0.09) 0%, rgba(244,63,94,0.04) 42%, rgba(13,13,20,0.3) 100%)',
+        marginTop: 20, padding: '13px 18px',
+        border: '1px solid rgba(255,255,255,0.08)',
+        background: '#0C0C0D',
         textDecoration: 'none',
+        transition: 'border-color .2s',
       }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
     >
       {/* Flame chip + text */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
         <span style={{
-          width: 32, height: 32, flexShrink: 0, borderRadius: 9,
-          background: 'radial-gradient(circle at 50% 30%, rgba(251,191,36,0.3), rgba(244,63,94,0.12))',
-          border: '1px solid rgba(251,191,36,0.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FBBF24',
+          width: 32, height: 32, flexShrink: 0,
+          border: '1px solid rgba(255,255,255,0.14)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9A9A9F',
         }}>
           <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 1.5 c2 3 4 4.2 4 7.5 a4 4 0 0 1 -8 0 c0 -1.6 0.8 -2.8 1.6 -3.6 C7 6.5 7.3 7.6 8 8 c0.3 -2 0 -4.5 1 -6.5 Z" />
           </svg>
         </span>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14, color: '#E2E8F0' }}>
-            <span style={{ fontWeight: 600 }}>
-              {streak > 0 ? `${streak}-day study streak` : 'Start your streak today'}
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+            <span style={{ fontWeight: 500, color: streak > 0 ? 'var(--color-accent)' : '#EDEDED' }}>
+              {streak > 0 ? `${streak}-DAY STREAK` : 'START YOUR STREAK TODAY'}
             </span>{' '}
-            {best > 0 && <span style={{ color: '#5B6478' }}>· best {best}</span>}
+            {best > 0 && <span style={{ color: '#76767B' }}>· BEST {best}</span>}
           </div>
-          <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 1 }}>
+          <div style={{ fontSize: 11.5, color: '#9A9A9F', marginTop: 1 }}>
             {course
-              ? <>{course.name} is <span style={{ color: '#FCD34D' }}>{course.pct}% exam-ready</span></>
-              : <span style={{ color: '#5B6478' }}>Tag sessions with a subject to track mastery</span>
+              ? <>{course.name} is <span style={{ color: '#EDEDED' }}>{course.pct}% exam-ready</span></>
+              : <span style={{ color: '#76767B' }}>Tag sessions with a subject to track mastery</span>
             }
           </div>
         </div>
@@ -168,9 +169,9 @@ export function MomentumRibbon() {
           <span
             key={i}
             style={{
-              width: 13, height: 13, borderRadius: 4,
-              background: done ? 'linear-gradient(145deg,#FBBF24,#F59E0B)' : undefined,
-              border: done ? undefined : '1px dashed #2D2B45',
+              width: 10, height: 10,
+              background: done ? '#EDEDED' : 'transparent',
+              border: done ? 'none' : '1px dashed rgba(255,255,255,0.18)',
             }}
           />
         ))}
@@ -178,13 +179,13 @@ export function MomentumRibbon() {
 
       {/* Balance + CTA */}
       <div style={{ flex: 1, minWidth: 120, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 14 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#FCD34D', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#9A9A9F', fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-mono)' }}>
           <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10 1.5 L4 10 h4 l-1 6.5 L14 7 h-4 Z" />
           </svg>
           {balance.toLocaleString()}
         </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#A5B4FC', fontWeight: 500, whiteSpace: 'nowrap' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#9A9A9F', fontWeight: 500, whiteSpace: 'nowrap' }}>
           Open Momentum{' '}
           <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 9 h9 M9 5 l4 4 l-4 4" />

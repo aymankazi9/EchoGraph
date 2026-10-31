@@ -127,7 +127,7 @@ export function SessionTitle({ sessionId }: Props) {
           className={[
             'text-subheading font-medium text-text-primary',
             'bg-transparent border-b outline-none focus:outline-none w-[320px]',
-            emptyError ? 'border-rose-400' : 'border-indigo-500',
+            emptyError ? 'border-[#FF3B30]' : 'border-border-strong',
           ].join(' ')}
         />
         <div className="flex items-center justify-between">
@@ -137,7 +137,7 @@ export function SessionTitle({ sessionId }: Props) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="text-caption text-rose-300"
+                className="text-caption text-[#FF3B30]"
               >
                 Title cannot be empty
               </motion.p>

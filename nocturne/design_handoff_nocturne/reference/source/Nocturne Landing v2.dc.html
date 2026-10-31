@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%230A0A0A%22%2F%3E%3Cmask%20id%3D%22m%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2213%22%20r%3D%2210.8%22%20fill%3D%22%23000%22%2F%3E%3C%2Fmask%3E%3Ccircle%20cx%3D%2213.3%22%20cy%3D%2210.7%22%20r%3D%229.5%22%20fill%3D%22%23FF3B30%22%20mask%3D%22url(%23m)%22%2F%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2213%22%20r%3D%229.2%22%20fill%3D%22none%22%20stroke%3D%22%23EDEDED%22%20stroke-width%3D%221.6%22%2F%3E%3C%2Fsvg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:#0A0A0A; color:#EDEDED; font-family:'Geist',system-ui,sans-serif; font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; }
+  a { color:#EDEDED; text-decoration:none; }
+  a:hover { color:#FFFFFF; }
+  button { font-family:inherit; }
+  ::selection { background:rgba(255,59,48,0.35); color:#FFFFFF; }
+  *::-webkit-scrollbar { width:8px; height:8px; }
+  *::-webkit-scrollbar-thumb { background:#1C1C1E; }
+  @keyframes noct-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  @keyframes noct-toast { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:none; } }
+  [data-focus="on"], [data-focus="on"] [style*="background: rgb(10, 10, 10)"], [data-focus="on"] [style*="background: rgb(12, 12, 13)"], [data-focus="on"] [style*="background: rgb(17, 17, 18)"] { background-color:#000000 !important; }
+  [data-focus="on"] [style*="rgba(12, 12, 13"] { background-color:rgba(0,0,0,0.6) !important; }
+  [data-focus="on"] [style*="rgba(255, 255, 255, 0.08)"], [data-focus="on"] [style*="rgba(255, 255, 255, 0.05)"], [data-focus="on"] [style*="rgba(255, 255, 255, 0.1)"] { border-color:rgba(255,255,255,0.035) !important; }
+  [data-focus="on"] [style*="color: rgb(255, 59, 48)"]:not([style*="background"]) { text-shadow:0 0 14px rgba(255,59,48,0.65); }
+  [data-focus="on"] [style*="background: rgb(255, 59, 48)"] { box-shadow:0 0 16px rgba(255,59,48,0.5); }
+  [data-focus="on"] [style*="solid rgb(255, 59, 48)"] { box-shadow:0 0 14px rgba(255,59,48,0.35); }
+  [data-focus="on"] [data-logo-btn] svg { filter:drop-shadow(0 0 6px rgba(255,59,48,0.8)); }
+  [data-focus="on"] [data-fade="hl"] { background:linear-gradient(90deg, #000 0%, rgba(0,0,0,0.7) 38%, rgba(0,0,0,0) 70%) !important; }
+  [data-focus="on"] [data-fade="hb"] { background:linear-gradient(180deg, rgba(0,0,0,0), #000) !important; }
+  [data-focus="on"] [data-fade="ft"] { background:radial-gradient(ellipse 60% 70% at 50% 45%, rgba(0,0,0,0.92), rgba(0,0,0,0.2)) !important; }
+  @keyframes noct-blink { 0%,49% { opacity:1; } 50%,100% { opacity:0; } }
+  @media (max-width: 960px) {
+    [data-nav-links] { visibility:hidden !important; width:0 !important; overflow:hidden !important; }
+    [data-hero-grid], [data-split], [data-demo-grid], [data-priv-grid], [data-plans] { grid-template-columns:1fr !important; }
+    [data-sticky] { position:static !important; }
+    [data-spec] { grid-template-columns:repeat(2,1fr) !important; }
+    [data-step-desc] { display:none !important; }
+    [data-vault-copy] { top:auto !important; bottom:28px !important; transform:none !important; gap:18px !important; }
+    [data-vault-h2], [data-vlabel], [data-vault-desc] { display:none !important; }
+  }
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" data-focus="{{ focusAttr }}" style="position:relative; background:#0A0A0A; color:#EDEDED; min-height:100vh;">
+
+  <header ref="{{ navRef }}" style="position:fixed; top:0; left:0; right:0; z-index:50; background-color:rgba(10,10,10,0); border-bottom:1px solid transparent; transition:background-color .25s, border-color .25s;">
+    <div style="max-width:1280px; margin:0 auto; padding:0 clamp(20px,4vw,40px); height:64px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:24px;">
+      <div style="justify-self:start; display:flex; align-items:center; gap:12px;">
+        <button type="button" data-logo-btn onClick="{{ toggleFocus }}" aria-pressed="{{ focusPressed }}" aria-label="Toggle 3 AM Deep Focus Mode" title="3 AM" style="padding:0; margin:0; border:none; background:none; cursor:pointer; display:flex; transition:transform .3s;" style-hover="transform:rotate(-20deg);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:block; flex-shrink:0;"><defs><mask id="nlm1"><rect width="24" height="24" fill="#FFFFFF"></rect><circle cx="11" cy="13" r="10.7" fill="#000000"></circle></mask></defs><circle cx="13.3" cy="10.7" r="9.5" fill="#FF3B30" mask="url(#nlm1)"></circle><circle cx="11" cy="13" r="9.4" stroke="#EDEDED" stroke-width="1.25"></circle></svg></button>
+        <a href="#top" style="font-size:13px; font-weight:600; letter-spacing:0.34em; color:#EDEDED;">NOCTURNE</a>
+      </div>
+      <nav data-nav-links style="display:flex; align-items:center; gap:36px;">
+        <a href="#workflows" style="font-size:13px; color:#9A9A9F; transition:color .2s;" style-hover="color:#EDEDED;">Workflows</a>
+        <a href="#architecture" style="font-size:13px; color:#9A9A9F; transition:color .2s;" style-hover="color:#EDEDED;">Architecture</a>
+        <a href="#privacy" style="font-size:13px; color:#9A9A9F; transition:color .2s;" style-hover="color:#EDEDED;">Privacy</a>
+        <a href="#pricing" style="font-size:13px; color:#9A9A9F; transition:color .2s;" style-hover="color:#EDEDED;">Pricing</a>
+      </nav>
+      <div style="justify-self:end; display:flex; align-items:center; gap:6px;">
+        <a href="Sign Up.dc.html" style="height:34px; padding:0 14px; display:inline-flex; align-items:center; font-size:13px; color:#9A9A9F; white-space:nowrap; transition:color .2s;" style-hover="color:#EDEDED;">Log in</a>
+        <a href="Sign Up.dc.html" style="height:34px; padding:0 14px; display:inline-flex; align-items:center; gap:10px; border-radius:2px; background:#FF3B30; color:#0A0A0A; font-size:13px; font-weight:500; white-space:nowrap; transition:background .2s;" style-hover="background:#FF5147; color:#0A0A0A;">Get started <span style="font-family:'Geist Mono',monospace; font-size:12px;">→</span></a>
+      </div>
+    </div>
+  </header>
+
+  <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position:fixed; top:76px; right:clamp(16px,3vw,32px); z-index:60; min-width:270px; padding:14px 16px; background:#000000; border:1px solid rgba(255,59,48,0.45); font-family:'Geist Mono',monospace; font-size:11.5px; line-height:1.9; letter-spacing:0.06em; color:#CFCFD2; animation:noct-toast .45s cubic-bezier(.22,1,.36,1) both;">
+      <div style="animation:noct-in .3s .15s ease both;"><span style="color:#FF3B30;">&gt;</span> SYSTEM STATE: 03:00_LOCAL_TIME</div>
+      <div style="animation:noct-in .3s .4s ease both;"><span style="color:#FF3B30;">&gt;</span> NOISE FILTER: MAXIMUM</div>
+      <div style="animation:noct-in .3s .65s ease both;"><span style="color:#FF3B30;">&gt;</span> RED ZONE: <span style="color:#FF3B30;">ACTIVE</span></div>
+    </div>
+  </sc-if>
+
+  <span id="top"></span>
+  <section style="position:relative; min-height:100vh; padding:150px clamp(20px,4vw,40px) 110px; background:#0A0A0A; overflow:hidden; border-bottom:1px solid rgba(255,255,255,0.08); box-sizing:border-box; display:flex; align-items:center;">
+    <canvas data-contour="hero" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"></canvas>
+    <div data-fade="hl" style="position:absolute; inset:0; background:linear-gradient(90deg, #0A0A0A 0%, rgba(10,10,10,0.7) 38%, rgba(10,10,10,0) 70%); pointer-events:none;"></div>
+    <div data-fade="hb" style="position:absolute; left:0; right:0; bottom:0; height:140px; background:linear-gradient(180deg, rgba(10,10,10,0), #0A0A0A); pointer-events:none;"></div>
+    <div ref="{{ readoutRef }}" style="position:absolute; top:0; left:0; z-index:3; font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.08em; color:#9A9A9F; white-space:nowrap; pointer-events:none; opacity:0; transition:opacity .25s;"></div>
+
+    <div data-hero-grid style="position:relative; z-index:2; width:100%; max-width:1280px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); gap:clamp(40px,5vw,80px); align-items:center;">
+      <div style="display:flex; flex-direction:column; gap:30px;">
+        <div style="display:flex; align-items:center; gap:10px; font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9A9A9F;">
+          <span style="width:6px; height:6px; background:#FF3B30;"></span>RUNS ENTIRELY IN YOUR BROWSER
+        </div>
+        <h1 style="margin:0; font-family:'Archivo',sans-serif; font-stretch:82%; font-weight:600; font-size:clamp(46px,6.2vw,92px); line-height:0.95; letter-spacing:-0.035em; color:#EDEDED; text-wrap:balance;">Two paths to mastery.<br><span style="color:#FF3B30;">Zero noise.</span></h1>
+        <p style="margin:0; max-width:540px; font-size:17px; line-height:1.6; color:#9A9A9F; text-wrap:pretty;">Whether you need an automated pipeline to extract the Red Zone or an infinite canvas to map complex conceptual structures, Nocturne runs locally, privately, and ruthlessly fast.</p>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; max-width:560px; border:1px solid rgba(255,255,255,0.08); background:rgba(12,12,13,0.7);">
+          <button type="button" onClick="{{ setA }}" style="{{ pathBtnA }}">
+            <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.16em;">PATH A</span>
+            <span style="font-size:14px; font-weight:500;">Zero-Effort Pipeline</span>
+          </button>
+          <button type="button" onClick="{{ setB }}" style="{{ pathBtnB }}">
+            <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.16em;">PATH B</span>
+            <span style="font-size:14px; font-weight:500;">Deep Knowledge Engine</span>
+          </button>
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:24px;">
+          <a href="Sign Up.dc.html" style="height:44px; padding:0 20px; display:inline-flex; align-items:center; gap:10px; border-radius:2px; background:#FF3B30; color:#0A0A0A; font-size:14px; font-weight:500; transition:background .2s;" style-hover="background:#FF5147; color:#0A0A0A;">Get started <span style="font-family:'Geist Mono',monospace;">→</span></a>
+          <a href="#demo" style="font-size:14px; color:#9A9A9F; display:inline-flex; gap:8px; align-items:center; transition:color .2s;" style-hover="color:#EDEDED;">Watch it run <span style="font-family:'Geist Mono',monospace;">→</span></a>
+        </div>
+      </div>
+
+      <div style="border:1px solid rgba(255,255,255,0.08); background:#0C0C0D;">
+        <div style="height:36px; display:grid; grid-template-columns:60px 1fr 60px; align-items:center; padding:0 12px; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; gap:6px;"><span style="width:7px; height:7px; background:rgba(255,255,255,0.16);"></span><span style="width:7px; height:7px; background:rgba(255,255,255,0.16);"></span><span style="width:7px; height:7px; background:rgba(255,255,255,0.16);"></span></div>
+          <div style="text-align:center; font-family:'Geist Mono',monospace; font-size:11px; color:#76767B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ inspectorPath }}</div>
+          <div style="text-align:right; font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:0.12em; color:#76767B;">LOCAL</div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-bottom:1px solid rgba(255,255,255,0.08);">
+          <sc-for list="{{ subjTabs }}" as="sb" hint-placeholder-count="3">
+            <button type="button" onClick="{{ sb.onClick }}" style="{{ sb.style }}">
+              <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.14em;">{{ sb.code }}</span>
+              <span style="font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ sb.topic }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ isA }}" hint-placeholder-val="{{ true }}">
+          <div style="height:440px; display:flex; flex-direction:column; animation:noct-in .4s ease both;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid rgba(255,255,255,0.08);">
+              <div style="padding:20px 22px; border-right:1px solid rgba(255,255,255,0.08);">
+                <div style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.14em; color:#76767B;">TOP CONFIDENCE</div>
+                <div style="font-family:'Geist Mono',monospace; font-size:44px; line-height:1.1; letter-spacing:-0.02em; color:#FF3B30; margin-top:6px;">{{ subj.top }}</div>
+              </div>
+              <div style="padding:20px 22px;">
+                <div style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.14em; color:#76767B;">RED ZONE</div>
+                <div style="font-family:'Geist Mono',monospace; font-size:44px; line-height:1.1; letter-spacing:-0.02em; color:#EDEDED; margin-top:6px;">{{ subj.red }}<span style="font-size:16px; color:#76767B;"> / {{ subj.terms }} terms</span></div>
+              </div>
+            </div>
+            <div style="padding:8px 0; flex:1;">
+              <div style="display:grid; grid-template-columns:44px minmax(0,1fr) 56px 72px; padding:8px 22px; font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#76767B;"><span>#</span><span>TERM</span><span>CONF</span><span style="text-align:right;">ZONE</span></div>
+              <sc-for list="{{ heroRows }}" as="r" hint-placeholder-count="5">
+                <div style="display:grid; grid-template-columns:44px minmax(0,1fr) 56px 72px; align-items:center; padding:10px 22px; border-top:1px solid rgba(255,255,255,0.05);">
+                  <span style="font-family:'Geist Mono',monospace; font-size:11px; color:#76767B;">{{ r.rank }}</span>
+                  <div style="display:flex; flex-direction:column; gap:7px; padding-right:16px; min-width:0;">
+                    <span style="font-size:13.5px; color:#EDEDED; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ r.n }}</span>
+                    <div style="height:1px; background:rgba(255,255,255,0.08);"><div style="{{ r.barStyle }}"></div></div>
+                  </div>
+                  <span style="{{ r.valStyle }}">{{ r.v }}</span>
+                  <span style="{{ r.zoneStyle }}">{{ r.z }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="padding:12px 22px; border-top:1px solid rgba(255,255,255,0.08); font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.1em; color:#76767B; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;"><span>PROCESSED IN {{ subj.time }}</span><span>0 BYTES UPLOADED</span></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isB }}" hint-placeholder-val="{{ false }}">
+          <div style="height:440px; display:flex; flex-direction:column; animation:noct-in .4s ease both;">
+            <div style="position:relative; flex:1; border-bottom:1px solid rgba(255,255,255,0.08); overflow:hidden; background-image:radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px); background-size:20px 20px;">
+              {{ graphEdges }}
+              <sc-for list="{{ heroNodes }}" as="nd" hint-placeholder-count="7">
+                <div style="{{ nd.style }}"><span>{{ nd.l }}</span><span style="color:#FF3B30;">{{ nd.c }}</span></div>
+              </sc-for>
+            </div>
+            <div style="display:grid; grid-template-columns:110px 1fr; row-gap:8px; padding:16px 22px; font-family:'Geist Mono',monospace; font-size:11.5px;">
+              <span style="color:#76767B; letter-spacing:0.1em;">NODE</span><span style="color:#EDEDED;">{{ subj.focus }}</span>
+              <span style="color:#76767B; letter-spacing:0.1em;">CONFIDENCE</span><span style="color:#FF3B30;">{{ subj.top }} · RED ZONE</span>
+              <span style="color:#76767B; letter-spacing:0.1em;">REFERENCED</span><span style="color:#9A9A9F;">{{ subj.refs }}</span>
+              <span style="color:#76767B; letter-spacing:0.1em;">EDGES</span><span style="color:#9A9A9F;">5 linked concepts</span>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </section>
+
+  <section ref="{{ vaultRef }}" id="engine" style="position:relative; height:300vh; border-bottom:1px solid rgba(255,255,255,0.08);">
+    <div style="position:sticky; top:0; height:100vh; overflow:hidden; background:#0A0A0A;">
+      <div ref="{{ vaultHostRef }}" style="position:absolute; inset:0;"></div>
+      <div ref="{{ vaultLabelsRef }}" style="position:absolute; inset:0; pointer-events:none; z-index:1;">
+        <sc-for list="{{ vaultLabels }}" as="vl" hint-placeholder-count="5">
+          <div data-vlabel style="position:absolute; top:0; left:0; opacity:0; display:flex; align-items:center; gap:10px; font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.12em; white-space:nowrap; color:#76767B;"><span style="width:18px; height:1px; background:rgba(255,255,255,0.28);"></span><span style="{{ vl.kStyle }}">{{ vl.k }}</span><span>{{ vl.v }}</span></div>
+        </sc-for>
+        <div data-vred style="position:absolute; top:0; left:0; opacity:0; display:flex; flex-direction:column; gap:4px; padding:8px 10px; border:1px solid rgba(255,59,48,0.5); background:rgba(10,10,10,0.85); font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.12em; white-space:nowrap;">
+          <span style="color:#FF3B30;">RED ZONE · 0.94</span>
+          <span style="color:#CFCFD2; letter-spacing:0.04em;">electron transport chain</span>
+        </div>
+      </div>
+      <div data-vault-copy style="position:absolute; z-index:2; left:max(clamp(20px,4vw,40px), calc((100% - 1280px) / 2 + clamp(20px,4vw,40px))); top:50%; transform:translateY(-50%); width:min(380px, calc(100% - 40px)); display:flex; flex-direction:column; gap:32px;">
+        <div style="display:flex; flex-direction:column; gap:18px;">
+          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF3B30;">THE ENGINE</span>
+          <h2 data-vault-h2 style="margin:0; font-family:'Archivo',sans-serif; font-stretch:82%; font-weight:600; font-size:clamp(34px,3.6vw,52px); line-height:1; letter-spacing:-0.03em; text-wrap:balance;">From local vault to knowledge graph.</h2>
+        </div>
+        <div style="position:relative; display:flex; flex-direction:column; gap:22px; padding-left:22px;">
+          <span style="position:absolute; left:0; top:4px; bottom:4px; width:1px; background:rgba(255,255,255,0.1);"></span>
+          <span ref="{{ railRef }}" style="position:absolute; left:0; top:4px; bottom:4px; width:1px; background:#FF3B30; transform:scaleY(0); transform-origin:top;"></span>
+          <sc-for list="{{ vaultPhases }}" as="ph" hint-placeholder-count="3">
+            <div style="{{ ph.style }}">
+              <div style="display:flex; gap:12px; align-items:baseline;"><span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.18em;">{{ ph.n }}</span><span style="font-size:16px; font-weight:500;">{{ ph.t }}</span></div>
+              <p data-vault-desc style="{{ ph.descStyle }}">{{ ph.d }}</p>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="demo" style="position:relative; scroll-margin-top:64px; padding:clamp(88px,10vw,140px) clamp(20px,4vw,40px); border-bottom:1px solid rgba(255,255,255,0.08);">
+    <div style="max-width:1280px; margin:0 auto; display:flex; flex-direction:column; gap:48px;">
+      <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:40px; align-items:end;" data-split>
+        <div style="display:flex; flex-direction:column; gap:18px;">
+          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF3B30;">APP BEHAVIOR</span>
+          <h2 style="margin:0; font-family:'Archivo',sans-serif; font-stretch:82%; font-weight:600; font-size:clamp(34px,4.2vw,56px); line-height:1; letter-spacing:-0.03em;">One session, three states.</h2>
+        </div>
+        <p style="margin:0; max-width:460px; font-size:16px; color:#9A9A9F; text-wrap:pretty;">Step through how a single lecture moves from raw files to a ranked Red Zone and a navigable concept map. Nothing here touches a server.</p>
+      </div>
+
+      <div onMouseEnter="{{ pauseDemo }}" onMouseLeave="{{ resumeDemo }}" style="border:1px solid rgba(255,255,255,0.08); background:#0C0C0D;">
+        <div style="height:40px; display:grid; grid-template-columns:80px 1fr 80px; align-items:center; padding:0 14px; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; gap:6px;"><span style="width:8px; height:8px; background:rgba(255,255,255,0.16);"></span><span style="width:8px; height:8px; background:rgba(255,255,255,0.16);"></span><span style="width:8px; height:8px; background:rgba(255,255,255,0.16);"></span></div>
+          <div style="text-align:center; font-family:'Geist Mono',monospace; font-size:11.5px; color:#76767B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Nocturne — BIOL 201 / Lecture 14</div>
+          <div style="text-align:right; font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:0.12em; color:#76767B;">OFFLINE</div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-bottom:1px solid rgba(255,255,255,0.08);">
+          <sc-for list="{{ steps }}" as="st" hint-placeholder-count="3">
+            <button type="button" onClick="{{ st.onClick }}" style="{{ st.style }}">
+              <span style="position:absolute; top:-1px; left:0; right:0; height:1px; background:rgba(255,255,255,0.06);"></span>
+              <span data-step-bar style="position:absolute; top:-1px; left:0; right:0; height:2px; background:#FF3B30; transform:scaleX(0); transform-origin:left;"></span>
+              <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.2em;">{{ st.n }}</span>
+              <span style="font-size:15px; font-weight:500;">{{ st.l }}</span>
+              <span data-step-desc style="font-size:12.5px; line-height:1.5; color:#76767B;">{{ st.d }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="position:relative; height:500px; overflow:hidden;">
+          <sc-if value="{{ isDrop }}" hint-placeholder-val="{{ true }}">
+            <div data-demo-grid style="position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);">
+              <div style="padding:32px; border-right:1px solid rgba(255,255,255,0.08); display:flex;">
+                <div style="flex:1; border:1px dashed rgba(255,255,255,0.18); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:24px;">
+                  <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.18em; color:#76767B;">DROP AUDIO + SLIDES</span>
+                  <div style="display:flex; flex-direction:column; gap:10px; width:100%; max-width:380px;">
+                    <div style="display:grid; grid-template-columns:44px 1fr auto; align-items:center; gap:12px; padding:12px 14px; border:1px solid rgba(255,255,255,0.12); background:#111112; animation:noct-in .5s .2s ease both;">
+                      <span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:0.1em; color:#9A9A9F; border:1px solid rgba(255,255,255,0.12); padding:2px 0; text-align:center;">M4A</span>
+                      <span style="font-size:13.5px;">lecture-14.m4a</span>
+                      <span style="font-family:'Geist Mono',monospace; font-size:11px; color:#76767B;">48:12</span>
+                    </div>
+                    <div style="display:grid; grid-template-columns:44px 1fr auto; align-items:center; gap:12px; padding:12px 14px; border:1px solid rgba(255,255,255,0.12); background:#111112; animation:noct-in .5s .55s ease both;">
+                      <span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:0.1em; color:#9A9A9F; border:1px solid rgba(255,255,255,0.12); padding:2px 0; text-align:center;">PDF</span>
+                      <span style="font-size:13.5px;">L14-oxidative-phosphorylation.pdf</span>
+                      <span style="font-family:'Geist Mono',monospace; font-size:11px; color:#76767B;">38 pp</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="padding:32px; display:flex; flex-direction:column; gap:0;">
+                <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.16em; color:#76767B; padding-bottom:14px;">INGEST</span>
+                <div style="display:grid; grid-template-columns:1fr auto; padding:13px 0; border-top:1px solid rgba(255,255,255,0.08); font-size:13.5px; animation:noct-in .4s .8s ease both;"><span style="color:#9A9A9F;">Audio</span><span style="font-family:'Geist Mono',monospace; font-size:12px;">48:12 · 61.4 MB</span></div>
+                <div style="display:grid; grid-template-columns:1fr auto; padding:13px 0; border-top:1px solid rgba(255,255,255,0.08); font-size:13.5px; animation:noct-in .4s 1s ease both;"><span style="color:#9A9A9F;">Slides</span><span style="font-family:'Geist Mono',monospace; font-size:12px;">38 extracted</span></div>
+                <div style="display:grid; grid-template-columns:1fr auto; padding:13px 0; border-top:1px solid rgba(255,255,255,0.08); font-size:13.5px; animation:noct-in .4s 1.2s ease both;"><span style="color:#9A9A9F;">Study guide</span><span style="font-family:'Geist Mono',monospace; font-size:12px; color:#76767B;">optional</span></div>
+                <div style="display:grid; grid-template-columns:1fr auto; padding:13px 0; border-top:1px solid rgba(255,255,255,0.08); border-bottom:1px solid rgba(255,255,255,0.08); font-size:13.5px; animation:noct-in .4s 1.4s ease both;"><span style="color:#9A9A9F;">Network</span><span style="font-family:'Geist Mono',monospace; font-size:12px;">disabled</span></div>
+                <div style="margin-top:auto; font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.1em; color:#EDEDED; animation:noct-in .4s 1.7s ease both;">LINKED · READY TO RUN</div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isPipe }}" hint-placeholder-val="{{ false }}">
+            <div data-demo-grid style="position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);">
+              <div ref="{{ termRef }}" style="padding:24px 28px; border-right:1px solid rgba(255,255,255,0.08); overflow-y:auto; font-family:'Geist Mono',monospace; font-size:12.5px; line-height:1.95; background:#0A0A0A;">
+                <sc-for list="{{ termLines }}" as="ln" hint-placeholder-count="6">
+                  <div style="display:grid; grid-template-columns:64px 76px minmax(0,1fr) auto; gap:10px; animation:noct-in .25s ease both;">
+                    <span style="color:#5E5E62;">{{ ln.ts }}</span>
+                    <span style="color:#76767B;">[{{ ln.src }}]</span>
+                    <span style="{{ ln.msgStyle }}">{{ ln.msg }}</span>
+                    <span style="{{ ln.valStyle }}">{{ ln.val }}</span>
+                  </div>
+                </sc-for>
+                <span style="display:inline-block; width:8px; height:14px; background:#EDEDED; vertical-align:middle; animation:noct-blink 1s steps(1) infinite;"></span>
+              </div>
+              <div style="padding:24px 28px; display:flex; flex-direction:column;">
+                <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.16em; color:#76767B; padding-bottom:14px;">CONFIDENCE · LIVE</span>
+                <sc-for list="{{ scored }}" as="sc" hint-placeholder-count="0">
+                  <div style="display:flex; flex-direction:column; gap:8px; padding:13px 0; border-top:1px solid rgba(255,255,255,0.08); animation:noct-in .3s ease both;">
+                    <div style="display:flex; justify-content:space-between; gap:12px; font-size:13.5px;"><span>{{ sc.n }}</span><span style="{{ sc.valStyle }}">{{ sc.v }}</span></div>
+                    <div style="height:1px; background:rgba(255,255,255,0.08);"><div style="{{ sc.barStyle }}"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isMap }}" hint-placeholder-val="{{ false }}">
+            <div data-demo-grid style="position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);">
+              <div style="position:relative; overflow:hidden; border-right:1px solid rgba(255,255,255,0.08); background:#0A0A0A;">
+                <div style="{{ mapInnerStyle }}">
+                  {{ graphEdges }}
+                  <sc-for list="{{ nodes }}" as="nd" hint-placeholder-count="7">
+                    <div style="{{ nd.style }}"><span>{{ nd.l }}</span><span style="color:#FF3B30;">{{ nd.c }}</span></div>
+                  </sc-for>
+                </div>
+                <div style="position:absolute; left:16px; bottom:14px; font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.12em; color:#76767B;">{{ zoomLabel }}</div>
+              </div>
+              <div style="padding:24px 28px; display:flex; flex-direction:column;">
+                <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.16em; color:#76767B; padding-bottom:14px;">INSPECTOR</span>
+                <div style="font-family:'Archivo',sans-serif; font-stretch:85%; font-size:24px; font-weight:600; letter-spacing:-0.02em; line-height:1.15; padding-bottom:18px;">electron transport chain</div>
+                <div style="display:grid; grid-template-columns:1fr auto; padding:12px 0; border-top:1px solid rgba(255,255,255,0.08); font-size:13px;"><span style="color:#9A9A9F;">Confidence</span><span style="font-family:'Geist Mono',monospace; color:#FF3B30;">0.94</span></div>
+                <div style="display:grid; grid-template-columns:1fr auto; padding:12px 0; border-top:1px solid rgba(255,255,255,0.08); font-size:13px;"><span style="color:#9A9A9F;">First introduced</span><span style="font-family:'Geist Mono',monospace;">L09 · 21:40</span></div>
+                <div style="display:grid; grid-template-columns:1fr auto; padding:12px 0; border-top:1px solid rgba(255,255,255,0.08); font-size:13px;"><span style="color:#9A9A9F;">Peak emphasis</span><span style="font-family:'Geist Mono',monospace;">L14 · slide 07</span></div>
+                <div style="display:grid; grid-template-columns:1fr auto; padding:12px 0; border-top:1px solid rgba(255,255,255,0.08); border-bottom:1px solid rgba(255,255,255,0.08); font-size:13px;"><span style="color:#9A9A9F;">Linked concepts</span><span style="font-family:'Geist Mono',monospace;">5</span></div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="workflows" style="position:relative; scroll-margin-top:64px; padding:clamp(88px,10vw,140px) clamp(20px,4vw,40px); border-bottom:1px solid rgba(255,255,255,0.08);">
+    <div data-split style="max-width:1280px; margin:0 auto; display:grid; grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr); gap:clamp(40px,6vw,100px); align-items:start;">
+      <div data-sticky style="position:sticky; top:120px; display:flex; flex-direction:column; gap:22px;">
+        <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF3B30;">PATH A</span>
+        <h2 style="margin:0; font-family:'Archivo',sans-serif; font-stretch:82%; font-weight:600; font-size:clamp(36px,4.6vw,64px); line-height:0.98; letter-spacing:-0.035em;">The Zero-Effort Pipeline.</h2>
+        <p style="margin:0; max-width:420px; font-size:16px; color:#9A9A9F; text-wrap:pretty;">Drop in what you already have. Nocturne transcribes, aligns, and ranks without a single prompt, then hands you the Red Zone.</p>
+        <div style="display:flex; flex-direction:column; gap:4px; padding-top:22px; margin-top:6px; border-top:1px solid rgba(255,255,255,0.08); max-width:420px;">
+          <span style="font-family:'Geist Mono',monospace; font-size:clamp(40px,4vw,56px); line-height:1.05; letter-spacing:-0.02em; color:#FF3B30;">1m 36s</span>
+          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.1em; color:#76767B;">48-MIN LECTURE → RANKED RED ZONE</span>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column;">
+        <div style="display:grid; grid-template-columns:clamp(84px,10vw,140px) minmax(0,1fr); gap:24px; padding:40px 0; border-top:1px solid rgba(255,255,255,0.08);">
+          <span style="font-family:'Geist Mono',monospace; font-size:clamp(28px,3vw,40px); letter-spacing:0.24em; color:#FF3B30; line-height:1;">01</span>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <h3 style="margin:0; font-size:22px; font-weight:500; letter-spacing:-0.015em;">Ingest raw sources</h3>
+            <p style="margin:0; font-size:15px; color:#9A9A9F; max-width:520px; text-wrap:pretty;">Lecture audio, slide decks, and an optional study guide. No tagging, no cleanup, no templates to fill in.</p>
+            <span style="font-family:'Geist Mono',monospace; font-size:11.5px; color:#76767B;">.m4a .mp3 .wav · .pdf .pptx · .docx .apkg</span>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:clamp(84px,10vw,140px) minmax(0,1fr); gap:24px; padding:40px 0; border-top:1px solid rgba(255,255,255,0.08);">
+          <span style="font-family:'Geist Mono',monospace; font-size:clamp(28px,3vw,40px); letter-spacing:0.24em; color:#FF3B30; line-height:1;">02</span>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <h3 style="margin:0; font-size:22px; font-weight:500; letter-spacing:-0.015em;">Align on-device</h3>
+            <p style="margin:0; font-size:15px; color:#9A9A9F; max-width:520px; text-wrap:pretty;">Whisper transcribes locally. Every word is synced to the slide on screen, so Nocturne knows how long the professor dwelled and how often each term came back.</p>
+            <span style="font-family:'Geist Mono',monospace; font-size:11.5px; color:#76767B;">word-level timestamps · silence-gap slide sync</span>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:clamp(84px,10vw,140px) minmax(0,1fr); gap:24px; padding:40px 0; border-top:1px solid rgba(255,255,255,0.08); border-bottom:1px solid rgba(255,255,255,0.08);">
+          <span style="font-family:'Geist Mono',monospace; font-size:clamp(28px,3vw,40px); letter-spacing:0.24em; color:#FF3B30; line-height:1;">03</span>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <h3 style="margin:0; font-size:22px; font-weight:500; letter-spacing:-0.015em;">Extract the Red Zone</h3>
+            <p style="margin:0; font-size:15px; color:#9A9A9F; max-width:520px; text-wrap:pretty;">Each term gets a confidence score from dwell time, repetition, and study-guide alignment. The top tier is your Red Zone, ready to export as tagged Anki cards.</p>
+            <span style="font-family:'Geist Mono',monospace; font-size:11.5px; color:#76767B;">red_zone.json · export → .apkg</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="architecture" style="position:relative; scroll-margin-top:64px; padding:clamp(88px,10vw,140px) clamp(20px,4vw,40px); border-bottom:1px solid rgba(255,255,255,0.08);">
+    <div style="max-width:1280px; margin:0 auto; display:flex; flex-direction:column; gap:clamp(56px,7vw,96px);">
+      <div data-split style="display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr); gap:clamp(40px,6vw,100px); align-items:center;">
+        <div style="position:relative; border:1px solid rgba(255,255,255,0.08); background:#0C0C0D; overflow:hidden;">
+          <canvas data-contour="card" style="position:absolute; inset:0; width:100%; height:100%;"></canvas>
+          <div style="position:absolute; inset:0; backdrop-filter:blur(60px); -webkit-backdrop-filter:blur(60px); background:rgba(12,12,13,0.5);"></div>
+          <div style="position:relative; padding:28px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; padding-bottom:18px; font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:0.14em; color:#9A9A9F;"><span>CROSS-REFERENCE</span><span>BIOL 201 · 3 LECTURES</span></div>
+            <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,0.7fr)); font-family:'Geist Mono',monospace; font-size:11.5px; border-top:1px solid rgba(255,255,255,0.1);">
+              <span style="padding:12px 0; color:#76767B; letter-spacing:0.1em;">CONCEPT</span><span style="padding:12px 0; color:#76767B; letter-spacing:0.1em;">L09</span><span style="padding:12px 0; color:#76767B; letter-spacing:0.1em;">L12</span><span style="padding:12px 0; color:#76767B; letter-spacing:0.1em;">L14</span>
+            </div>
+            <sc-for list="{{ xrefRows }}" as="x" hint-placeholder-count="5">
+              <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,0.7fr)); align-items:center; border-top:1px solid rgba(255,255,255,0.08); font-size:13.5px;">
+                <span style="padding:13px 12px 13px 0; color:#EDEDED;">{{ x.n }}</span>
+                <span style="{{ x.s0 }}">{{ x.a }}</span>
+                <span style="{{ x.s1 }}">{{ x.b }}</span>
+                <span style="{{ x.s2 }}">{{ x.c }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:22px;">
+          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF3B30;">PATH B</span>
+          <h2 style="margin:0; font-family:'Archivo',sans-serif; font-stretch:82%; font-weight:600; font-size:clamp(36px,4.6vw,64px); line-height:0.98; letter-spacing:-0.035em;">The Deep Knowledge Engine.</h2>
+          <p style="margin:0; font-size:16px; color:#9A9A9F; text-wrap:pretty;">For material that doesn't fit in a list. Every session feeds one infinite canvas where concepts link across lectures, so you can trace an idea from the day it was introduced to the day it was tested.</p>
+          <div style="display:flex; flex-direction:column; margin-top:8px;">
+            <div style="display:grid; grid-template-columns:140px minmax(0,1fr); gap:16px; padding:16px 0; border-top:1px solid rgba(255,255,255,0.08);"><span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#76767B; padding-top:2px;">CANVAS</span><span style="font-size:14.5px; color:#CFCFD2;">Infinite, zoomable concept map built from your sessions.</span></div>
+            <div style="display:grid; grid-template-columns:140px minmax(0,1fr); gap:16px; padding:16px 0; border-top:1px solid rgba(255,255,255,0.08);"><span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#76767B; padding-top:2px;">CROSS-LECTURE</span><span style="font-size:14.5px; color:#CFCFD2;">The same term in L09 and L14 resolves to one node, with both timestamps.</span></div>
+            <div style="display:grid; grid-template-columns:140px minmax(0,1fr); gap:16px; padding:16px 0; border-top:1px solid rgba(255,255,255,0.08); border-bottom:1px solid rgba(255,255,255,0.08);"><span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#76767B; padding-top:2px;">VAULT</span><span style="font-size:14.5px; color:#CFCFD2;">Zero-knowledge, AES-GCM encrypted. Data never leaves the device.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="privacy" style="scroll-margin-top:96px; position:relative; border:1px solid rgba(255,255,255,0.08); background:#0C0C0D; overflow:hidden;">
+        <canvas data-contour="card" style="position:absolute; inset:0; width:100%; height:100%;"></canvas>
+        <div style="position:absolute; inset:0; backdrop-filter:blur(60px); -webkit-backdrop-filter:blur(60px); background:rgba(12,12,13,0.5);"></div>
+        <div data-priv-grid style="position:relative; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);">
+          <div style="padding:clamp(28px,4vw,48px); display:flex; flex-direction:column; gap:18px; border-right:1px solid rgba(255,255,255,0.08);">
+            <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF3B30;">PRIVACY</span>
+            <h3 style="margin:0; font-family:'Archivo',sans-serif; font-stretch:82%; font-weight:600; font-size:clamp(28px,3vw,40px); line-height:1.02; letter-spacing:-0.03em;">Your data never leaves the device.</h3>
+            <p style="margin:0; font-size:15px; color:#9A9A9F; max-width:400px; text-wrap:pretty;">Your passphrase derives the key that unlocks everything else, and it is never stored or transmitted. There is no password reset and no backdoor.</p>
+          </div>
+          <div style="padding:clamp(28px,4vw,48px); font-family:'Geist Mono',monospace; font-size:12.5px;">
+            <sc-for list="{{ keyChain }}" as="kc" hint-placeholder-count="7">
+              <div style="{{ kc.rowStyle }}"><span style="{{ kc.labelStyle }}">{{ kc.a }}</span><span style="{{ kc.valStyle }}">{{ kc.b }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:28px;">
+        <div style="display:flex; justify-content:space-between; align-items:end; gap:24px; flex-wrap:wrap;">
+          <h3 style="margin:0; font-family:'Archivo',sans-serif; font-stretch:82%; font-weight:600; font-size:clamp(28px,3vw,40px); line-height:1.02; letter-spacing:-0.03em;">Systems log.</h3>
+          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#FF3B30;">NOCTURNE VS. TRADITIONAL TOOLS</span>
+        </div>
+        <div style="position:relative; border:1px solid rgba(255,255,255,0.08); background:#0C0C0D; overflow:hidden;">
+          <canvas data-contour="card" style="position:absolute; inset:0; width:100%; height:100%;"></canvas>
+          <div style="position:absolute; inset:0; backdrop-filter:blur(60px); -webkit-backdrop-filter:blur(60px); background:rgba(12,12,13,0.62);"></div>
+          <div style="position:relative; overflow-x:auto;">
+            <div style="min-width:680px; font-family:'Geist Mono',monospace; font-size:12.5px;">
+              <div style="display:grid; grid-template-columns:56px minmax(0,2.2fr) repeat(3,minmax(0,1fr)); border-bottom:1px solid rgba(255,255,255,0.14); font-size:10.5px; letter-spacing:0.14em;">
+                <span style="padding:14px 0 14px 18px; color:#76767B;">ID</span>
+                <span style="padding:14px 12px; color:#76767B;">CAPABILITY</span>
+                <span style="padding:14px 12px; color:#76767B;">OTTER</span>
+                <span style="padding:14px 12px; color:#76767B;">NOTION AI</span>
+                <span style="padding:14px 12px; color:#FF3B30; border-left:1px solid rgba(255,59,48,0.4); background:rgba(255,59,48,0.05);">NOCTURNE</span>
+              </div>
+              <sc-for list="{{ compareRows }}" as="cr" hint-placeholder-count="9">
+                <div style="{{ cr.rowStyle }}">
+                  <span style="padding:12px 0 12px 18px; color:#5E5E62;">{{ cr.id }}</span>
+                  <span style="padding:12px; font-family:'Geist',sans-serif; font-size:14px; color:#CFCFD2;">{{ cr.label }}</span>
+                  <span style="padding:12px; color:#76767B;">{{ cr.o }}</span>
+                  <span style="padding:12px; color:#76767B;">{{ cr.no }}</span>
+                  <span style="padding:12px; color:#EDEDED; border-left:1px solid rgba(255,59,48,0.4); background:rgba(255,59,48,0.05);">{{ cr.n }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing" style="position:relative; scroll-margin-top:64px; padding:clamp(88px,10vw,140px) clamp(20px,4vw,40px); border-bottom:1px solid rgba(255,255,255,0.08);">
+    <div style="max-width:1280px; margin:0 auto; display:flex; flex-direction:column; gap:48px;">
+      <div data-split style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:40px; align-items:end;">
+        <div style="display:flex; flex-direction:column; gap:18px;">
+          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF3B30;">PRICING</span>
+          <h2 style="margin:0; font-family:'Archivo',sans-serif; font-stretch:82%; font-weight:600; font-size:clamp(34px,4.2vw,56px); line-height:1; letter-spacing:-0.03em;">The free tier is the full product.</h2>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:20px; align-items:flex-start;">
+          <p style="margin:0; max-width:460px; font-size:16px; color:#9A9A9F; text-wrap:pretty;">The complete core pipeline is free. Paid tiers add sharper transcription and more storage, never access to the basics.</p>
+          <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+            <div style="display:inline-flex; padding:3px; gap:3px; border:1px solid rgba(255,255,255,0.1);">
+              <button type="button" onClick="{{ setMonthly }}" style="{{ monthlyBtn }}">MONTHLY</button>
+              <button type="button" onClick="{{ setYearly }}" style="{{ yearlyBtn }}">YEARLY · SAVE 25%</button>
+            </div>
+            <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.08em; color:#76767B;">{{ billingHint }}</span>
+          </div>
+        </div>
+      </div>
+      <div data-plans style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border:1px solid rgba(255,255,255,0.08); background:#0C0C0D;">
+        <sc-for list="{{ plans }}" as="p" hint-placeholder-count="3">
+          <div style="{{ p.cardStyle }}">
+            <span style="{{ p.topBar }}"></span>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; min-height:22px;">
+              <span style="font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:0.18em; color:#EDEDED;">{{ p.name }}</span>
+              <span style="{{ p.badgeStyle }}">{{ p.badge }}</span>
+            </div>
+            <div style="display:flex; align-items:baseline; gap:10px;">
+              <span style="{{ p.strikeStyle }}">{{ p.strike }}</span>
+              <span style="font-family:'Geist Mono',monospace; font-size:48px; line-height:1; letter-spacing:-0.03em; color:#EDEDED;">{{ p.price }}</span>
+              <span style="font-family:'Geist Mono',monospace; font-size:12px; color:#76767B;">{{ p.period }}</span>
+            </div>
+            <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.06em; color:#76767B; margin-top:-8px;">{{ p.sub }}</span>
+            <p style="margin:0; font-size:14px; color:#9A9A9F;">{{ p.tagline }}</p>
+            <a href="{{ p.href }}" style="{{ p.ctaStyle }}">{{ p.cta }}</a>
+            <div style="display:flex; flex-direction:column; border-top:1px solid rgba(255,255,255,0.08); margin-top:4px;">
+              <sc-for list="{{ p.features }}" as="f" hint-placeholder-count="7">
+                <div style="display:grid; grid-template-columns:18px 1fr; gap:8px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:13.5px; color:#CFCFD2;"><span style="{{ p.markStyle }}">+</span><span>{{ f }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section style="position:relative; border-bottom:1px solid rgba(255,255,255,0.08);">
+    <div data-spec style="max-width:1280px; margin:0 auto; display:grid; grid-template-columns:repeat(4,minmax(0,1fr));">
+      <div style="padding:26px 16px; display:flex; align-items:center; justify-content:center; gap:10px; text-align:center; font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:0.14em; color:#CFCFD2; border-left:1px solid rgba(255,255,255,0.08);"><span style="width:5px; height:5px; background:#FF3B30; flex-shrink:0;"></span>100% LOCAL EXECUTION</div>
+      <div style="padding:26px 16px; display:flex; align-items:center; justify-content:center; gap:10px; text-align:center; font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:0.14em; color:#CFCFD2; border-left:1px solid rgba(255,255,255,0.08);"><span style="width:5px; height:5px; background:#FF3B30; flex-shrink:0;"></span>ZERO-KNOWLEDGE PRIVACY</div>
+      <div style="padding:26px 16px; display:flex; align-items:center; justify-content:center; gap:10px; text-align:center; font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:0.14em; color:#CFCFD2; border-left:1px solid rgba(255,255,255,0.08);"><span style="width:5px; height:5px; background:#FF3B30; flex-shrink:0;"></span>WASM / WHISPER ENGINE</div>
+      <div style="padding:26px 16px; display:flex; align-items:center; justify-content:center; gap:10px; text-align:center; font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:0.14em; color:#CFCFD2; border-left:1px solid rgba(255,255,255,0.08); border-right:1px solid rgba(255,255,255,0.08);"><span style="width:5px; height:5px; background:#FF3B30; flex-shrink:0;"></span>OFFLINE FIRST</div>
+    </div>
+  </section>
+
+  <footer id="start" style="position:relative; overflow:hidden;">
+    <canvas data-contour="footer" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"></canvas>
+    <div data-fade="ft" style="position:absolute; inset:0; background:radial-gradient(ellipse 60% 70% at 50% 45%, rgba(10,10,10,0.92), rgba(10,10,10,0.2)); pointer-events:none;"></div>
+    <div style="position:relative; padding:clamp(120px,14vw,200px) clamp(20px,4vw,40px); display:flex; justify-content:center;">
+      <div style="width:100%; max-width:640px; display:flex; flex-direction:column; align-items:center; gap:30px; text-align:center;">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:block; flex-shrink:0;"><defs><mask id="nlm2"><rect width="24" height="24" fill="#FFFFFF"></rect><circle cx="11" cy="13" r="10.7" fill="#000000"></circle></mask></defs><circle cx="13.3" cy="10.7" r="9.5" fill="#FF3B30" mask="url(#nlm2)"></circle><circle cx="11" cy="13" r="9.4" stroke="#EDEDED" stroke-width="1"></circle></svg>
+        <h2 style="margin:0; font-family:'Archivo',sans-serif; font-stretch:82%; font-weight:600; font-size:clamp(40px,5.4vw,76px); line-height:0.96; letter-spacing:-0.035em; text-wrap:balance;">Stop re-reading everything.</h2>
+        <a href="Sign Up.dc.html" style="height:50px; padding:0 26px; display:inline-flex; align-items:center; gap:12px; border-radius:2px; background:#FF3B30; color:#0A0A0A; font-size:15px; font-weight:500; transition:background .2s;" style-hover="background:#FF5147; color:#0A0A0A;">Start Mastering Faster <span style="font-family:'Geist Mono',monospace;">→</span></a>
+      </div>
+    </div>
+    <div style="position:relative; border-top:1px solid rgba(255,255,255,0.08);">
+      <div style="max-width:1280px; margin:0 auto; padding:22px clamp(20px,4vw,40px); display:flex; flex-wrap:wrap; justify-content:space-between; gap:16px; font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:0.1em; color:#76767B;">
+        <span style="display:flex; align-items:center; gap:10px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:block; flex-shrink:0;"><defs><mask id="nlm3"><rect width="24" height="24" fill="#FFFFFF"></rect><circle cx="11" cy="13" r="10.7" fill="#000000"></circle></mask></defs><circle cx="13.3" cy="10.7" r="9.5" fill="#FF3B30" mask="url(#nlm3)"></circle><circle cx="11" cy="13" r="9.4" stroke="#EDEDED" stroke-width="1.25"></circle></svg>© 2026 NOCTURNE</span>
+        <div style="display:flex; gap:24px;">
+          <a href="Legal.dc.html" style="color:#76767B;" style-hover="color:#EDEDED;">LEGAL</a>
+          <a href="Help Center.dc.html" style="color:#76767B;" style-hover="color:#EDEDED;">HELP</a>
+          <a href="Community.dc.html" style="color:#76767B;" style-hover="color:#EDEDED;">COMMUNITY</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;contourIntensity&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1.5,&quot;min&quot;:0.3,&quot;max&quot;:2,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Ambient&quot;},&quot;autoplayDemo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Demo&quot;}}">
+const RED = '#FF3B30'
+const LINES = [
+  { ts:'00.000', src:'boot',    msg:'nocturne-core 0.9.2 · wasm32 · 8 threads' },
+  { ts:'00.214', src:'whisper', msg:'model base.en loaded from disk (142 MB)' },
+  { ts:'00.231', src:'net',     msg:'network disabled · 0 bytes out' },
+  { ts:'01.870', src:'asr',     msg:'transcribing lecture-14.m4a · 48:12' },
+  { ts:'94.402', src:'asr',     msg:'8,412 words · word-level timestamps' },
+  { ts:'95.118', src:'align',   msg:'38 slides ↔ audio · silence-gap sync' },
+  { ts:'95.640', src:'align',   msg:'slide 07 dwell 4m 51s · peak emphasis' },
+  { ts:'96.020', src:'score',   msg:'electron transport chain', val:'0.94', red:true },
+  { ts:'96.041', src:'score',   msg:'substrate-level phosphorylation', val:'0.88', red:true },
+  { ts:'96.057', src:'score',   msg:'net ATP yield', val:'0.83', red:true },
+  { ts:'96.070', src:'score',   msg:'glycolysis', val:'0.72' },
+  { ts:'96.082', src:'score',   msg:'pyruvate', val:'0.60' },
+  { ts:'96.300', src:'done',    msg:'red_zone.json written · 3 RED · 2 LIKELY' },
+]
+const NODES = [
+  { l:'electron transport chain', x:52, y:46, c:'0.94', focus:true },
+  { l:'net ATP yield', x:80, y:22, c:'0.83', red:true },
+  { l:'substrate-level phosph.', x:24, y:20, c:'0.88', red:true },
+  { l:'glycolysis', x:16, y:68 },
+  { l:'pyruvate', x:38, y:84 },
+  { l:'Krebs cycle', x:72, y:78 },
+  { l:'NADH', x:88, y:52 },
+]
+const SUBJECTS = [
+  { code:'BIOL 201', topic:'Cellular Respiration', dir:'BIOL201/L14', terms:412, time:'1m 36s', refs:'L09 21:40 · L12 08:12 · L14 11:42',
+    kw:[['electron transport chain','0.94','RED'],['substrate-level phosphorylation','0.88','RED'],['net ATP yield','0.83','RED'],['glycolysis','0.72','LIKELY'],['pyruvate','0.60','LIKELY']],
+    nodes:['electron transport chain','net ATP yield','substrate-level phosph.','glycolysis','pyruvate','Krebs cycle','NADH'] },
+  { code:'CHEM 241', topic:'Nucleophilic Substitution', dir:'CHEM241/L08', terms:367, time:'1m 22s', refs:'L06 14:05 · L07 22:48 · L08 31:12',
+    kw:[['SN2 backside attack','0.96','RED'],['carbocation stability','0.89','RED'],['leaving group ability','0.81','RED'],['polar aprotic solvents','0.69','LIKELY'],['Walden inversion','0.58','LIKELY']],
+    nodes:['SN2 backside attack','leaving group ability','carbocation stability','SN1 mechanism','Walden inversion','polar aprotic solvents','nucleophile strength'] },
+  { code:'ECON 102', topic:'Monetary Policy', dir:'ECON102/L11', terms:298, time:'1m 51s', refs:'L07 18:22 · L10 09:47 · L11 26:03',
+    kw:[['money multiplier','0.93','RED'],['open market operations','0.87','RED'],['federal funds rate','0.80','RED'],['quantity theory of money','0.66','LIKELY'],['velocity of money','0.55','LIKELY']],
+    nodes:['money multiplier','federal funds rate','open market ops','reserve ratio','quantity theory','velocity of money','inflation target'] },
+]
+const EDGES = [[0,1],[0,2],[0,6],[0,5],[0,4],[3,4],[4,5],[2,3],[5,6]]
+
+class Component extends DCLogic {
+  state = { path:'A', step:0, termCount:0, mapZoom:false, billing:'yearly', vPhase:0, subj:0, focus:false, toast:false }
+
+  constructor(p){
+    super(p)
+    this.rootRef = React.createRef(); this.navRef = React.createRef()
+    this.readoutRef = React.createRef(); this.termRef = React.createRef()
+    this.vaultRef = React.createRef(); this.vaultHostRef = React.createRef(); this.vaultLabelsRef = React.createRef(); this.railRef = React.createRef()
+  }
+
+  componentDidMount(){
+    this.reduced = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)
+    this._onScroll = () => {
+      const n = this.navRef.current; if(!n) return
+      const s = window.scrollY > 12; if(s === this._navS) return; this._navS = s
+      n.style.backgroundColor = s ? (this._focus ? 'rgba(0,0,0,0.85)' : 'rgba(10,10,10,0.82)') : 'rgba(10,10,10,0)'
+      n.style.backdropFilter = n.style.webkitBackdropFilter = s ? 'blur(14px)' : 'none'
+      n.style.borderBottomColor = s ? (this._focus ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.08)') : 'transparent'
+    }
+    window.addEventListener('scroll', this._onScroll, { passive:true }); this._onScroll()
+    this.setupFields()
+    this.goStep(0)
+    this.initVault()
+  }
+  componentDidUpdate(prev){
+    const t = this.termRef.current; if(t) t.scrollTop = t.scrollHeight
+    if((prev.autoplayDemo ?? true) !== (this.props.autoplayDemo ?? true)) this.goStep(this.state.step)
+  }
+  componentWillUnmount(){
+    this._vDead = true; if(this._vCleanup) this._vCleanup(); clearTimeout(this._toastT); document.body.style.background = ''
+    cancelAnimationFrame(this._raf); clearInterval(this._termI); clearTimeout(this._zoomT)
+    if(this._anim){ this._anim.onfinish = null; this._anim.cancel() }
+    window.removeEventListener('scroll', this._onScroll)
+    if(this._ro) this._ro.disconnect(); if(this._io) this._io.disconnect()
+    if(this._hero){ this._hero.removeEventListener('pointermove', this._onMove); this._hero.removeEventListener('pointerleave', this._onLeave) }
+  }
+
+  toggleFocus(){
+    const on = !this.state.focus; this._focus = on
+    document.body.style.background = on ? '#000000' : ''
+    this._navS = null; if(this._onScroll) this._onScroll()
+    clearTimeout(this._toastT); this.setState({ focus:on, toast:on })
+    if(on) this._toastT = setTimeout(() => this.setState({ toast:false }), 4200)
+    if(this.reduced && this.fields) this.fields.forEach(F => this._draw(F,0))
+  }
+
+  async initVault(){
+    const host = this.vaultHostRef.current, sec = this.vaultRef.current; if(!host || !sec) return
+    let T; try { T = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js') } catch(e){ console.warn('three.js failed to load', e); return }
+    if(this._vDead || !host.isConnected) return
+    const R = new T.WebGLRenderer({ antialias:true, alpha:true })
+    R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); R.setClearColor(0x000000, 0)
+    R.domElement.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'
+    host.appendChild(R.domElement)
+    const scene = new T.Scene(), cam = new T.PerspectiveCamera(30, 1, 0.1, 100)
+    scene.add(new T.HemisphereLight(0xffffff, 0x050505, 0.5))
+    const key = new T.DirectionalLight(0xffffff, 2.2); key.position.set(-5,9,6); scene.add(key)
+    const rim = new T.DirectionalLight(0xffffff, 0.6); rim.position.set(6,1,-7); scene.add(rim)
+    const red = new T.PointLight(0xff3b30, 0, 8, 1.6); scene.add(red)
+    const world = new T.Group(); scene.add(world)
+    const S = 3.2, HS = [0.14,0.14,0.26,0.14,0.32], GAP = 0.82, total = HS.reduce((a,b) => a+b, 0)
+    let acc = 0
+    const layers = HS.map((h,i) => {
+      const yc = total/2 - acc - h/2; acc += h
+      const core = i === 2, g = new T.Group(); world.add(g)
+      const mm = new T.MeshStandardMaterial({ color:0x151517, roughness:0.8, metalness:0.1, transparent:true })
+      const box = new T.Mesh(new T.BoxGeometry(S,h,S), mm)
+      const em = new T.LineBasicMaterial({ color: core ? 0xff3b30 : 0xededed, transparent:true, opacity: core ? 0.9 : 0.5 })
+      const P = [], y = h/2 + 0.004, seg = (a,b,c,d) => P.push(a,y,b,c,y,d), sq = r => { seg(-r,-r,r,-r); seg(r,-r,r,r); seg(r,r,-r,r); seg(-r,r,-r,-r) }
+      if(i===0) for(let k=0;k<=44;k++){ const x=-1.32+k*2.64/44, a=0.08+0.5*Math.abs(Math.sin(k*0.61)*Math.cos(k*0.19)); seg(x,-a,x,a) }
+      if(i===1) for(let r=0;r<2;r++) for(let c=0;c<3;c++){ const x0=-1.3+c*0.9, z0=-0.95+r*1.0, w=0.75, d=0.85; seg(x0,z0,x0+w,z0); seg(x0+w,z0,x0+w,z0+d); seg(x0+w,z0+d,x0,z0+d); seg(x0,z0+d,x0,z0) }
+      if(i===2){ [1.2,0.7,0.25].forEach(sq); seg(-1.2,0,-0.25,0); seg(0.25,0,1.2,0); seg(0,-1.2,0,-0.25); seg(0,0.25,0,1.2) }
+      if(i===3) for(let k=-3;k<=3;k++){ const v=k*0.4; seg(v,-1.3,v,1.3); seg(-1.3,v,1.3,v) }
+      if(i===4){ sq(1.35); sq(1.0) }
+      const dg = new T.BufferGeometry(); dg.setAttribute('position', new T.Float32BufferAttribute(P,3))
+      const dm = new T.LineBasicMaterial({ color: core ? 0xff3b30 : 0xededed, transparent:true, opacity: core ? 0.75 : 0.3 })
+      g.add(box, new T.LineSegments(new T.EdgesGeometry(box.geometry), em), new T.LineSegments(dg, dm))
+      return { g, h, yc, yo: yc + (2-i)*GAP, mats:[mm,em,dm], base:[1, em.opacity, dm.opacity] }
+    })
+    let seed = 7
+    const rnd = () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 }
+    const CL = [[0,0.2,0],[-2.5,1.1,-0.9],[2.4,1.3,0.7],[-1.7,-1.5,1.5],[2.0,-1.3,-1.4],[0.3,2.3,-2.0],[-0.4,-2.4,-1.2]], RC = 2
+    const nodes = []
+    for(let i=0;i<84;i++){
+      const c = i % CL.length, L = layers[i % 5], rad = 0.35 + rnd()*0.55, th = rnd()*Math.PI*2, ph = Math.acos(2*rnd()-1)
+      nodes.push({ c, red: c === RC, d: rnd(), size: 0.035 + rnd()*0.03, p: new T.Vector3(),
+        t: new T.Vector3(CL[c][0] + rad*Math.sin(ph)*Math.cos(th), CL[c][1] + rad*Math.cos(ph), CL[c][2] + rad*Math.sin(ph)*Math.sin(th)),
+        s: new T.Vector3((rnd()*2-1)*1.4, L.yo + L.h/2 + 0.06, (rnd()*2-1)*1.4) })
+    }
+    const sg = new T.SphereGeometry(1, 14, 10)
+    const wM = new T.InstancedMesh(sg, new T.MeshStandardMaterial({ color:0xcfcfd2, roughness:0.8, metalness:0.1, emissive:0x2a2a2c }), nodes.filter(n => !n.red).length)
+    const rM = new T.InstancedMesh(sg, new T.MeshBasicMaterial({ color:0xff3b30 }), nodes.filter(n => n.red).length)
+    wM.frustumCulled = rM.frustumCulled = false; world.add(wM, rM)
+    const pairs = []
+    nodes.forEach((n,i) => nodes.map((m,j) => [j,m]).filter(([j,m]) => j !== i && m.c === n.c).sort((a,b) => a[1].t.distanceTo(n.t) - b[1].t.distanceTo(n.t)).slice(0,2).forEach(([j]) => { if(!pairs.some(p => p[0]===j && p[1]===i)) pairs.push([i,j]) }))
+    const link = (a,b) => { let best = null, bd = 1e9; nodes.forEach((n,i) => { if(n.c !== a) return; nodes.forEach((m,j) => { if(m.c !== b) return; const d = n.t.distanceTo(m.t); if(d < bd){ bd = d; best = [i,j] } }) }); if(best) pairs.push(best) }
+    ;[[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[1,5],[2,5],[3,6],[4,6],[2,4]].forEach(([a,b]) => link(a,b))
+    const mkL = (ps,color) => { const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(new Float32Array(ps.length*6),3)); const m = new T.LineBasicMaterial({ color, transparent:true, opacity:0, depthWrite:false }); const l = new T.LineSegments(g,m); l.frustumCulled = false; world.add(l); return { g, m, ps, l } }
+    const wL = mkL(pairs.filter(([a,b]) => !(nodes[a].red && nodes[b].red)), 0xededed), rL = mkL(pairs.filter(([a,b]) => nodes[a].red && nodes[b].red), 0xff3b30)
+    const shell = new T.LineSegments(new T.EdgesGeometry(new T.IcosahedronGeometry(1.25,1)), new T.LineBasicMaterial({ color:0xff3b30, transparent:true, opacity:0, depthWrite:false }))
+    shell.position.set(...CL[RC]); world.add(shell)
+
+    const lbls = this.vaultLabelsRef.current ? Array.from(this.vaultLabelsRef.current.querySelectorAll('[data-vlabel]')) : []
+    const redLbl = this.vaultLabelsRef.current && this.vaultLabelsRef.current.querySelector('[data-vred]')
+    const cl = x => Math.min(1, Math.max(0, x)), sm = (a,b,x) => { const t = cl((x-a)/(b-a)); return t*t*(3-2*t) }
+    const ease = t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2
+    const dummy = new T.Object3D(), v = new T.Vector3(), tv = new T.Vector3(), up = new T.Vector3(0,1,0)
+    let W = 1, H = 1
+    const update = p => {
+      const ex = ease(cl(p/0.36)), fade = sm(0.48,0.66,p), lock = sm(0.7,0.88,p), appear = sm(0.36,0.46,p)
+      world.rotation.y = -0.35 + p*0.5
+      layers.forEach((L,i) => {
+        L.g.position.y = L.yc + (L.yo - L.yc)*ex
+        L.g.rotation.y = fade*0.32*(i-2)
+        const sc = 1 + fade*0.35; L.g.scale.set(sc,1,sc)
+        const o = 1 - fade; L.g.visible = o > 0.01
+        L.mats.forEach((m,k) => { m.opacity = L.base[k]*o }); L.mats[0].depthWrite = o > 0.98
+      })
+      let wi = 0, ri = 0
+      nodes.forEach(n => {
+        const m = ease(cl((p - 0.44 - n.d*0.08)/0.16)), a = m*1.6, ca = Math.cos(a), sa = Math.sin(a)
+        v.set(n.s.x*ca - n.s.z*sa, n.s.y, n.s.x*sa + n.s.z*ca).lerp(n.t, m); v.y += Math.sin(Math.PI*m)*0.5
+        n.p.copy(v)
+        dummy.position.copy(v); dummy.scale.setScalar(Math.max(1e-4, n.size*appear*(n.red ? 1 + 0.8*lock : 1))); dummy.updateMatrix()
+        if(n.red) rM.setMatrixAt(ri++, dummy.matrix); else wM.setMatrixAt(wi++, dummy.matrix)
+      })
+      wM.instanceMatrix.needsUpdate = rM.instanceMatrix.needsUpdate = true
+      const lo = sm(0.56,0.72,p)
+      ;[wL,rL].forEach(L => { const arr = L.g.attributes.position.array; L.ps.forEach(([i,j],k) => { const A = nodes[i].p, B = nodes[j].p; arr[k*6]=A.x; arr[k*6+1]=A.y; arr[k*6+2]=A.z; arr[k*6+3]=B.x; arr[k*6+4]=B.y; arr[k*6+5]=B.z }); L.g.attributes.position.needsUpdate = true })
+      wL.m.opacity = 0.22*lo*(1 - 0.4*lock); rL.m.opacity = 0.9*lo*(0.35 + 0.65*lock)
+      wL.l.visible = wL.m.opacity > 0.002; rL.l.visible = rL.m.opacity > 0.002; wM.visible = rM.visible = appear > 0.002
+      shell.material.opacity = 0.35*lock; shell.visible = lock > 0.002; shell.rotation.y = p*2; shell.rotation.x = p
+      world.updateMatrixWorld()
+      const i1 = 18*sm(0.05,0.3,p)*(1-fade), i2 = 26*lock
+      if(i2 > i1){ red.position.set(...CL[RC]).applyMatrix4(world.matrixWorld); red.intensity = i2 } else { red.position.set(0, layers[2].g.position.y, 0); red.intensity = i1 }
+      const az = 0.75 + ease(lock)*1.0, el = 0.4 - lock*0.1, r = 12.5 + 2*sm(0.45,0.7,p) - 4*lock
+      tv.set(...CL[RC]).applyAxisAngle(up, world.rotation.y).multiplyScalar(0.55*lock)
+      cam.position.set(tv.x + r*Math.cos(el)*Math.sin(az), tv.y + r*Math.sin(el), tv.z + r*Math.cos(el)*Math.cos(az))
+      cam.lookAt(tv); cam.updateMatrixWorld()
+      const lop = sm(0.08,0.22,p)*(1 - sm(0.4,0.5,p))
+      lbls.forEach((el,i) => { const L = layers[i]; if(!L) return; let bx = -1e9, by = 0
+        ;[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([a,b]) => { v.set(a*S/2, 0, b*S/2).applyMatrix4(L.g.matrixWorld).project(cam); const x = (v.x+1)/2*W; if(x > bx){ bx = x; by = (1-v.y)/2*H } })
+        el.style.opacity = lop; el.style.transform = 'translate(' + (bx+12) + 'px,' + (by-7) + 'px)' })
+      if(redLbl){ v.set(CL[RC][0], CL[RC][1] + 1.45, CL[RC][2]).applyMatrix4(world.matrixWorld).project(cam); redLbl.style.opacity = sm(0.78,0.9,p); const lx = Math.min(W - 230, Math.max(16, (v.x+1)/2*W + 10)), ly = Math.min(H - 60, Math.max(80, (1-v.y)/2*H - 40)); redLbl.style.transform = 'translate(' + lx + 'px,' + ly + 'px)' }
+      if(this.railRef.current) this.railRef.current.style.transform = 'scaleY(' + p + ')'
+      const ph = p < 0.4 ? 0 : p < 0.7 ? 1 : 2; if(ph !== this.state.vPhase) this.setState({ vPhase: ph })
+    }
+    let cur = 0, last = -1, vis = false
+    const size = () => { W = host.clientWidth || 1; H = host.clientHeight || 1; R.setSize(W, H, false); cam.aspect = W/H
+      if(W > 960) cam.setViewOffset(W, H, -W*0.1, 0, W, H); else cam.setViewOffset(W, H, 0, H*0.14, W, H)
+      cam.updateProjectionMatrix(); last = -1 }
+    const io = new IntersectionObserver(([e]) => { vis = e.isIntersecting }); io.observe(sec)
+    const ro = new ResizeObserver(size); ro.observe(host); size()
+    const tick = () => { this._vRaf = requestAnimationFrame(tick); if(!vis) return
+      const b = sec.getBoundingClientRect(), tgt = cl(-b.top / Math.max(1, b.height - window.innerHeight))
+      cur = (this.reduced || Math.abs(tgt-cur) < 0.0005) ? tgt : cur + (tgt-cur)*0.1
+      if(Math.abs(cur - last) < 0.0001) return; last = cur; update(cur); R.render(scene, cam) }
+    tick()
+    this._vCleanup = () => { cancelAnimationFrame(this._vRaf); io.disconnect(); ro.disconnect(); R.dispose(); R.domElement.remove() }
+  }
+
+  // ---- demo stepper ----
+  goStep(i){
+    clearInterval(this._termI); clearTimeout(this._zoomT)
+    if(this._anim){ this._anim.onfinish = null; this._anim.cancel(); this._anim = null }
+    this.setState({ step:i, termCount: this.reduced ? LINES.length : 0, mapZoom: this.reduced })
+    const root = this.rootRef.current; if(!root) return
+    const bars = root.querySelectorAll('[data-step-bar]')
+    bars.forEach((b,j) => { b.style.transform = j < i ? 'scaleX(1)' : 'scaleX(0)' })
+    if(i === 1 && !this.reduced){
+      this._termI = setInterval(() => this.setState(s => {
+        if(s.termCount >= LINES.length){ clearInterval(this._termI); return null }
+        return { termCount: s.termCount + 1 }
+      }), 240)
+    }
+    if(i === 2 && !this.reduced) this._zoomT = setTimeout(() => this.setState({ mapZoom:true }), 450)
+    const bar = bars[i]; if(!bar) return
+    if(this.reduced || !(this.props.autoplayDemo ?? true)){ bar.style.transform = 'scaleX(1)'; return }
+    this._anim = bar.animate([{ transform:'scaleX(0)' }, { transform:'scaleX(1)' }], { duration: i === 1 ? 7000 : 6000, fill:'forwards', easing:'linear' })
+    if(this._hovering) this._anim.pause()
+    this._anim.onfinish = () => this.goStep((i + 1) % 3)
+  }
+
+  // ---- contour fields ----
+  _buildPerm(){
+    const p = new Uint8Array(512), src = []
+    for(let i=0;i<256;i++) src[i]=i
+    for(let i=255;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=src[i]; src[i]=src[j]; src[j]=t }
+    for(let i=0;i<512;i++) p[i]=src[i&255]
+    return p
+  }
+  _perlin(perm,x,y,z){
+    const fl=Math.floor, fade=t=>t*t*t*(t*(t*6-15)+10), L=(a,b,t)=>a+t*(b-a)
+    const g=(h,x,y,z)=>{ h&=15; const u=h<8?x:y; const v=h<4?y:(h===12||h===14?x:z); return ((h&1)?-u:u)+((h&2)?-v:v) }
+    let X=fl(x)&255, Y=fl(y)&255, Z=fl(z)&255
+    x-=fl(x); y-=fl(y); z-=fl(z)
+    const u=fade(x), v=fade(y), w=fade(z)
+    const A=perm[X]+Y, AA=perm[A]+Z, AB=perm[A+1]+Z, B=perm[X+1]+Y, BA=perm[B]+Z, BB=perm[B+1]+Z
+    return L(
+      L(L(g(perm[AA],x,y,z), g(perm[BA],x-1,y,z), u), L(g(perm[AB],x,y-1,z), g(perm[BB],x-1,y-1,z), u), v),
+      L(L(g(perm[AA+1],x,y,z-1), g(perm[BA+1],x-1,y,z-1), u), L(g(perm[AB+1],x,y-1,z-1), g(perm[BB+1],x-1,y-1,z-1), u), v), w)
+  }
+
+  setupFields(){
+    const root = this.rootRef.current; if(!root) return
+    this._perm = this._buildPerm()
+    this.fields = Array.from(root.querySelectorAll('canvas[data-contour]')).map((c,i) => {
+      const kind = c.getAttribute('data-contour')
+      return { c, ctx:c.getContext('2d'), kind, host:c.parentElement, vis:true, seed:i*11.7,
+        cell: kind==='card' ? 34 : kind==='hero' ? 22 : 26, dprMax: kind==='card' ? 0.6 : 1.5,
+        mx:-1e5, my:-1e5, tmx:-1e5, tmy:-1e5 }
+    })
+    const resize = F => {
+      const r = F.host.getBoundingClientRect()
+      F.w = r.width; F.h = r.height; F.dpr = Math.min(window.devicePixelRatio || 1, F.dprMax)
+      F.c.width = Math.max(1, Math.round(F.w*F.dpr)); F.c.height = Math.max(1, Math.round(F.h*F.dpr))
+      F.ctx.setTransform(F.dpr,0,0,F.dpr,0,0)
+      F.cols = Math.max(8, Math.round(F.w/F.cell)); F.rows = Math.max(6, Math.round(F.h/F.cell))
+      F.cw = F.w/(F.cols-1); F.ch = F.h/(F.rows-1); F.vals = new Float32Array(F.cols*F.rows)
+    }
+    this._ro = new ResizeObserver(es => es.forEach(e => this.fields.filter(f => f.host === e.target).forEach(F => { resize(F); if(this.reduced) this._draw(F,0) })))
+    this._io = new IntersectionObserver(es => es.forEach(e => this.fields.filter(f => f.host === e.target).forEach(F => { F.vis = e.isIntersecting })))
+    this.fields.forEach(F => { resize(F); this._ro.observe(F.host); this._io.observe(F.host) })
+
+    const H = this.fields.find(f => f.kind === 'hero')
+    if(H){
+      this._hero = H.host
+      this._onMove = e => { const r = H.host.getBoundingClientRect(); H.tmx = e.clientX - r.left; H.tmy = e.clientY - r.top; if(H.mx < -5e4){ H.mx = H.tmx; H.my = H.tmy } }
+      this._onLeave = () => { H.tmx = -1e5; H.tmy = -1e5 }
+      H.host.addEventListener('pointermove', this._onMove)
+      H.host.addEventListener('pointerleave', this._onLeave)
+    }
+    if(this.reduced){ this.fields.forEach(F => this._draw(F,0)); return }
+    const start = performance.now(); let frame = 0
+    const loop = now => {
+      const t = (now - start)/1000; frame++
+      for(const F of this.fields){
+        if(!F.c.isConnected){ const fresh = this.rootRef.current && this.rootRef.current.querySelectorAll('canvas[data-contour]')[this.fields.indexOf(F)]; if(fresh){ F.c = fresh; F.ctx = fresh.getContext('2d'); F.host = fresh.parentElement; F.w = -1 } }
+        if(Math.abs(F.host.clientWidth - F.w) > 1 || Math.abs(F.host.clientHeight - F.h) > 1) resize(F)
+        if(!F.vis) continue
+        if(F.kind === 'card' && (frame & 1)) continue
+        if(F.kind === 'hero') this._track(F)
+        this._draw(F,t)
+      }
+      this._raf = requestAnimationFrame(loop)
+    }
+    this._raf = requestAnimationFrame(loop)
+  }
+
+  _track(F){
+    const inside = F.tmx > -5e4
+    if(inside){ F.mx += (F.tmx-F.mx)*0.14; F.my += (F.tmy-F.my)*0.14 } else { F.mx = -1e5; F.my = -1e5 }
+    const el = this.readoutRef.current; if(!el) return
+    if(!inside){ el.style.opacity = '0'; return }
+    const gx = Math.min(F.cols-1, Math.max(0, Math.round(F.tmx/F.cw))), gy = Math.min(F.rows-1, Math.max(0, Math.round(F.tmy/F.ch)))
+    const v = F.vals[gx + gy*F.cols] || 0, pad = n => String(Math.round(n)).padStart(4,'0')
+    el.style.opacity = '1'
+    el.style.transform = 'translate(' + (F.tmx+18) + 'px,' + (F.tmy+18) + 'px)'
+    el.textContent = 'X ' + pad(F.tmx) + '  Y ' + pad(F.tmy) + '  Z ' + v.toFixed(3)
+  }
+
+  _draw(F,t){
+    const { cols, rows, cw, ch, vals, ctx } = F; if(!vals) return
+    const k = this.props.contourIntensity ?? 1
+    const perm = this._perm, card = F.kind === 'card'
+    const ns = card ? 0.11 : 0.085, zt = t*0.08 + F.seed
+    const hasMouse = F.kind === 'hero' && F.mx > -5e4
+    for(let gy=0; gy<rows; gy++) for(let gx=0; gx<cols; gx++){
+      let v = this._perlin(perm, gx*ns, gy*ns, zt)*0.5 + 0.5
+      if(hasMouse){ const dx=gx*cw-F.mx, dy=gy*ch-F.my, d2=dx*dx+dy*dy; if(d2 < 60000) v += 0.3*Math.exp(-d2/14000) }
+      vals[gx+gy*cols] = v
+    }
+    ctx.clearRect(0,0,F.w,F.h); ctx.lineJoin='round'; ctx.lineCap='round'
+    const LEVELS = card ? 7 : 12
+    const breath = F.kind === 'footer' ? (0.55 + 0.45*Math.sin(t*0.9)) : 1
+    const seg = (ax,ay,bx,by) => { ctx.moveTo(ax,ay); ctx.lineTo(bx,by) }
+    for(let li=0; li<LEVELS; li++){
+      const f = li/(LEVELS-1), thr = 0.18 + f*0.66, top = f > 0.8
+      let color, a, lw
+      const fz = this._focus, base = fz ? '255,59,48' : '237,237,237', boost = fz ? 1.5 : 1
+      if(card){ color = top ? '255,59,48' : base; a = (top ? 0.5 : 0.06 + 0.22*f)*k*boost; lw = top ? 3 : 2.5 }
+      else { color = top ? (fz ? '255,120,110' : '255,59,48') : base; a = (top ? (fz ? 0.75 : 0.5) : 0.03 + 0.10*f)*k*breath*boost; lw = 1 }
+      ctx.beginPath()
+      for(let gy=0; gy<rows-1; gy++) for(let gx=0; gx<cols-1; gx++){
+        const i=gx+gy*cols, tl=vals[i], tr=vals[i+1], bl=vals[i+cols], br=vals[i+cols+1]
+        let idx=0; if(tl>thr) idx|=8; if(tr>thr) idx|=4; if(br>thr) idx|=2; if(bl>thr) idx|=1
+        if(idx===0 || idx===15) continue
+        const x0=gx*cw, y0=gy*ch, x1=x0+cw, y1=y0+ch
+        const tpx=x0+(thr-tl)/(tr-tl)*cw, rpy=y0+(thr-tr)/(br-tr)*ch, bpx=x0+(thr-bl)/(br-bl)*cw, lpy=y0+(thr-tl)/(bl-tl)*ch
+        switch(idx){
+          case 1: case 14: seg(x0,lpy,bpx,y1); break
+          case 2: case 13: seg(bpx,y1,x1,rpy); break
+          case 3: case 12: seg(x0,lpy,x1,rpy); break
+          case 4: case 11: seg(tpx,y0,x1,rpy); break
+          case 5: seg(tpx,y0,x1,rpy); seg(x0,lpy,bpx,y1); break
+          case 6: case 9: seg(tpx,y0,bpx,y1); break
+          case 7: case 8: seg(tpx,y0,x0,lpy); break
+          case 10: seg(tpx,y0,x0,lpy); seg(bpx,y1,x1,rpy); break
+        }
+      }
+      ctx.strokeStyle = 'rgba('+color+','+Math.min(1,a)+')'; ctx.lineWidth = lw; ctx.stroke()
+    }
+  }
+
+  renderVals(){
+    const { path, step, termCount, mapZoom } = this.state
+    const mono = "'Geist Mono',monospace"
+    const pathBtn = on => ({ position:'relative', textAlign:'left', padding:'14px 16px', display:'flex', flexDirection:'column', gap:'4px', cursor:'pointer', border:'none', borderTop:'1px solid ' + (on ? RED : 'transparent'), marginTop:'-1px', background: on ? 'rgba(255,255,255,0.05)' : 'transparent', color: on ? '#EDEDED' : '#76767B', transition:'background .2s, color .2s, border-color .2s' })
+
+    const SB = SUBJECTS[this.state.subj], KW = SB.kw
+    const subj = { top:KW[0][1], red:KW.filter(k => k[2]==='RED').length, terms:SB.terms, time:SB.time, focus:KW[0][0], refs:SB.refs }
+    const subjTabs = SUBJECTS.map((x,i) => { const on = i === this.state.subj; return { code:x.code, topic:x.topic, onClick:() => this.setState({ subj:i }),
+      style:{ position:'relative', textAlign:'left', display:'flex', flexDirection:'column', gap:'2px', minWidth:0, padding:'10px 14px', border:'none', borderLeft: i ? '1px solid rgba(255,255,255,0.08)' : 'none', boxShadow: on ? 'inset 0 -1px 0 #FF3B30' : 'none', background: on ? 'rgba(255,255,255,0.04)' : 'transparent', color: on ? '#EDEDED' : '#76767B', cursor:'pointer', transition:'background .2s, color .2s' } } })
+    const hc = [KW[0][1], KW[2][1], KW[1][1]]
+    const heroRows = KW.map(([n,v,z],i) => {
+      const red = z === 'RED'
+      return { rank:String(i+1).padStart(2,'0'), n, v, z,
+        barStyle:{ height:'1px', width:(parseFloat(v)*100)+'%', background: red ? RED : '#9A9A9F' },
+        valStyle:{ fontFamily:mono, fontSize:'12.5px', color: red ? RED : '#9A9A9F' },
+        zoneStyle:{ fontFamily:mono, fontSize:'10px', letterSpacing:'0.14em', textAlign:'right', color: red ? RED : '#76767B' } }
+    })
+
+    const steps = [
+      { n:'01', l:'The Drop', d:'Drag in lecture audio and slides. Nocturne links them.' },
+      { n:'02', l:'The Pipeline', d:'Local WASM transcription streams confidence scores.' },
+      { n:'03', l:'The Concept Map', d:'Zoom into the knowledge graph built from the session.' },
+    ].map((s,i) => ({ ...s, onClick:() => this.goStep(i),
+      style:{ position:'relative', textAlign:'left', display:'flex', flexDirection:'column', gap:'6px', padding:'20px 22px', border:'none', borderLeft: i ? '1px solid rgba(255,255,255,0.08)' : 'none', background: i===step ? 'rgba(255,255,255,0.03)' : 'transparent', color: i===step ? '#EDEDED' : '#76767B', cursor:'pointer', transition:'background .2s, color .2s' } }))
+
+    const termLines = LINES.slice(0, termCount).map(l => ({ ...l, val: l.val || '',
+      msgStyle:{ color: l.red ? '#EDEDED' : l.src==='done' ? '#EDEDED' : '#9A9A9F', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
+      valStyle:{ color: l.red ? RED : '#9A9A9F' } }))
+    const scored = LINES.slice(0, termCount).filter(l => l.src === 'score').map(l => ({ n:l.msg, v:l.val,
+      valStyle:{ fontFamily:mono, fontSize:'12.5px', color: l.red ? RED : '#9A9A9F' },
+      barStyle:{ height:'1px', width:(parseFloat(l.val)*100)+'%', background: l.red ? RED : '#9A9A9F', transition:'width .6s' } }))
+
+    const nodes = NODES.map(n => ({ l:n.l, c:n.c || '',
+      style:{ position:'absolute', left:n.x+'%', top:n.y+'%', transform:'translate(-50%,-50%)', display:'flex', gap:'8px', alignItems:'center', padding:'5px 9px', whiteSpace:'nowrap', fontFamily:mono, fontSize:'11px', background:'#0C0C0D', color: n.focus ? '#EDEDED' : '#9A9A9F', border:'1px solid ' + (n.focus ? RED : n.red ? 'rgba(255,59,48,0.45)' : 'rgba(255,255,255,0.14)') } }))
+    const heroNodes = NODES.map((n,i) => ({ l:SB.nodes[i], c: i < 3 ? hc[i] : '', style:nodes[i].style }))
+    const E = React.createElement
+    const graphEdges = E('svg', { viewBox:'0 0 100 100', preserveAspectRatio:'none', style:{ position:'absolute', inset:0, width:'100%', height:'100%' } },
+      EDGES.map(([a,b],i) => E('line', { key:i, x1:NODES[a].x, y1:NODES[a].y, x2:NODES[b].x, y2:NODES[b].y, stroke: a===0 ? 'rgba(255,59,48,0.45)' : 'rgba(255,255,255,0.14)', strokeWidth:1, vectorEffect:'non-scaling-stroke' })))
+    const mapInnerStyle = { position:'absolute', inset:0, transformOrigin:'52% 46%', transform: mapZoom ? 'scale(1.55)' : 'scale(0.92)', transition:'transform 1.6s cubic-bezier(.22,1,.36,1)', backgroundImage:'radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px)', backgroundSize:'22px 22px' }
+
+    const xref = [['electron transport chain','intro','—','peak'],['net ATP yield','—','mention','peak'],['substrate-level phosph.','intro','mention','peak'],['glycolysis','peak','mention','—'],['Krebs cycle','—','intro','mention']]
+    const xs = v => ({ padding:'13px 0', fontFamily:mono, fontSize:'11.5px', letterSpacing:'0.06em', color: v==='peak' ? RED : v==='—' ? '#5E5E62' : '#CFCFD2' })
+    const xrefRows = xref.map(([n,a,b,c]) => ({ n, a, b, c, s0:xs(a), s1:xs(b), s2:xs(c) }))
+
+    const chain = [['PASSPHRASE','your memory only'],['↓ PBKDF2-SHA256','310,000 iterations'],['KEK','memory only · discarded'],['↓ AES-KW','unwrap'],['MASTER KEY','non-extractable'],['↓ AES-GCM 256','unique IV per file'],['STORED','opaque encrypted blob']]
+    const keyChain = chain.map(([a,b],i) => { const arrow = a[0] === '↓'; return { a, b,
+      rowStyle:{ display:'grid', gridTemplateColumns:'minmax(0,1fr) auto', gap:'16px', padding: arrow ? '8px 0 8px 16px' : '13px 0', borderTop: arrow ? 'none' : '1px solid rgba(255,255,255,0.1)', borderBottom: i===chain.length-1 ? '1px solid rgba(255,255,255,0.1)' : 'none' },
+      labelStyle:{ color: arrow ? '#76767B' : '#EDEDED', letterSpacing:'0.1em', fontSize: arrow ? '11px' : '12px' },
+      valStyle:{ color: arrow ? '#76767B' : '#9A9A9F', fontSize: arrow ? '11px' : '12px' } } })
+
+    const C = [
+      ['Where audio is processed','Cloud','Cloud','On-device'],
+      ['Works fully offline','[ ]','[ ]','[✓]'],
+      ['Transcribes lecture audio','[✓]','[✓]','[✓]'],
+      ['Measures professor emphasis','[ ]','[ ]','[✓]'],
+      ['Ranks terms by exam likelihood','[ ]','[ ]','[✓]'],
+      ['Links concepts across lectures','[ ]','[~]','[✓]'],
+      ['Infinite concept canvas','[ ]','[ ]','[✓]'],
+      ['Zero-knowledge encryption','[ ]','[ ]','AES-GCM 256'],
+      ['Exports tagged Anki .apkg','[ ]','[ ]','[✓]'],
+    ]
+    const compareRows = C.map(([label,o,no,n],i) => ({ id:'R'+String(i+1).padStart(2,'0'), label, o, no, n,
+      rowStyle:{ display:'grid', gridTemplateColumns:'56px minmax(0,2.2fr) repeat(3,minmax(0,1fr))', alignItems:'center', background: i%2 ? 'rgba(255,255,255,0.025)' : 'transparent', borderTop: i ? '1px solid rgba(255,255,255,0.05)' : 'none' } }))
+
+    const yearly = this.state.billing === 'yearly'
+    const planSrc = [
+      { name:'Dusk', monthly:0, tagline:'The full core product.', cta:'Start for free', href:'Sign Up.dc.html',
+        features:['PDF viewer + slide extraction','In-browser Whisper transcription','Synthetic study guide','Red Zone scoring','Slide density heatmap','Anki .apkg import + export','500 MB encrypted storage','3 sessions per month'] },
+      { name:'Midnight', monthly:8, tagline:'Sharper transcription. More storage.', badge:'POPULAR', hi:true, cta:'Get Midnight', href:'Sign Up.dc.html',
+        features:['Everything in Dusk','Server-side ASR + diarization (opt-in)','Hotword injection from guide','YouTube Red Zone search','Cross-session convergence','Exam Urgency Mode','5 GB encrypted storage','Unlimited sessions'] },
+      { name:'Eclipse', monthly:20, tagline:'Everything, with AI explanations.', badge:'SOON', cta:'Join the waitlist', href:'Sign Up.dc.html',
+        features:['Everything in Midnight','AI summarization (opt-in)','Practice quiz mode','Cross-session deck merging','Markdown notes export','20 GB encrypted storage','Priority processing'] },
+    ]
+    const ctaBase = { display:'flex', alignItems:'center', justifyContent:'center', height:'42px', borderRadius:'2px', fontSize:'14px', fontWeight:500, transition:'background .2s, border-color .2s' }
+    const plans = planSrc.map((p,i) => {
+      const free = !p.monthly, per = yearly ? p.monthly*0.75 : p.monthly
+      return { name:p.name.toUpperCase(), badge:p.badge || '', tagline:p.tagline, cta:p.cta, href:p.href, features:p.features,
+        price: free ? '$0' : '$' + per, period: free ? 'forever' : '/ mo', strike:'$' + p.monthly,
+        sub: free ? 'NO CARD REQUIRED' : yearly ? ('$' + per*12 + ' BILLED YEARLY') : ('$' + p.monthly*12 + ' / YR BILLED MONTHLY'),
+        cardStyle:{ position:'relative', display:'flex', flexDirection:'column', gap:'18px', padding:'32px 28px', borderLeft: i ? '1px solid rgba(255,255,255,0.08)' : 'none', background: p.hi ? 'rgba(255,59,48,0.04)' : 'transparent' },
+        topBar:{ position:'absolute', top:'-1px', left:'-1px', right:'-1px', height:'2px', background: p.hi ? RED : 'transparent' },
+        badgeStyle: p.badge ? { fontFamily:mono, fontSize:'10px', letterSpacing:'0.16em', padding:'3px 7px', color: p.hi ? RED : '#9A9A9F', border:'1px solid ' + (p.hi ? 'rgba(255,59,48,0.45)' : 'rgba(255,255,255,0.14)') } : { display:'none' },
+        strikeStyle: yearly && !free ? { fontFamily:mono, fontSize:'18px', color:'#5E5E62', textDecoration:'line-through' } : { display:'none' },
+        ctaStyle: p.hi ? { ...ctaBase, background:RED, color:'#0A0A0A' } : { ...ctaBase, border:'1px solid rgba(255,255,255,0.16)', color:'#EDEDED' },
+        markStyle:{ fontFamily:mono, color: p.hi ? RED : '#76767B' } }
+    })
+    const seg = on => ({ height:'30px', padding:'0 12px', border:'none', cursor:'pointer', fontFamily:mono, fontSize:'10.5px', letterSpacing:'0.12em', background: on ? '#EDEDED' : 'transparent', color: on ? '#0A0A0A' : '#9A9A9F', transition:'background .2s, color .2s' })
+
+    const vp = this.state.vPhase
+    const vaultPhases = [
+      { n:'01', t:'Intake, sealed', d:'Audio and slides enter a closed stack. A WASM core transcribes and aligns them on your device. Nothing is uploaded.' },
+      { n:'02', t:'Pipeline to map', d:'Extracted terms leave their linear layers and reorganize into concept clusters linked across lectures.' },
+      { n:'03', t:'Red Zone lock', d:'The highest-confidence cluster is isolated and flagged, so you know what to study first.' },
+    ].map((x,i) => ({ ...x, style:{ display:'flex', flexDirection:'column', gap:'8px', color: i===vp ? '#EDEDED' : '#5E5E62', transition:'color .3s' },
+      descStyle:{ margin:0, fontSize:'14px', lineHeight:1.55, color: i===vp ? '#9A9A9F' : '#4A4A4E', transition:'color .3s', textWrap:'pretty' } }))
+    const vaultLabels = [['AUDIO','lecture-14.m4a'],['SLIDES','38 pp'],['WASM CORE','whisper.base.en'],['ALIGN','word ↔ slide'],['VAULT','AES-GCM 256']]
+      .map(([k,v],i) => ({ k, v, kStyle:{ color: i===2 ? '#FF3B30' : '#EDEDED' } }))
+
+    return {
+      vaultRef:this.vaultRef, vaultHostRef:this.vaultHostRef, vaultLabelsRef:this.vaultLabelsRef, railRef:this.railRef, vaultPhases, vaultLabels,
+      monthlyBtn: seg(!yearly), yearlyBtn: seg(yearly), plans,
+      billingHint: yearly ? 'THREE MONTHS FREE VS. MONTHLY' : 'SWITCH TO YEARLY TO SAVE 25%',
+      setMonthly:() => this.setState({ billing:'monthly' }), setYearly:() => this.setState({ billing:'yearly' }),
+      rootRef:this.rootRef, navRef:this.navRef, readoutRef:this.readoutRef, termRef:this.termRef,
+      isA: path==='A', isB: path==='B',
+      setA:() => this.setState({ path:'A' }), setB:() => this.setState({ path:'B' }),
+      pathBtnA: pathBtn(path==='A'), pathBtnB: pathBtn(path==='B'),
+      inspectorPath: path==='A' ? '~/nocturne/' + SB.dir + '/red_zone.json' : '~/nocturne/' + SB.dir.split('/')[0] + '/canvas.graph',
+      subj, subjTabs, heroNodes,
+      focusAttr: this.state.focus ? 'on' : 'off', focusPressed: this.state.focus ? 'true' : 'false', toastOn: this.state.toast,
+      toggleFocus:() => this.toggleFocus(),
+      heroRows, steps, isDrop: step===0, isPipe: step===1, isMap: step===2,
+      termLines, scored, nodes, graphEdges, mapInnerStyle,
+      zoomLabel: mapZoom ? 'ZOOM 155% · FOCUS NODE' : 'ZOOM 92%',
+      pauseDemo:() => { this._hovering = true; if(this._anim) this._anim.pause() },
+      resumeDemo:() => { this._hovering = false; if(this._anim) this._anim.play() },
+      xrefRows, keyChain, compareRows,
+    }
+  }
+}
+</script>
+</body>
+</html>

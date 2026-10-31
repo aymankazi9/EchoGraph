@@ -146,9 +146,9 @@ function searchNotes(text: string, query: string): NotesHit[] {
 
 function Snippet({ before, match, after }: { before: string; match: string; after: string }) {
   return (
-    <span style={{ fontSize: 12, color: '#7C8398', lineHeight: 1.5 }}>
+    <span style={{ fontSize: 12, color: '#9A9A9F', lineHeight: 1.5 }}>
       {before}
-      <mark style={{ background: 'rgba(99,102,241,0.25)', color: '#C7D2FE', borderRadius: 2, padding: '0 1px' }}>
+      <mark style={{ background: 'rgba(255,59,48,0.18)', color: '#FF3B30', padding: '0 1px' }}>
         {match}
       </mark>
       {after}
@@ -157,36 +157,36 @@ function Snippet({ before, match, after }: { before: string; match: string; afte
 }
 
 const SOURCE_STYLES = {
-  transcript: { bg: 'rgba(99,102,241,0.15)', color: '#A5B4FC', label: 'Transcript' },
-  keyword: { bg: '', color: '', label: 'Keyword' }, // filled per-zone below
-  notes: { bg: 'rgba(52,211,153,0.12)', color: '#6EE7B7', label: 'Notes' },
+  transcript: { label: 'Transcript' },
+  keyword: { label: 'Keyword' }, // zone-specific override below
+  notes: { label: 'Notes' },
 } as const
 
 function SourceBadge({ hit }: { hit: Hit }) {
-  let bg: string
-  let color: string
+  let color = '#9A9A9F'
+  let borderColor = 'rgba(255,255,255,0.14)'
   let label: string
 
   if (hit.kind === 'keyword') {
-    bg = hit.zone === 'red' ? 'rgba(136,19,55,0.25)' : 'rgba(76,29,149,0.25)'
-    color = hit.zone === 'red' ? '#FDA4AF' : '#C4B5FD'
     label = hit.zone === 'red' ? 'Red Zone' : 'Likely Zone'
+    if (hit.zone === 'red') {
+      color = '#FF3B30'
+      borderColor = 'rgba(255,59,48,0.35)'
+    }
   } else {
-    const s = SOURCE_STYLES[hit.kind]
-    bg = s.bg
-    color = s.color
-    label = s.label
+    label = SOURCE_STYLES[hit.kind].label
   }
 
   return (
     <span style={{
       display: 'inline-block',
       padding: '1px 6px',
-      borderRadius: 4,
-      fontSize: 10.5,
+      fontFamily: 'var(--font-mono)',
+      fontSize: 10,
       fontWeight: 500,
-      letterSpacing: '0.02em',
-      background: bg,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      border: `1px solid ${borderColor}`,
       color,
       flexShrink: 0,
       lineHeight: 1.8,
@@ -266,11 +266,11 @@ export function SessionSearchBar({
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         height: 32, padding: '0 10px',
-        borderRadius: 8, border: `1px solid ${open ? '#3730A3' : '#1E1E2E'}`,
-        background: '#0D0D14', width: 220,
+        borderRadius: 2, border: `1px solid ${open ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.08)'}`,
+        background: '#0C0C0D', width: 220,
         transition: 'border-color 0.15s',
       }}>
-        <span style={{ color: open ? '#818CF8' : '#3F485C', display: 'flex', flexShrink: 0, transition: 'color 0.15s' }}>
+        <span style={{ color: open ? '#EDEDED' : '#76767B', display: 'flex', flexShrink: 0, transition: 'color 0.15s' }}>
           <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
             <circle cx="8" cy="8" r="5.5" /><path d="M12.5 12.5 L16 16" />
           </svg>
@@ -287,7 +287,7 @@ export function SessionSearchBar({
           style={{
             flex: 1, minWidth: 0,
             background: 'transparent', border: 'none', outline: 'none',
-            fontSize: 12, color: '#CBD5E1',
+            fontSize: 12, color: '#EDEDED',
             fontFamily: 'inherit',
           }}
         />
@@ -295,7 +295,7 @@ export function SessionSearchBar({
           <button
             type="button"
             onMouseDown={(e) => { e.preventDefault(); setQuery(''); setOpen(false) }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3F485C', display: 'flex', padding: 0, flexShrink: 0 }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#76767B', display: 'flex', padding: 0, flexShrink: 0 }}
             aria-label="Clear search"
           >
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -315,14 +315,13 @@ export function SessionSearchBar({
           width: 360,
           maxHeight: 340,
           overflowY: 'auto',
-          background: '#0D0D14',
-          border: '1px solid #1E1E2E',
-          borderRadius: 10,
-          boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+          background: '#0C0C0D',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 2,
           zIndex: 50,
         }}>
           {hits.length === 0 ? (
-            <div style={{ padding: '14px 16px', fontSize: 12, color: '#3F485C', textAlign: 'center' }}>
+            <div style={{ padding: '14px 16px', fontSize: 12, color: '#76767B', textAlign: 'center' }}>
               No results for "{query.trim()}"
             </div>
           ) : (
@@ -352,7 +351,7 @@ export function SessionSearchBar({
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {hit.kind === 'keyword' ? (
-                        <span style={{ fontSize: 13, color: '#E2E8F0', fontWeight: 500 }}>{hit.term}</span>
+                        <span style={{ fontSize: 13, color: '#EDEDED', fontWeight: 500 }}>{hit.term}</span>
                       ) : (
                         <Snippet before={hit.before} match={hit.match} after={hit.after} />
                       )}
@@ -360,7 +359,7 @@ export function SessionSearchBar({
                   </button>
                   {/* Separator between different source types */}
                   {i < hits.length - 1 && hits[i + 1].kind !== hit.kind && (
-                    <div style={{ height: 1, background: '#12121A', margin: '2px 0' }} />
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '2px 0' }} />
                   )}
                 </li>
               ))}

@@ -18,7 +18,7 @@ export const PassphraseInput = forwardRef<HTMLInputElement, PassphraseInputProps
         {label && (
           <label
             htmlFor={inputId}
-            className="text-label text-text-secondary tracking-wide"
+            className="text-label text-text-secondary font-mono uppercase tracking-wider"
           >
             {label}
           </label>
@@ -35,10 +35,8 @@ export const PassphraseInput = forwardRef<HTMLInputElement, PassphraseInputProps
               'text-body text-text-primary',
               'placeholder:text-text-tertiary',
               'transition-colors duration-75',
-              'focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40',
-              error
-                ? 'border-rose-400 ring-1 ring-red-200/40'
-                : 'border-border-default',
+              'focus:outline-none focus:border-[rgba(255,255,255,0.3)]',
+              error ? 'border-[#FF3B30]' : 'border-border-default',
             ]
               .filter(Boolean)
               .join(' ')}
@@ -58,7 +56,7 @@ export const PassphraseInput = forwardRef<HTMLInputElement, PassphraseInputProps
             )}
           </button>
         </div>
-        {error && <p className="text-label text-rose-300">{error}</p>}
+        {error && <p className="text-label text-[#FF3B30]">{error}</p>}
       </div>
     )
   },

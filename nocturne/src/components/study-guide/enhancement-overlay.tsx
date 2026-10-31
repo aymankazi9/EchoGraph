@@ -68,17 +68,17 @@ export function EnhancementOverlay({ sessionId, onDismiss }: OverlayProps) {
       {/* Spinner */}
       <div style={{
         width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-        border: '2px solid rgba(99,102,241,0.18)',
-        borderTopColor: '#818CF8',
+        border: '2px solid rgba(255,255,255,0.14)',
+        borderTopColor: '#FF3B30',
         animation: 'enh-spin 0.75s linear infinite',
       }} />
 
       {/* Message */}
       <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: 14.5, fontWeight: 600, color: '#E2E8F0', margin: '0 0 5px' }}>
+        <p style={{ fontSize: 14.5, fontWeight: 600, color: '#EDEDED', margin: '0 0 5px' }}>
           Flashcards are being made.
         </p>
-        <p style={{ fontSize: 13, color: '#4B5563', margin: 0 }}>
+        <p style={{ fontSize: 13, color: '#76767B', margin: 0 }}>
           Please wait a moment.
         </p>
       </div>
@@ -90,18 +90,18 @@ export function EnhancementOverlay({ sessionId, onDismiss }: OverlayProps) {
           width: '100%', maxWidth: 220,
         }}>
           <span style={{
-            fontSize: 11.5, color: '#4B5563',
+            fontSize: 11.5, color: '#76767B',
             fontVariantNumeric: 'tabular-nums', letterSpacing: '0.02em',
           }}>
             {completed} of {total}
           </span>
           <div style={{
             width: '100%', height: 2, borderRadius: 2,
-            background: 'rgba(99,102,241,0.12)', overflow: 'hidden',
+            background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
           }}>
             <div style={{
               height: '100%', borderRadius: 2,
-              background: 'linear-gradient(90deg, #4F46E5, #818CF8)',
+              background: '#FF3B30',
               width: `${pct}%`,
               transition: 'width 0.5s ease',
             }} />
@@ -116,8 +116,8 @@ export function EnhancementOverlay({ sessionId, onDismiss }: OverlayProps) {
           onClick={onDismiss}
           style={{
             background: 'none', border: 'none', padding: '2px 0',
-            fontSize: 12, color: '#374151', cursor: 'pointer',
-            textDecoration: 'underline', textDecorationColor: '#1F2937',
+            fontSize: 12, color: '#76767B', cursor: 'pointer',
+            textDecoration: 'underline', textDecorationColor: '#76767B',
             textUnderlineOffset: 3,
           }}
         >
@@ -146,20 +146,20 @@ export function EnhancementTimeoutBanner({ sessionId, onRetry }: BannerProps) {
       flexShrink: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '9px 18px', gap: 12,
-      background: 'rgba(234,179,8,0.05)',
-      borderBottom: '1px solid rgba(234,179,8,0.12)',
+      background: 'rgba(255,255,255,0.04)',
+      borderBottom: '1px solid rgba(255,255,255,0.08)',
     }}>
-      <span style={{ fontSize: 12.5, color: '#92813A' }}>
+      <span style={{ fontSize: 12.5, color: '#9A9A9F' }}>
         Some cards couldn&apos;t be improved.
       </span>
       <button
         type="button"
         onClick={onRetry}
         style={{
-          flexShrink: 0, height: 26, padding: '0 11px', borderRadius: 6, cursor: 'pointer',
-          border: '1px solid rgba(234,179,8,0.22)',
-          background: 'rgba(234,179,8,0.07)',
-          fontSize: 12, color: '#B8972E',
+          flexShrink: 0, height: 26, padding: '0 11px', borderRadius: 2, cursor: 'pointer',
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: '#0C0C0D',
+          fontSize: 12, color: '#9A9A9F',
         }}
       >
         Retry

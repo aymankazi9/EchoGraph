@@ -134,8 +134,8 @@ export function GuideUpload({ onGuide, isScoring }: Props) {
             className={[
               'w-full resize-none rounded-input border border-border-default',
               'bg-bg-input text-body text-text-primary px-2 py-1.5',
-              'placeholder:text-text-tertiary focus:outline-none focus:border-indigo-500',
-              'focus:shadow-teal transition-colors text-body-sm',
+              'placeholder:text-text-tertiary focus:outline-none focus:border-border-strong',
+              'transition-colors text-body-sm',
             ].join(' ')}
           />
           <button
@@ -143,10 +143,10 @@ export function GuideUpload({ onGuide, isScoring }: Props) {
             disabled={!pasteText.trim() || isScoring}
             onClick={handlePaste}
             className={[
-              'w-full py-1.5 rounded-btn text-label font-medium',
-              'bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors',
+              'w-full py-1.5 rounded-btn text-label font-medium transition-colors',
               !pasteText.trim() || isScoring ? 'opacity-40 cursor-not-allowed' : '',
             ].join(' ')}
+            style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
           >
             Use as guide
           </button>

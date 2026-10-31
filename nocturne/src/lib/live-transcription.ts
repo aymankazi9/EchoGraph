@@ -96,6 +96,12 @@ export interface LiveTranscriptionOptions {
   onSizeEstimate?: (bytes: number) => void
   /** Called once after ~10 s of continuous silence (rms < threshold). */
   onSilenceDetected?: () => void
+  /**
+   * Called once the mic's AnalyserNode exists, so the UI can drive its own
+   * requestAnimationFrame waveform loop directly off the node — pushing raw
+   * samples through React state would re-render on every frame.
+   */
+  onAnalyserReady?: (analyser: AnalyserNode) => void
 }
 
 type WorkerMsg =
@@ -423,12 +429,15 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
       ctx = new AudioContext({ sampleRate: 16_000 })
       const source = ctx.createMediaStreamSource(stream)
 
-      // AnalyserNode — parallel branch for level meter and silence detection.
-      // Not in the audio chain (source → processor path is unchanged).
+      // AnalyserNode — parallel branch for level meter, silence detection, and
+      // the waveform canvas. Not in the audio chain (source → processor path
+      // is unchanged). 1024 gives a smooth waveform; level/silence sampling
+      // above adapts to fftSize automatically.
       analyser = ctx.createAnalyser()
-      analyser.fftSize = 256
+      analyser.fftSize = 1024
       analyser.smoothingTimeConstant = 0.4
       source.connect(analyser)
+      opts.onAnalyserReady?.(analyser)
 
       // ScriptProcessorNode accumulates 16kHz samples.
       // Deprecated in favor of AudioWorklet but remains the lowest-complexity option
@@ -548,6 +557,14 @@ export function startLiveTranscription(opts: LiveTranscriptionOptions): () => Pr
           // Route to onWarning, not onStatus, so the recording phase is not disturbed.
           console.error('[live-transcription] worker error msg:', msg.message)
           opts.onWarning?.({ kind: 'worker_error', message: msg.message })
+          // The failed chunk never sends CHUNK_DONE, so workerBusy must be cleared
+          // here too — otherwise drainQueue() stalls forever and doStop()'s drain
+          // wait (which only resolves from the CHUNK_DONE branch) hangs indefinitely.
+          workerBusy = false
+          drainQueue()
+          if (isStopping && chunkQueue.length === 0 && !workerBusy) {
+            drainResolve?.()
+          }
         }
       }
 

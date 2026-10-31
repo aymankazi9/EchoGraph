@@ -11,8 +11,12 @@ let sqlJsReady: Promise<Awaited<ReturnType<typeof initSqlJs>>> | null = null
 function getSqlJs() {
   if (!sqlJsReady) {
     sqlJsReady = initSqlJs({
-      locateFile: (file: string) =>
-        `https://cdn.jsdelivr.net/npm/sql.js@1.12.0/dist/${file}`,
+      // Served from public/ (copied from the installed sql.js version — currently
+      // 1.14.1) instead of a CDN. The previous CDN URL was hardcoded to the stale
+      // 1.12.0 and failed to compile ("HTTP status code is not ok") — same-origin
+      // avoids CDN/CORS/ad-blocker failures and version drift entirely.
+      // Re-copy node_modules/sql.js/dist/sql-wasm.wasm to public/ if sql.js is upgraded.
+      locateFile: (file: string) => `/${file}`,
     })
   }
   return sqlJsReady

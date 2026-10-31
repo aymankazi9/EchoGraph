@@ -103,15 +103,18 @@ function SingleZone({ type, label, icon, accept, hint, multiple, onFileSelect, d
       onDrop={handleDrop}
       animate={showAccepted ? dropAccepted.animate : {}}
       className={[
-        'flex-1 min-h-[200px] flex flex-col items-center justify-center gap-3',
+        'flex-1 min-w-[160px] min-h-[200px] flex flex-col items-center justify-center gap-3',
         'border-2 border-dashed rounded-card transition-colors select-none',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
-        isDragOver
-          ? 'border-indigo-500 bg-indigo-500/5'
-          : hasContent
-          ? 'border-indigo-500 bg-indigo-500/5'
-          : 'border-border-strong hover:border-indigo-500',
+        isDragOver || hasContent
+          ? ''
+          : 'border-border-strong hover:border-[rgba(255,255,255,0.3)]',
       ].join(' ')}
+      style={
+        isDragOver || hasContent
+          ? { borderColor: 'rgba(255,59,48,0.45)', background: 'rgba(255,59,48,0.08)' }
+          : undefined
+      }
     >
       <input
         ref={inputRef}
@@ -123,12 +126,12 @@ function SingleZone({ type, label, icon, accept, hint, multiple, onFileSelect, d
         disabled={disabled}
       />
 
-      <span className={hasContent ? 'text-indigo-400' : 'text-text-secondary'}>{icon}</span>
+      <span className="text-text-secondary" style={hasContent ? { color: '#FF3B30' } : undefined}>{icon}</span>
 
       <div className="flex flex-col items-center gap-1">
         <span className="text-body font-medium text-text-primary">{label}</span>
         {hasContent ? (
-          <span className="text-label text-indigo-400 max-w-[140px] truncate text-center">
+          <span className="text-label max-w-[140px] truncate text-center" style={{ color: '#FF3B30' }}>
             {droppedCount !== undefined && droppedCount > 0
               ? `${droppedCount} file${droppedCount > 1 ? 's' : ''} selected`
               : droppedFile?.name ?? ''}

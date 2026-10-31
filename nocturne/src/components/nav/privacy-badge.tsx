@@ -26,7 +26,8 @@ export function PrivacyBadge({ collapsed }: Props) {
               <motion.span
                 variants={localPulse}
                 animate="animate"
-                className="inline-block w-2 h-2 rounded-full bg-indigo-500"
+                className="inline-block w-1.5 h-1.5"
+                style={{ background: 'var(--color-accent)' }}
               />
             </div>
           </TooltipTrigger>
@@ -37,14 +38,15 @@ export function PrivacyBadge({ collapsed }: Props) {
   }
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 rounded-btn border border-local-border bg-local-bg">
+    <div className="flex items-center gap-2 px-2 py-1.5 border" style={{ borderColor: 'rgba(255,255,255,0.14)' }}>
       <motion.span
         variants={localPulse}
         animate="animate"
-        className="inline-block w-2 h-2 rounded-full bg-indigo-500 shrink-0"
+        className="inline-block w-1.5 h-1.5 shrink-0"
+        style={{ background: 'var(--color-accent)' }}
       />
-      <Shield size={12} strokeWidth={1.5} className="text-local-text shrink-0" />
-      <span className="text-caption text-local-text">Local Mode</span>
+      <Shield size={12} strokeWidth={1.5} className="shrink-0" style={{ color: '#9A9A9F' }} />
+      <span className="text-caption" style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: '#9A9A9F' }}>Local Mode</span>
     </div>
   )
 }

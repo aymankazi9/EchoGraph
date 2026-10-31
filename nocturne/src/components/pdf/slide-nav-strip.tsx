@@ -112,7 +112,7 @@ export function SlideNavStrip({ slides, currentPage, onPageSelect }: Props) {
         const isActive = entry.globalIndex === currentPage
         // Zone lookup uses globalIndex — the correct key in the store map.
         const zone = slideZoneMap[entry.globalIndex]
-        const dotColor = zone === 'red' ? '#FB7185' : zone === 'likely' ? '#FBBF24' : null
+        const dotColor = zone === 'red' ? '#FF3B30' : zone === 'likely' ? 'rgba(255,255,255,0.3)' : null
 
         return (
           <Fragment key={entry.globalIndex}>
@@ -122,10 +122,10 @@ export function SlideNavStrip({ slides, currentPage, onPageSelect }: Props) {
                 padding: '8px 6px 2px',
                 fontSize: 9,
                 fontFamily: 'var(--font-mono), monospace',
-                color: '#3F485C',
+                color: '#4A4A4E',
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase',
-                borderTop: '1px solid #16151E',
+                borderTop: '1px solid rgba(255,255,255,0.08)',
                 marginTop: 4,
                 flexShrink: 0,
               }}>
@@ -144,16 +144,16 @@ export function SlideNavStrip({ slides, currentPage, onPageSelect }: Props) {
                 flexDirection: 'column',
                 gap: 5,
                 padding: '6px 6px 5px',
-                borderRadius: 8,
-                border: `1px solid ${isActive ? '#2D2B45' : 'transparent'}`,
-                background: isActive ? '#111119' : 'transparent',
+                borderRadius: 2,
+                border: `1px solid ${isActive ? 'rgba(255,255,255,0.14)' : 'transparent'}`,
+                background: isActive ? 'rgba(255,255,255,0.06)' : 'transparent',
                 cursor: 'pointer',
                 textAlign: 'left',
                 width: '100%',
               }}
             >
               {/* Thumbnail */}
-              <div style={{ position: 'relative', width: '100%', background: '#0D0D14', borderRadius: 5, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 66 }}>
+              <div style={{ position: 'relative', width: '100%', background: '#0C0C0D', borderRadius: 2, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 66 }}>
                 {isActive ? (
                   <motion.div
                     key={flashKey}
@@ -169,7 +169,7 @@ export function SlideNavStrip({ slides, currentPage, onPageSelect }: Props) {
                 {/* Slide number — bottom-left; shows global index */}
                 <span style={{
                   position: 'absolute', bottom: 4, left: 6,
-                  fontFamily: 'var(--font-mono), monospace', fontSize: 9, color: '#94A3B8',
+                  fontFamily: 'var(--font-mono), monospace', fontSize: 9, color: '#9A9A9F',
                 }}>
                   {String(entry.globalIndex).padStart(2, '0')}
                 </span>
@@ -177,7 +177,7 @@ export function SlideNavStrip({ slides, currentPage, onPageSelect }: Props) {
                 {dotColor && (
                   <span style={{
                     position: 'absolute', top: 5, right: 5,
-                    width: 7, height: 7, borderRadius: '50%', background: dotColor,
+                    width: 6, height: 6, background: dotColor,
                   }} />
                 )}
               </div>

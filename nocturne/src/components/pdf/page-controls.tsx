@@ -50,7 +50,7 @@ export function PageControls({ currentPage, totalPages, onPageChange }: Props) {
               e.currentTarget.blur()
             }
           }}
-          className="w-12 h-7 text-center text-label text-text-primary bg-bg-input border border-border-default rounded-input focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className="w-12 h-7 text-center text-label text-text-primary bg-bg-input border border-border-default rounded-input focus:border-border-strong focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           aria-label="Current page"
         />
         <span>/</span>

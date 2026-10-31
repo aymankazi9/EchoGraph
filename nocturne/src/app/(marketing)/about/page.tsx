@@ -47,7 +47,7 @@ export default function AboutPage() {
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div data-reveal="" className="mb-14">
-          <p className="text-caption uppercase tracking-[0.1em] text-indigo-400 mb-3">
+          <p className="text-caption uppercase tracking-[0.1em] mb-3" style={{ color: 'var(--color-accent)' }}>
             About
           </p>
           <h1 className="text-heading font-medium text-text-primary mb-4">
@@ -91,7 +91,7 @@ export default function AboutPage() {
             {features.map(({ icon: Icon, title, description }) => (
               <div key={title} className="flex gap-4 p-5 rounded-card border border-border-default bg-bg-elevated">
                 <div className="p-2 rounded-btn bg-bg-subtle shrink-0 h-fit">
-                  <Icon size={18} strokeWidth={1.5} className="text-indigo-400" />
+                  <Icon size={18} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
                 </div>
                 <div>
                   <h2 className="text-subheading font-medium text-text-primary mb-1.5">{title}</h2>
@@ -158,13 +158,12 @@ export default function AboutPage() {
                 alignItems: 'center',
                 height: 46,
                 padding: '0 26px',
-                borderRadius: 8,
+                borderRadius: 2,
                 fontSize: 15,
                 fontWeight: 500,
-                background: '#6366F1',
-                color: '#09090F',
+                background: 'var(--color-accent)',
+                color: 'var(--color-text-inverse)',
                 textDecoration: 'none',
-                boxShadow: '0 8px 28px rgba(99,102,241,0.35)',
               }}
             >
               Start for free

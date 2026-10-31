@@ -3,9 +3,9 @@
 // ThemeProvider — pure context wrapper for the authenticated app shell.
 //
 // Provides prefs + setPrefs to descendant components.  The actual data-theme /
-// data-accent / data-focus-mode attributes are applied by AppShell (which
-// consumes this context) so the CSS custom property overrides in globals.css
-// scope correctly without any extra wrapper DOM element.
+// data-focus-mode attributes are applied by AppShell (which consumes this
+// context) so the CSS custom property overrides in globals.css scope
+// correctly without any extra wrapper DOM element.
 
 import { createContext, useContext, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'

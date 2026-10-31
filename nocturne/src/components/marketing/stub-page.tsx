@@ -9,12 +9,6 @@ interface Props {
   description: string
 }
 
-const badgeStyles: Record<BadgeVariant, string> = {
-  soon: 'bg-amber-400/10 text-amber-200 border border-amber-400/20',
-  beta: 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
-  wip:  'bg-amber-400/10 text-amber-200 border border-amber-400/20',
-}
-
 const badgeLabels: Record<BadgeVariant, string> = {
   soon: 'Coming soon',
   beta: 'Beta',
@@ -25,7 +19,7 @@ export function StubPage({ badge, title, description }: Props) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 py-20 text-center">
       <span
-        className={`text-caption uppercase tracking-[0.07em] px-2.5 py-1 rounded-full mb-6 ${badgeStyles[badge]}`}
+        className="font-mono text-[10px] uppercase tracking-[0.16em] px-[7px] py-[3px] mb-6 border border-border-strong text-text-secondary"
       >
         {badgeLabels[badge]}
       </span>

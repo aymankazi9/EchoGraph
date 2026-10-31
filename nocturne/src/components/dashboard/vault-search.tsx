@@ -68,10 +68,10 @@ export function VaultSearch({ inputRef: externalRef }: Props) {
         placeholder="Search sessions…"
         className={[
           'w-full h-9 pl-9 pr-8',
-          'bg-bg-input border border-border-default rounded-card',
+          'bg-bg-input border border-border-default',
           'text-body text-text-primary placeholder:text-text-tertiary',
           'transition-colors duration-75',
-          'focus:outline-none focus:border-border-strong focus:ring-1 focus:ring-indigo-500/40',
+          'focus:outline-none focus:border-border-strong',
         ].join(' ')}
       />
       {localValue && (

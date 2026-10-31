@@ -5,7 +5,10 @@ export function TryAgainButton() {
     <button
       type="button"
       onClick={() => window.location.reload()}
-      className="mt-5 h-9 px-5 rounded-btn text-body font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
+      className="mt-5 h-9 px-5 rounded-btn text-body font-medium text-text-inverse transition-colors"
+      style={{ background: 'var(--color-accent)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-accent-hover)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-accent)' }}
     >
       Try again
     </button>

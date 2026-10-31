@@ -3,7 +3,17 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence } from 'framer-motion'
-import { Mic, Square } from 'lucide-react'
+import { Mic, Square, Trash2 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { isVaultUnlocked, getMasterKey, vaultRestoreFromCache } from '@/lib/crypto/vault'
 import { decryptText } from '@/lib/crypto/decrypt'
 import { encryptText } from '@/lib/crypto/encrypt'
@@ -38,6 +48,7 @@ import { useEnhancementStore } from '@/store/enhancement-store'
 import { QuizPanel } from '@/components/study-guide/quiz-panel'
 import { NotesEditor } from '@/components/notes/notes-editor'
 import { AskPanel } from '@/components/ask/ask-panel'
+import { MapTab } from '@/components/map/map-tab'
 import { hasAccess, type Tier } from '@/lib/tiers/features'
 import { LockedFeature } from '@/components/paywall/locked-feature'
 import { PublishDeckModal } from '@/components/community/publish-deck-modal'
@@ -96,9 +107,10 @@ const TAB_GATES: Partial<Record<Tab, 'midnight' | 'eclipse'>> = {
   notes: 'midnight',
   quiz:  'eclipse',
   ask:   'eclipse',
+  map:   'midnight',
 }
 
-type Tab = 'lecture' | 'study' | 'quiz' | 'notes' | 'ask'
+type Tab = 'lecture' | 'study' | 'quiz' | 'notes' | 'ask' | 'map'
 
 // Data computed during the score phase, held for deferred execution if user confirmation is required.
 interface RescorePayload {
@@ -141,10 +153,17 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   const [liveSessionStatus, setLiveSessionStatus] = useState(session.status)
   const [guideModalOpen, setGuideModalOpen] = useState(false)
   const [publishDeckOpen, setPublishDeckOpen] = useState(false)
+  const [isExportingFlashcards, setIsExportingFlashcards] = useState(false)
+  const [discardAudioConfirmOpen, setDiscardAudioConfirmOpen] = useState(false)
+  const [isDiscardingAudio, setIsDiscardingAudio] = useState(false)
+  const [discardAudioError, setDiscardAudioError] = useState<string | null>(null)
   const [pendingRescore, setPendingRescore] = useState<{ payload: RescorePayload; reviewCount: number } | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [liveStatus, setLiveStatus] = useState<LiveStatus>({ phase: 'idle' })
   const stopLiveRef = useRef<(() => Promise<Blob | null>) | null>(null)
+  // Live AnalyserNode for the waveform canvas — read directly in a rAF loop,
+  // never piped through React state (would re-render every frame).
+  const liveAnalyserRef = useRef<AnalyserNode | null>(null)
   // Pre-assigned UUID for the current recording take.
   // Set at recording start so transcript_words and the final files row share the same id.
   const liveFileIdRef = useRef<string | null>(null)
@@ -156,7 +175,6 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   // interrupted recording. Set here; UI will offer recovery when implemented.
   const [pendingCheckpoints, setPendingCheckpoints] = useState<CheckpointMeta[]>([])
   // Live recording telemetry — driven by throttled callbacks in live-transcription.ts
-  const [liveLevel, setLiveLevel]                   = useState(0)
   const [liveLagSec, setLiveLagSec]                 = useState(0)
   const [liveSilenceDetected, setLiveSilenceDetected] = useState(false)
   const [liveEstimatedBytes, setLiveEstimatedBytes] = useState(0)
@@ -182,6 +200,38 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
   // Populated by an effect on mount; fed into guideText during keyword extraction.
   const [handwrittenOcrText, setHandwrittenOcrText] = useState<string | null>(null)
   const pdfViewerRef = useRef<PdfViewerHandle | null>(null)
+  // User-adjustable height of the timeline/transcript panel in the Lecture tab —
+  // dragged via the handle between it and the slide area.
+  const [timelineHeight, setTimelineHeight] = useState(400)
+  const timelineResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
+  const handleTimelineResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    timelineResizeRef.current = { startY: e.clientY, startHeight: timelineHeight }
+    document.body.style.cursor = 'row-resize'
+    document.body.style.userSelect = 'none'
+    const onMove = (ev: MouseEvent) => {
+      const r = timelineResizeRef.current
+      if (!r) return
+      const delta = ev.clientY - r.startY
+      setTimelineHeight(Math.min(700, Math.max(160, r.startHeight - delta)))
+    }
+    const onUp = () => {
+      timelineResizeRef.current = null
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [timelineHeight])
+  // Set when a slide jump is requested from outside the Lecture tab (e.g. a
+  // Notes slide-ref chip) — PdfViewer consumes this once it's mounted and ready.
+  const [pendingSlideJump, setPendingSlideJump] = useState<number | null>(null)
+  // Lifted from the initialFlashcardId prop so Map's "Go to flashcard" can
+  // update it mid-session — switching tabs always unmounts/remounts
+  // FlashcardPanel, so it reads the new value fresh, no stale-ref risk.
+  const [activeFlashcardId, setActiveFlashcardId] = useState(initialFlashcardId)
   const playTrackedRef = useRef(false)
   // Holds the decrypted plain-text of the current note once the Notes tab is opened.
   // Updated by NotesEditor via onContentChange; read synchronously by SessionSearchBar.
@@ -1138,7 +1188,6 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
     liveFileIdRef.current = fileId
 
     // Reset telemetry and warnings before each take
-    setLiveLevel(0)
     setLiveLagSec(0)
     setLiveSilenceDetected(false)
     setLiveEstimatedBytes(0)
@@ -1171,10 +1220,10 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
       onDriftDetected: () => {
         // liveStatus.drifted flag is set by live-transcription.ts; UI warning deferred
       },
-      onLevel:            setLiveLevel,
       onLag:              setLiveLagSec,
       onSilenceDetected: () => { if (isMountedRef.current) setLiveSilenceDetected(true) },
       onSizeEstimate:     setLiveEstimatedBytes,
+      onAnalyserReady:    (a) => { liveAnalyserRef.current = a },
       // onChunkComplete not needed in SessionClient — RecordingBar doesn't need chunk count
     })
   }, [isRecording, liveStatus.phase, supabase, session.id, userId, addTranscriptWords])
@@ -1312,6 +1361,69 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
       console.error('[SessionClient] discard error:', e)
     }
   }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Top-bar Export — mirrors FlashcardPanel's Anki export so the Export
+  // button in the top bar does the same thing without duplicating UI state.
+  const handleExportFlashcardsAnki = useCallback(async () => {
+    if (flashcards.length === 0 || isExportingFlashcards) return
+    setIsExportingFlashcards(true)
+    try {
+      const { generateApkg } = await import('@/lib/study-guide/anki-export')
+      const title = sessionTitle ?? 'nocturne-deck'
+      const data = await generateApkg(flashcards, title)
+      const blob = new Blob([data.buffer as ArrayBuffer], { type: 'application/octet-stream' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${title.replace(/[^a-z0-9]/gi, '_')}.apkg`
+      a.click()
+      URL.revokeObjectURL(url)
+      useNotificationStore.getState().notify({ type: 'success', message: 'Anki deck exported', duration: 2000 })
+      supabase.from('users').update({ checklist_exported: true }).eq('id', userId)
+      fetch('/api/export/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: session.id, card_count: flashcards.length }),
+      }).catch(() => {})
+    } catch (e) {
+      console.error('[SessionClient] flashcard export error:', e)
+      useNotificationStore.getState().notify({ type: 'error', message: 'Failed to export flashcards', duration: 4000 })
+    } finally {
+      setIsExportingFlashcards(false)
+    }
+  }, [flashcards, sessionTitle, isExportingFlashcards, supabase, userId, session.id])
+
+  // ── Discard a saved recording take ───────────────────────────────────────
+  // Permanent — the storage bucket has no versioning/trash, so once the blob
+  // is removed there is no recovery path. Mirrors the storage-then-row delete
+  // order already used for whole-session delete in session-card.tsx. A full
+  // reload afterward is deliberate: transcriptWords/syncMap in the client
+  // store aren't scoped by file_id, so there's no reliable partial-state
+  // reconciliation — a reload re-derives everything from the DB correctly.
+  const handleDiscardAudioTake = useCallback(async () => {
+    if (!audioFile || isDiscardingAudio) return
+    setIsDiscardingAudio(true)
+    setDiscardAudioError(null)
+    try {
+      await supabase.from('transcript_words').delete().eq('file_id', audioFile.id)
+      await supabase.from('sync_map').delete().eq('file_id', audioFile.id)
+      await supabase.storage.from('nocturne-files').remove([audioFile.storage_path])
+      const { error } = await supabase.from('files').delete().eq('id', audioFile.id)
+      if (error) throw error
+
+      const remainingTakes = allAudioFiles.length - 1
+      await supabase.from('sessions').update({
+        has_audio: remainingTakes > 0,
+        ...(remainingTakes === 0 ? { status: 'ingesting' } : {}),
+      }).eq('id', session.id)
+
+      window.location.reload()
+    } catch (e) {
+      console.error('[SessionClient] discard audio take error:', e)
+      setDiscardAudioError('Failed to discard recording. Please try again.')
+      setIsDiscardingAudio(false)
+    }
+  }, [audioFile, isDiscardingAudio, supabase, allAudioFiles.length, session.id])
 
   // ── Failed-save recovery callbacks (logic only — no UI yet) ─────────────
   // These are wired up but not yet surfaced in JSX. The UI for retry / download /
@@ -1627,7 +1739,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
     <div className="relative flex flex-col h-full overflow-hidden">
 
       {/* ── Top bar ───────────────────────────────────────────────────────── */}
-      <div style={{ height: 54, flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: '1px solid #16151E', background: '#0B0B11', gap: 12 }}>
+      <div style={{ height: 54, flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', background: '#0A0A0A', gap: 12 }}>
         {/* Left: breadcrumb */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 11 }}>
           <button
@@ -1638,7 +1750,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               if (isRecording && !window.confirm('Recording in progress — navigate away? Your recording will be saved automatically.')) return
               router.push('/vault')
             }}
-            style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, border: '1px solid #1E1E2E', background: '#0D0D14', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', cursor: 'pointer' }}
+            style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9A9A9F', cursor: 'pointer' }}
           >
             <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4 L6 9 L11 14" /></svg>
           </button>
@@ -1648,18 +1760,17 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               if (isRecording && !window.confirm('Recording in progress — navigate away? Your recording will be saved automatically.')) return
               router.push('/vault')
             }}
-            style={{ fontSize: 12.5, color: '#5B6478', background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ fontSize: 12.5, color: '#76767B', background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >Vault</button>
-          <span style={{ color: '#2D2B45' }}>/</span>
+          <span style={{ color: 'rgba(255,255,255,0.14)' }}>/</span>
           <SessionTitle sessionId={session.id} />
           {session.status === 'synced' && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 9999, border: '1px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.1)', flexShrink: 0 }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#A78BFA' }} />
-              <span style={{ fontSize: 10.5, color: '#C4B5FD', fontWeight: 500 }}>Synced</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9A9F', border: '1px solid rgba(255,255,255,0.14)', padding: '2px 6px', flexShrink: 0 }}>
+              Synced
             </span>
           )}
           {isScoring && (
-            <span style={{ fontSize: 10.5, color: '#FBBF24', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Scoring…</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: '#9A9A9F', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Scoring…</span>
           )}
           {/* Recording indicator — visible on every tab; click jumps to Lecture */}
           {isRecording && liveStatus.phase === 'recording' && (
@@ -1669,24 +1780,24 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               title="Recording in progress — click to go to Lecture tab"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                height: 24, padding: '0 9px', borderRadius: 6,
-                border: '1px solid rgba(251,113,133,0.3)',
-                background: 'rgba(251,113,133,0.08)',
-                color: '#FB7185', fontSize: 11, fontWeight: 500,
+                height: 24, padding: '0 9px', borderRadius: 2,
+                border: '1px solid rgba(255,59,48,0.35)',
+                background: 'rgba(255,59,48,0.08)',
+                color: '#FF3B30', fontSize: 11, fontWeight: 500,
                 cursor: 'pointer',
                 fontVariantNumeric: 'tabular-nums',
                 fontFamily: 'var(--font-mono), monospace',
               }}
             >
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#FB7185', flexShrink: 0, animation: 'rec-pulse 1.4s ease-in-out infinite' }} />
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#FF3B30', flexShrink: 0, animation: 'rec-pulse 1.4s ease-in-out infinite' }} />
               {'elapsedSec' in liveStatus ? `${Math.floor(liveStatus.elapsedSec / 60)}:${String(liveStatus.elapsedSec % 60).padStart(2, '0')}` : '0:00'}
             </button>
           )}
         </div>
 
         {/* Center: mode tabs */}
-        <div style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 10, border: '1px solid #1E1E2E', background: '#0D0D14', flexShrink: 0 }}>
-          {(['lecture', 'study', 'quiz', 'notes', 'ask'] as Tab[]).map((t) => {
+        <div style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D', flexShrink: 0 }}>
+          {(['lecture', 'study', 'quiz', 'notes', 'ask', 'map'] as Tab[]).map((t) => {
             const gate = TAB_GATES[t]
             const locked = !!gate && !hasAccess(userTier, gate)
             const active = tab === t
@@ -1696,11 +1807,11 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
                 type="button"
                 onClick={() => setTab(t)}
                 style={{
-                  height: 28, padding: '0 13px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  height: 28, padding: '0 13px', borderRadius: 2, border: 'none', cursor: 'pointer',
                   fontSize: 12.5, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5,
-                  background: active ? '#1E1D2E' : 'transparent',
-                  color: active ? '#E2E8F0' : locked ? '#3A4155' : '#5B6478',
-                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
+                  background: active ? 'rgba(255,255,255,0.05)' : 'transparent',
+                  color: active ? '#EDEDED' : locked ? '#4A4A4E' : '#76767B',
+                  boxShadow: active ? 'inset 0 -2px 0 0 #FF3B30' : 'none',
                 }}
               >
                 {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -1716,22 +1827,6 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
         {/* Right: subject tag + search + export */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={() => setGuideModalOpen(true)}
-            disabled={isScoring}
-            style={{
-              height: 32, padding: '0 12px', display: 'inline-flex', alignItems: 'center', gap: 6,
-              borderRadius: 8, border: '1px solid #23222F', background: '#0D0D14',
-              fontSize: 12, color: '#7C8398', cursor: isScoring ? 'not-allowed' : 'pointer',
-              opacity: isScoring ? 0.5 : 1, flexShrink: 0,
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="1" width="12" height="16" rx="2" /><path d="M6 6 H12 M6 9 H12 M6 12 H9" />
-            </svg>
-            Study guide
-          </button>
           <CourseTagPicker
             sessionId={session.id}
             userId={userId}
@@ -1755,10 +1850,19 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           />
           <button
             type="button"
-            style={{ height: 32, padding: '0 13px', display: 'inline-flex', alignItems: 'center', gap: 7, borderRadius: 8, border: '1px solid #2D2B45', background: 'transparent', fontSize: 12.5, color: '#CBD5E1', cursor: 'pointer' }}
+            onClick={handleExportFlashcardsAnki}
+            disabled={flashcards.length === 0 || isExportingFlashcards}
+            title={flashcards.length === 0 ? 'No flashcards to export yet' : 'Export flashcards as an Anki deck'}
+            style={{
+              height: 32, padding: '0 13px', display: 'inline-flex', alignItems: 'center', gap: 7, borderRadius: 2,
+              border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', fontSize: 12.5,
+              color: flashcards.length === 0 ? '#4A4A4E' : '#9A9A9F',
+              cursor: flashcards.length === 0 || isExportingFlashcards ? 'not-allowed' : 'pointer',
+              opacity: isExportingFlashcards ? 0.5 : 1,
+            }}
           >
             <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2 V11 M5.5 7.5 L9 11 L12.5 7.5 M3 14 H15" /></svg>
-            Export
+            {isExportingFlashcards ? 'Exporting…' : 'Export'}
           </button>
         </div>
       </div>
@@ -1783,18 +1887,32 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
             />
           ) : flashcards.length > 0 ? (
             <>
-              {hasAccess(userTier, 'eclipse') && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10, flexShrink: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 10, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setGuideModalOpen(true)}
+                  style={{
+                    height: 30, padding: '0 12px', display: 'inline-flex', alignItems: 'center', gap: 6,
+                    borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+                    fontSize: 12, color: '#9A9A9F', cursor: 'pointer',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="1" width="12" height="16" rx="2" /><path d="M6 6 H12 M6 9 H12 M6 12 H9" />
+                  </svg>
+                  Update study guide
+                </button>
+                {hasAccess(userTier, 'eclipse') && (
                   <button
                     type="button"
                     onClick={() => setPublishDeckOpen(true)}
                     style={{
                       height: 30, padding: '0 12px',
                       display: 'inline-flex', alignItems: 'center', gap: 6,
-                      borderRadius: 8,
-                      border: '1px solid rgba(99,102,241,0.35)',
-                      background: 'rgba(99,102,241,0.08)',
-                      color: '#818CF8', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      borderRadius: 2,
+                      border: '1px solid rgba(255,59,48,0.35)',
+                      background: 'rgba(255,59,48,0.08)',
+                      color: '#FF3B30', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                     }}
                   >
                     <svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -1803,30 +1921,43 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
                     </svg>
                     Publish to room
                   </button>
-                </div>
-              )}
-              <FlashcardPanel sessionTitle={sessionTitle ?? ''} sessionId={session.id} userId={userId} examDate={(session.courses as unknown as { exam_date: string | null } | null)?.exam_date ?? null} initialFlashcardId={initialFlashcardId} />
+                )}
+              </div>
+              <FlashcardPanel sessionTitle={sessionTitle ?? ''} sessionId={session.id} userId={userId} examDate={(session.courses as unknown as { exam_date: string | null } | null)?.exam_date ?? null} initialFlashcardId={activeFlashcardId} />
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
               <span className="text-text-tertiary text-body-sm">No flashcards yet — add a study guide or let Nocturne score your slides.</span>
-              {session.has_slides && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                 <button
                   type="button"
-                  onClick={() => handleScore({ type: 'extract', guideText: null })}
-                  disabled={isScoring}
+                  onClick={() => setGuideModalOpen(true)}
                   style={{
-                    marginTop: 4, height: 32, padding: '0 16px',
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    borderRadius: 8, border: '1px solid #23222F', background: '#0D0D14',
-                    fontSize: 12, color: isScoring ? '#3A4155' : '#7C8398',
-                    cursor: isScoring ? 'not-allowed' : 'pointer',
-                    opacity: isScoring ? 0.5 : 1,
+                    height: 32, padding: '0 16px', display: 'inline-flex', alignItems: 'center', gap: 6,
+                    borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+                    fontSize: 12, color: '#9A9A9F', cursor: 'pointer',
                   }}
                 >
-                  {isScoring ? 'Scoring…' : 'Score now'}
+                  Add study guide
                 </button>
-              )}
+                {session.has_slides && (
+                  <button
+                    type="button"
+                    onClick={() => handleScore({ type: 'extract', guideText: null })}
+                    disabled={isScoring}
+                    style={{
+                      height: 32, padding: '0 16px',
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+                      fontSize: 12, color: '#9A9A9F',
+                      cursor: isScoring ? 'not-allowed' : 'pointer',
+                      opacity: isScoring ? 0.5 : 1,
+                    }}
+                  >
+                    {isScoring ? 'Scoring…' : 'Score now'}
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1889,8 +2020,12 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               userTier={userTier}
               totalSlides={totalPages}
               onGoToSlide={(slideIndex) => {
+                // The Lecture tab (and PdfViewer) is unmounted while on Notes, so the
+                // ref call below would silently no-op — pendingJumpPage is applied once
+                // PdfViewer actually mounts and finishes loading. jumpToSlide separately
+                // moves the audio playhead to the matching sync-map segment, if any.
                 setTab('lecture')
-                pdfViewerRef.current?.goToPage(slideIndex)
+                setPendingSlideJump(slideIndex)
                 jumpToSlide(slideIndex)
               }}
               onContentChange={(text) => { notesTextRef.current = text }}
@@ -1919,6 +2054,38 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         </div>
       )}
 
+      {/* MAP mode */}
+      {tab === 'map' && (
+        <div className="flex-1 min-h-0 flex flex-col">
+          {!hasAccess(userTier, 'midnight') ? (
+            <div className="p-6 flex-1">
+              <LockedFeature
+                requiredTier="midnight"
+                feature="Map"
+                description="A knowledge graph of this session's keywords — connected by shared slides, lecture co-occurrence, and semantic similarity."
+              />
+            </div>
+          ) : (
+            <MapTab
+              sessionId={session.id}
+              hasSlides={hasSlides}
+              isScoring={isScoring}
+              bertBusy={isScoring || isRecording || liveSessionStatus === 'syncing'}
+              onScoreNow={() => handleScore({ type: 'extract', guideText: null })}
+              onGoToSlide={(slideIndex) => {
+                setTab('lecture')
+                setPendingSlideJump(slideIndex)
+                jumpToSlide(slideIndex)
+              }}
+              onGoToFlashcard={(flashcardId) => {
+                setTab('study')
+                setActiveFlashcardId(flashcardId)
+              }}
+            />
+          )}
+        </div>
+      )}
+
       {/* LECTURE mode */}
       {tab === 'lecture' && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -1927,10 +2094,10 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
 
             {/* ── Outline rail (170px) ──────────────────────────────────── */}
-            <div style={{ width: 170, flexShrink: 0, borderRight: '1px solid #16151E', background: '#0A0A0F', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: 170, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.08)', background: '#0A0A0A', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '13px 14px 9px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#5B6478' }}>Outline</span>
-                <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 10, color: '#3F485C' }}>{totalPages > 0 ? `${totalPages} slides` : ''}</span>
+                <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#76767B' }}>Outline</span>
+                <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 10, color: '#4A4A4E' }}>{totalPages > 0 ? `${totalPages} slides` : ''}</span>
               </div>
 
               {slideEntries.length > 0 ? (
@@ -1947,14 +2114,14 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               )}
 
               {/* Legend */}
-              <div style={{ padding: '9px 14px', borderTop: '1px solid #16151E', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+              <div style={{ padding: '9px 14px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FB7185' }} />
-                  <span style={{ fontSize: 10, color: '#7C8398' }}>Red</span>
+                  <span style={{ width: 6, height: 6, background: '#FF3B30' }} />
+                  <span style={{ fontSize: 10, color: '#76767B' }}>Red</span>
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FBBF24' }} />
-                  <span style={{ fontSize: 10, color: '#7C8398' }}>Likely</span>
+                  <span style={{ width: 6, height: 6, background: 'rgba(255,255,255,0.3)' }} />
+                  <span style={{ fontSize: 10, color: '#76767B' }}>Likely</span>
                 </span>
               </div>
             </div>
@@ -1964,7 +2131,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               {/* Hero header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 11, minWidth: 0 }}>
-                  <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 12, color: '#5B6478', flexShrink: 0 }}>
+                  <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 12, color: '#76767B', flexShrink: 0 }}>
                     Slide {String(currentPage).padStart(2, '0')} / {totalPages || '—'}
                   </span>
                 </div>
@@ -1977,15 +2144,15 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
                       disabled={liveStatus.phase === 'saving'}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 5,
-                        height: 32, padding: '0 11px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
-                        border: isRecording ? '1px solid rgba(251,113,133,0.4)' : '1px solid #23222F',
-                        background: isRecording ? 'rgba(251,113,133,0.1)' : '#0D0D14',
-                        color: isRecording ? '#FB7185' : '#5B6478',
+                        height: 32, padding: '0 11px', borderRadius: 2, fontSize: 11.5, cursor: 'pointer',
+                        border: isRecording ? '1px solid rgba(255,59,48,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                        background: isRecording ? 'rgba(255,59,48,0.1)' : '#0C0C0D',
+                        color: isRecording ? '#FF3B30' : '#9A9A9F',
                         opacity: liveStatus.phase === 'saving' ? 0.5 : 1,
                       }}
                     >
                       {isRecording
-                        ? <><Square size={10} strokeWidth={0} style={{ fill: '#FB7185', flexShrink: 0 }} /> Stop</>
+                        ? <><Square size={10} strokeWidth={0} style={{ fill: '#FF3B30', flexShrink: 0 }} /> Stop</>
                         : <><Mic size={11} strokeWidth={1.5} style={{ flexShrink: 0 }} /> Record live</>
                       }
                     </button>
@@ -1996,15 +2163,28 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
                       title="Upgrade to Midnight to record live"
                       style={{
                         display: 'flex', alignItems: 'center', gap: 5,
-                        height: 32, padding: '0 11px', borderRadius: 8, fontSize: 11.5, cursor: 'not-allowed',
-                        border: '1px solid #1B1A29', background: '#0D0D14',
-                        color: '#3A4155', opacity: 0.55, flexShrink: 0,
+                        height: 32, padding: '0 11px', borderRadius: 2, fontSize: 11.5, cursor: 'not-allowed',
+                        border: '1px solid rgba(255,255,255,0.06)', background: '#0C0C0D',
+                        color: '#4A4A4E', opacity: 0.55, flexShrink: 0,
                       }}
                     >
                       <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                         <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                       </svg>
                       Record live
+                    </button>
+                  )}
+                  {!isRecording && (
+                    <button
+                      type="button"
+                      onClick={() => useSessionStore.getState().openUploadPanel()}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        height: 32, padding: '0 11px', borderRadius: 2, fontSize: 11.5, cursor: 'pointer',
+                        border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D', color: '#9A9A9F',
+                      }}
+                    >
+                      Upload files
                     </button>
                   )}
                   <button
@@ -2015,7 +2195,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
                       jumpToSlide(p)
                     }}
                     disabled={currentPage <= 1}
-                    style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #23222F', background: '#0D0D14', display: 'flex', alignItems: 'center', justifyContent: 'center', color: currentPage <= 1 ? '#2D2B45' : '#94A3B8', cursor: currentPage <= 1 ? 'not-allowed' : 'pointer' }}
+                    style={{ width: 32, height: 32, borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D', display: 'flex', alignItems: 'center', justifyContent: 'center', color: currentPage <= 1 ? '#3A3A3D' : '#9A9A9F', cursor: currentPage <= 1 ? 'not-allowed' : 'pointer' }}
                   >
                     <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4 L6 9 L11 14" /></svg>
                   </button>
@@ -2027,7 +2207,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
                       jumpToSlide(p)
                     }}
                     disabled={currentPage >= totalPages}
-                    style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #23222F', background: '#0D0D14', display: 'flex', alignItems: 'center', justifyContent: 'center', color: currentPage >= totalPages ? '#2D2B45' : '#94A3B8', cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer' }}
+                    style={{ width: 32, height: 32, borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D', display: 'flex', alignItems: 'center', justifyContent: 'center', color: currentPage >= totalPages ? '#3A3A3D' : '#9A9A9F', cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer' }}
                   >
                     <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4 L12 9 L7 14" /></svg>
                   </button>
@@ -2035,7 +2215,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               </div>
 
               {/* PDF canvas area + zone chip */}
-              <div style={{ flex: 1, minHeight: 0, position: 'relative', borderRadius: 12, border: '1px solid #1B1B27', overflow: 'hidden' }}>
+              <div style={{ flex: 1, minHeight: 0, position: 'relative', borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                 {hasSlides && pdfFile ? (
                   <PdfViewer
                     ref={pdfViewerRef}
@@ -2046,6 +2226,8 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
                     onSlidesExtracted={handleSlidesExtracted}
                     onPdfDocReady={(entries, pages) => { setSlideEntries(entries); setTotalPages(pages) }}
                     onPageChange={setCurrentPage}
+                    pendingJumpPage={pendingSlideJump}
+                    onJumpConsumed={() => setPendingSlideJump(null)}
                   />
                 ) : (
                   <GuidedEmptyState variant="pdf" />
@@ -2056,12 +2238,12 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
                   <div style={{
                     position: 'absolute', top: 14, left: 14,
                     display: 'inline-flex', alignItems: 'center', gap: 7,
-                    padding: '5px 10px', borderRadius: 8,
-                    background: currentZone === 'red' ? 'rgba(251,113,133,0.15)' : 'rgba(251,191,36,0.13)',
-                    border: `1px solid ${currentZone === 'red' ? 'rgba(251,113,133,0.35)' : 'rgba(251,191,36,0.3)'}`,
+                    padding: '5px 10px', borderRadius: 2,
+                    background: currentZone === 'red' ? 'rgba(255,59,48,0.12)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${currentZone === 'red' ? 'rgba(255,59,48,0.35)' : 'rgba(255,255,255,0.14)'}`,
                   }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: currentZone === 'red' ? '#FB7185' : '#FBBF24', flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, fontWeight: 500, color: currentZone === 'red' ? '#FDA4AF' : '#FDE68A' }}>
+                    <span style={{ width: 6, height: 6, background: currentZone === 'red' ? '#FF3B30' : 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, fontWeight: 500, color: currentZone === 'red' ? '#FF3B30' : '#9A9A9F' }}>
                       {currentZone === 'red' ? 'Red Zone' : 'Likely Zone'}
                     </span>
                   </div>
@@ -2072,31 +2254,53 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
 
           {/* ── Timeline spine ────────────────────────────────────────────── */}
           {hasAudioFile && audioFile && (
-            <div style={{ flexShrink: 0, height: 400, borderTop: '1px solid #16151E', background: '#0A0A0F', display: 'flex', flexDirection: 'column' }}>
+            <>
+              {/* Drag handle — resizes the timeline/transcript panel below */}
+              <div
+                onMouseDown={handleTimelineResizeStart}
+                title="Drag to resize"
+                style={{ flexShrink: 0, height: 7, cursor: 'row-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.14)' }} />
+              </div>
+              <div style={{ flexShrink: 0, height: timelineHeight, background: '#0A0A0A', display: 'flex', flexDirection: 'column' }}>
 
-              {/* Take selector — only visible when there are multiple audio takes */}
-              {allAudioFiles.length > 1 && (
-                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderBottom: '1px solid #16151E' }}>
-                  <span style={{ fontSize: 9.5, color: '#3F485C', fontFamily: 'var(--font-mono), monospace', letterSpacing: '0.05em', textTransform: 'uppercase', marginRight: 4 }}>Take</span>
-                  {allAudioFiles.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setSelectedTakeIdx(i)}
-                      style={{
-                        height: 22, padding: '0 9px', borderRadius: 5,
-                        border: `1px solid ${selectedTakeIdx === i ? '#2D2B45' : 'transparent'}`,
-                        background: selectedTakeIdx === i ? '#111119' : 'transparent',
-                        color: selectedTakeIdx === i ? '#C4B5FD' : '#5B6478',
-                        fontSize: 10.5, fontFamily: 'var(--font-mono), monospace',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
+              {/* Take selector + discard — the row always shows so there's always
+                  a way to discard, even for a session with only one take */}
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {allAudioFiles.length > 1 && (
+                    <>
+                      <span style={{ fontSize: 9.5, color: '#4A4A4E', fontFamily: 'var(--font-mono), monospace', letterSpacing: '0.05em', textTransform: 'uppercase', marginRight: 4 }}>Take</span>
+                      {allAudioFiles.map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setSelectedTakeIdx(i)}
+                          style={{
+                            height: 22, padding: '0 9px', borderRadius: 2,
+                            border: `1px solid ${selectedTakeIdx === i ? 'rgba(255,255,255,0.14)' : 'transparent'}`,
+                            background: selectedTakeIdx === i ? 'rgba(255,255,255,0.06)' : 'transparent',
+                            color: selectedTakeIdx === i ? '#EDEDED' : '#76767B',
+                            fontSize: 10.5, fontFamily: 'var(--font-mono), monospace',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                    </>
+                  )}
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setDiscardAudioConfirmOpen(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: '#76767B', fontSize: 10.5, cursor: 'pointer', flexShrink: 0 }}
+                >
+                  <Trash2 size={11} strokeWidth={1.5} />
+                  Discard{allAudioFiles.length > 1 ? ' take' : ' recording'}
+                </button>
+              </div>
 
               {/* Transcription controls header */}
               <div style={{ flexShrink: 0 }}>
@@ -2112,7 +2316,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               </div>
 
               {/* Transcript pane */}
-              <div style={{ flex: 1, minHeight: 0, borderTop: '1px solid #16151E' }}>
+              <div style={{ flex: 1, minHeight: 0, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 <TranscriptPane
                   progress={transcriptionProgress}
                   sessionStatus={liveSessionStatus}
@@ -2122,68 +2326,58 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
                 />
               </div>
 
-              {/* Time-axis density ribbon — bars sized by audio duration, not slide count */}
-              {syncMap.length > 0 && durationMs > 0 && (
-                <div style={{ flexShrink: 0, height: 40, borderTop: '1px solid #16151E', padding: '0 16px', display: 'flex', alignItems: 'flex-end' }}>
-                  <div style={{ position: 'relative', width: '100%', height: 32 }}>
-                    {syncMap.map((seg, i) => {
-                      const leftPct  = (seg.startMs / durationMs) * 100
-                      const widthPct = ((seg.endMs - seg.startMs) / durationMs) * 100
-                      const score    = slideDensityMap[seg.slideIndex] ?? 0
-                      const zone     = slideZoneMap[seg.slideIndex]
-                      const barColor = zone === 'red' ? '#FB7185' : zone === 'likely' ? '#FBBF24' : '#2D2B45'
-                      const barH     = Math.max(3, Math.round((score / 100) * 32))
-                      return (
-                        <div
-                          key={i}
-                          style={{
-                            position: 'absolute',
-                            left: `${leftPct}%`,
-                            width: `${widthPct}%`,
-                            bottom: 0,
-                            height: barH,
-                            background: barColor,
-                            borderRadius: '2px 2px 0 0',
-                            opacity: seg.slideIndex === currentPage ? 1 : 0.6,
-                          }}
-                        />
-                      )
-                    })}
+              {/* Time-axis density ribbon — grayscale by density, single peak cell crimson */}
+              {syncMap.length > 0 && durationMs > 0 && (() => {
+                let peakIdx = 0
+                let peakScore = -1
+                syncMap.forEach((seg, i) => {
+                  const s = slideDensityMap[seg.slideIndex] ?? 0
+                  if (s > peakScore) { peakScore = s; peakIdx = i }
+                })
+                return (
+                  <div style={{ flexShrink: 0, height: 40, borderTop: '1px solid rgba(255,255,255,0.08)', padding: '0 16px', display: 'flex', alignItems: 'flex-end' }}>
+                    <div style={{ position: 'relative', width: '100%', height: 32 }}>
+                      {syncMap.map((seg, i) => {
+                        const leftPct  = (seg.startMs / durationMs) * 100
+                        const widthPct = ((seg.endMs - seg.startMs) / durationMs) * 100
+                        const score    = slideDensityMap[seg.slideIndex] ?? 0
+                        const isPeak   = i === peakIdx && peakScore > 0
+                        const barColor = isPeak ? '#FF3B30' : `rgba(255,255,255,${(0.04 + (score / 100) * 0.26).toFixed(3)})`
+                        const barH     = Math.max(3, Math.round((score / 100) * 32))
+                        return (
+                          <div
+                            key={i}
+                            style={{
+                              position: 'absolute',
+                              left: `${leftPct}%`,
+                              width: `${widthPct}%`,
+                              bottom: 0,
+                              height: barH,
+                              background: barColor,
+                              borderRadius: '2px 2px 0 0',
+                              opacity: seg.slideIndex === currentPage ? 1 : 0.6,
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* Audio player */}
-              <div style={{ height: 150, flexShrink: 0, borderTop: '1px solid #16151E' }}>
+              <div style={{ height: 150, flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 <AudioPlayer audioStoragePath={audioFile.storage_path} />
               </div>
             </div>
+            </>
           )}
 
           {/* ── No-audio empty state ─────────────────────────────────────── */}
           {!hasAudioFile && !isRecording && (
-            <div style={{ flexShrink: 0, borderTop: '1px solid #16151E', background: '#0A0A0F', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '14px 26px' }}>
-              <Mic size={14} strokeWidth={1.5} style={{ color: '#3F485C', flexShrink: 0 }} />
-              <span style={{ fontSize: 12.5, color: '#5B6478' }}>No audio recorded for this session</span>
-              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                {hasAccess(userTier, 'midnight') && (
-                  <button
-                    type="button"
-                    onClick={handleStartRecording}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid #23222F', background: '#0D0D14', color: '#5B6478', fontSize: 11.5, cursor: 'pointer', flexShrink: 0 }}
-                  >
-                    <Mic size={10} strokeWidth={1.5} />
-                    Record live
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => useSessionStore.getState().openUploadPanel()}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid #23222F', background: '#0D0D14', color: '#5B6478', fontSize: 11.5, cursor: 'pointer', flexShrink: 0 }}
-                >
-                  Upload audio
-                </button>
-              </div>
+            <div style={{ flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.08)', background: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '14px 26px' }}>
+              <Mic size={14} strokeWidth={1.5} style={{ color: '#4A4A4E', flexShrink: 0 }} />
+              <span style={{ fontSize: 12.5, color: '#76767B' }}>No audio recorded for this session — use Record live or Upload files above</span>
             </div>
           )}
 
@@ -2195,7 +2389,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
         <RecordingBar
           liveStatus={liveStatus}
           liveWords={recentLiveWords as LiveWord[]}
-          level={liveLevel}
+          analyserRef={liveAnalyserRef}
           lagSec={liveLagSec}
           silenceDetected={liveSilenceDetected}
           estimatedBytes={liveEstimatedBytes}
@@ -2212,14 +2406,14 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
       {/* ── Study guide modal ────────────────────────────────────────────── */}
       {guideModalOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#0D0D14', border: '1px solid #23222F', borderRadius: 14, width: 360, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }}>
+          <div style={{ background: '#0C0C0D', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 2, width: 360, overflow: 'hidden' }}>
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 12px', borderBottom: '1px solid #16151E' }}>
-              <span style={{ fontSize: 13.5, fontWeight: 600, color: '#E2E8F0' }}>Update study guide</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: '#EDEDED' }}>Update study guide</span>
               <button
                 type="button"
                 onClick={() => setGuideModalOpen(false)}
-                style={{ width: 26, height: 26, borderRadius: 7, border: '1px solid #1E1E2E', background: 'transparent', color: '#5B6478', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                style={{ width: 26, height: 26, borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#9A9A9F', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
                 <svg width="11" height="11" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 4 L14 14 M14 4 L4 14" /></svg>
               </button>
@@ -2236,12 +2430,12 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
       {/* ── Rescore confirmation dialog ──────────────────────────────────── */}
       {pendingRescore && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.65)' }}>
-          <div style={{ background: '#0F0F19', border: '1px solid #1E1E2E', borderRadius: 16, padding: 28, maxWidth: 400, width: '90%', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ background: '#0C0C0D', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 2, padding: 28, maxWidth: 400, width: '90%', display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div>
-              <p style={{ fontSize: 15, fontWeight: 600, color: '#E2E8F0', margin: '0 0 10px' }}>Remove studied keywords?</p>
-              <p style={{ fontSize: 13.5, color: '#94A3B8', lineHeight: 1.65, margin: 0 }}>
+              <p style={{ fontSize: 15, fontWeight: 600, color: '#EDEDED', margin: '0 0 10px' }}>Remove studied keywords?</p>
+              <p style={{ fontSize: 13.5, color: '#9A9A9F', lineHeight: 1.65, margin: 0 }}>
                 This rescore removes {pendingRescore.payload.removedIds.length} keyword{pendingRescore.payload.removedIds.length !== 1 ? 's' : ''} you&apos;ve been reviewing.{' '}
-                <span style={{ color: '#E2E8F0', fontWeight: 500 }}>{pendingRescore.reviewCount} review{pendingRescore.reviewCount !== 1 ? 's' : ''}</span>{' '}
+                <span style={{ color: '#EDEDED', fontWeight: 500 }}>{pendingRescore.reviewCount} review{pendingRescore.reviewCount !== 1 ? 's' : ''}</span>{' '}
                 (streak progress, ease factors, due dates) will be permanently deleted.
               </p>
             </div>
@@ -2249,7 +2443,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
               <button
                 type="button"
                 onClick={() => setPendingRescore(null)}
-                style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid #1E1E2E', background: 'transparent', color: '#94A3B8', fontSize: 13.5, cursor: 'pointer' }}
+                style={{ height: 36, padding: '0 16px', borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#9A9A9F', fontSize: 13.5, cursor: 'pointer' }}
               >
                 Keep current keywords
               </button>
@@ -2267,7 +2461,7 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
                     setIsScoring(false)
                   }
                 }}
-                style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', fontSize: 13.5, cursor: 'pointer', fontWeight: 500 }}
+                style={{ height: 36, padding: '0 16px', borderRadius: 2, border: '1px solid #FF3B30', background: 'transparent', color: '#FF3B30', fontSize: 13.5, cursor: 'pointer', fontWeight: 500 }}
               >
                 Remove and rescore
               </button>
@@ -2285,6 +2479,38 @@ export function SessionClient({ userId, session, pdfFile, slideFiles, audioFiles
           onClose={() => setPublishDeckOpen(false)}
         />
       )}
+
+      {/* ── Discard recording confirmation ───────────────────────────────── */}
+      <AlertDialog open={discardAudioConfirmOpen} onOpenChange={setDiscardAudioConfirmOpen}>
+        <AlertDialogContent className="bg-bg-overlay border border-border-default max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-subheading font-medium text-text-primary">
+              Discard this recording?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-body-sm text-text-secondary">
+              This permanently deletes the audio and its transcript from this session.
+              There is no recovery — Nocturne&apos;s storage keeps no trash or backup copy.
+              You can record live or upload a new take afterward.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {discardAudioError && (
+            <p className="text-body-sm" style={{ color: 'var(--color-severity)' }}>{discardAudioError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel className="h-9 px-4 text-body text-text-secondary border border-border-default hover:bg-bg-subtle bg-transparent">
+              Keep recording
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.stopPropagation(); handleDiscardAudioTake() }}
+              disabled={isDiscardingAudio}
+              className="h-9 px-4 text-body font-medium bg-transparent transition-colors"
+              style={{ border: '1px solid var(--color-severity)', color: 'var(--color-severity)' }}
+            >
+              {isDiscardingAudio ? 'Discarding…' : 'Discard'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Upload files panel ───────────────────────────────────────────── */}
       <AnimatePresence>

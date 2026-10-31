@@ -54,10 +54,10 @@ function ToolbarBtn({
         alignItems: 'center',
         justifyContent: 'center',
         border: 'none',
-        borderRadius: 5,
+        borderRadius: 2,
         cursor: disabled ? 'default' : 'pointer',
-        background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
-        color: active ? '#A5B4FC' : disabled ? '#2D2B45' : '#5B6478',
+        background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
+        color: active ? '#EDEDED' : disabled ? '#4A4A4E' : '#76767B',
         transition: 'background 0.1s, color 0.1s',
         flexShrink: 0,
       }}
@@ -73,7 +73,7 @@ function Separator() {
       style={{
         width: 1,
         height: 18,
-        background: '#1E1E2E',
+        background: 'rgba(255,255,255,0.08)',
         margin: '0 3px',
         flexShrink: 0,
       }}
@@ -103,10 +103,10 @@ function HeadingSelect({ editor, compact = false }: { editor: Editor; compact?: 
         if (v === 'h3') editor.chain().focus().setHeading({ level: 3 }).run()
       }}
       style={{
-        background: '#0D0D14',
-        color: isHeading ? '#A5B4FC' : '#5B6478',
-        border: `1px solid ${isHeading ? 'rgba(99,102,241,0.3)' : '#1E1E2E'}`,
-        borderRadius: 5,
+        background: '#0C0C0D',
+        color: isHeading ? '#EDEDED' : '#76767B',
+        border: `1px solid ${isHeading ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)'}`,
+        borderRadius: 2,
         fontSize: 11.5,
         fontWeight: 500,
         padding: compact ? '0 5px' : '0 7px',
@@ -255,14 +255,13 @@ function HighlightBtn({ editor }: { editor: Editor }) {
         left: pos.left,
         transform: 'translateX(-50%)',
         zIndex: 9999,
-        background: '#0D0D14',
-        border: '1px solid #1E1E2E',
-        borderRadius: 8,
+        background: '#0C0C0D',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 2,
         padding: '5px 6px',
         display: 'flex',
         alignItems: 'center',
         gap: 4,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
         pointerEvents: 'auto',
       }}
     >
@@ -304,14 +303,14 @@ function HighlightBtn({ editor }: { editor: Editor }) {
         style={{
           width: 18,
           height: 18,
-          borderRadius: 3,
+          borderRadius: 2,
           background: 'transparent',
-          border: '1px solid #2D2B45',
+          border: '1px solid rgba(255,255,255,0.14)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#5B6478',
+          color: '#76767B',
           fontSize: 10,
           lineHeight: 1,
           padding: 0,
@@ -339,10 +338,10 @@ function HighlightBtn({ editor }: { editor: Editor }) {
           justifyContent: 'center',
           gap: 2,
           border: 'none',
-          borderRadius: 5,
+          borderRadius: 2,
           cursor: 'pointer',
-          background: open || activeColor ? 'rgba(99,102,241,0.15)' : 'transparent',
-          color:      open || activeColor ? '#A5B4FC' : '#5B6478',
+          background: open || activeColor ? 'rgba(255,255,255,0.1)' : 'transparent',
+          color:      open || activeColor ? '#EDEDED' : '#76767B',
           transition: 'background 0.1s, color 0.1s',
           padding: 0,
           flexShrink: 0,
@@ -389,9 +388,9 @@ function MathBtn({ editor }: { editor: Editor }) {
         style={{
           width: 28, height: 28,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: 'none', borderRadius: 5, cursor: 'pointer',
-          background: open ? 'rgba(99,102,241,0.15)' : 'transparent',
-          color:      open ? '#A5B4FC' : '#5B6478',
+          border: 'none', borderRadius: 2, cursor: 'pointer',
+          background: open ? 'rgba(255,255,255,0.1)' : 'transparent',
+          color:      open ? '#EDEDED' : '#76767B',
           transition: 'background 0.1s, color 0.1s',
           fontSize: 14, fontStyle: 'italic', fontFamily: 'Georgia, serif',
           flexShrink: 0,
@@ -419,10 +418,10 @@ function MathBtn({ editor }: { editor: Editor }) {
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); setDisplay(i === 1) }}
                 style={{
-                  fontSize: 11, padding: '3px 9px', borderRadius: 5, cursor: 'pointer',
-                  background: (i === 1) === display ? 'rgba(99,102,241,0.18)' : 'transparent',
-                  color:      (i === 1) === display ? '#A5B4FC' : '#5B6478',
-                  border:     (i === 1) === display ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
+                  fontSize: 11, padding: '3px 9px', borderRadius: 2, cursor: 'pointer',
+                  background: (i === 1) === display ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  color:      (i === 1) === display ? '#EDEDED' : '#76767B',
+                  border:     (i === 1) === display ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
                 }}
               >
                 {label}
@@ -457,8 +456,8 @@ export function NotesToolbar({ editor }: { editor: Editor | null }) {
         alignItems: 'center',
         gap: 1,
         padding: '3px 4px',
-        borderBottom: '1px solid #0F0F18',
-        background: '#09090F',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        background: '#0A0A0A',
         flexShrink: 0,
         overflowX: 'auto',
         scrollbarWidth: 'none',
@@ -582,14 +581,13 @@ export function NotesBubbleMenu({ editor }: { editor: Editor | null }) {
         // Centre horizontally, lift above the selection with an 8px gap
         transform: 'translate(-50%, calc(-100% - 8px))',
         zIndex: 9999,
-        background: '#0D0D14',
-        border: '1px solid #1E1E2E',
-        borderRadius: 8,
+        background: '#0C0C0D',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 2,
         padding: '3px 4px',
         display: 'flex',
         alignItems: 'center',
         gap: 1,
-        boxShadow: '0 8px 28px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.3)',
         pointerEvents: 'auto',
       }}
     >

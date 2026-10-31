@@ -65,7 +65,7 @@ export default function PreMedPage() {
 
           {/* Header */}
           <div data-reveal="" className="mb-14">
-            <p className="text-caption uppercase tracking-[0.1em] text-rose-400 mb-3">
+            <p className="text-caption uppercase tracking-[0.1em] mb-3" style={{ color: 'var(--color-accent)' }}>
               For Pre-Med
             </p>
             <h1 className="text-heading font-medium text-text-primary mb-4">
@@ -75,7 +75,7 @@ export default function PreMedPage() {
               USMLE-style coursework tests specific recall — mechanisms, enzyme names, receptor
               subtypes. Your professor signals what matters through dwell time and verbal repetition.
               Nocturne reads those signals and surfaces the{' '}
-              <span className="text-rose-400 font-medium">Red Zone</span>: the keywords that cross
+              <span className="font-medium" style={{ color: 'var(--color-severity)' }}>Red Zone</span>: the keywords that cross
               both thresholds.
             </p>
             <Link
@@ -87,13 +87,12 @@ export default function PreMedPage() {
                 alignItems: 'center',
                 height: 46,
                 padding: '0 26px',
-                borderRadius: 8,
+                borderRadius: 2,
                 fontSize: 15,
                 fontWeight: 500,
-                background: '#6366F1',
-                color: '#09090F',
+                background: 'var(--color-accent)',
+                color: 'var(--color-text-inverse)',
                 textDecoration: 'none',
-                boxShadow: '0 8px 28px rgba(99,102,241,0.35)',
               }}
             >
               Start for free
@@ -140,12 +139,12 @@ export default function PreMedPage() {
                   key={r.initials}
                   className="flex flex-col gap-3 p-5 rounded-card border border-border-default bg-bg-elevated"
                 >
-                  <p className="text-indigo-400 text-xs tracking-widest">★★★★★</p>
+                  <p className="text-text-secondary text-xs tracking-widest">★★★★★</p>
                   <p className="text-body-sm text-text-primary-soft leading-relaxed flex-1">
                     {r.body}
                   </p>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-caption font-semibold text-indigo-300 shrink-0">
+                    <div className="w-8 h-8 rounded-full border border-border-default bg-bg-subtle flex items-center justify-center text-caption font-semibold text-text-secondary shrink-0">
                       {r.initials}
                     </div>
                     <div>
@@ -175,13 +174,12 @@ export default function PreMedPage() {
                 alignItems: 'center',
                 height: 46,
                 padding: '0 26px',
-                borderRadius: 8,
+                borderRadius: 2,
                 fontSize: 15,
                 fontWeight: 500,
-                background: '#6366F1',
-                color: '#09090F',
+                background: 'var(--color-accent)',
+                color: 'var(--color-text-inverse)',
                 textDecoration: 'none',
-                boxShadow: '0 8px 28px rgba(99,102,241,0.35)',
               }}
             >
               Start for free

@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { LayoutDashboard, Plus, Settings, ChevronLeft, ChevronRight, Flame, Users, HelpCircle, CreditCard, Sparkles, ScrollText } from 'lucide-react'
 import { STORAGE_CAPS_BYTES, type Tier } from '@/lib/tiers/features'
+import { EclipseMark } from '@/components/surgical/eclipse-mark'
+import { useFocusMode } from '@/components/surgical/use-focus-mode'
+import { FocusToast } from '@/components/surgical/focus-toast'
 import { NavItem } from './nav-item'
 import { PrivacyBadge } from './privacy-badge'
 import { StorageIndicator } from './storage-indicator'
@@ -33,6 +36,7 @@ export function SideNav({ email, usedBytes, tier }: Props) {
   const [collapsed, setCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [animationReady, setAnimationReady] = useState(false)
+  const { toastOn, toggleFocus } = useFocusMode()
 
   useEffect(() => {
     const saved = localStorage.getItem('nocturne-nav-collapsed')
@@ -50,8 +54,9 @@ export function SideNav({ email, usedBytes, tier }: Props) {
   }
 
   return (
+    <>
     <motion.nav
-      animate={{ width: mounted ? (collapsed ? 64 : 224) : 224 }}
+      animate={{ width: mounted ? (collapsed ? 64 : 232) : 232 }}
       transition={
         animationReady
           ? { duration: 0.2, ease: [0.4, 0.0, 0.2, 1.0] }
@@ -63,41 +68,34 @@ export function SideNav({ email, usedBytes, tier }: Props) {
           Single layout in both states so the icon never shifts vertically —
           items-center + h-14 keeps it locked to the same vertical band.
           Collapsed: icon is centered and acts as the expand button.
-          Expanded: icon + wordmark on the left, chevron on the right. */}
+          Expanded: icon + wordmark on the left, chevron on the right.
+          The eclipse mark also doubles as the in-app "3 AM Deep Focus Mode" trigger. */}
       {collapsed ? (
         <div className="flex items-center justify-center h-14 border-b border-border-subtle shrink-0">
           <button
             type="button"
             onClick={toggleCollapse}
             aria-label="Expand navigation"
-            className="w-10 h-10 flex items-center justify-center rounded-md hover:bg-bg-subtle transition-colors"
+            className="w-10 h-10 flex items-center justify-center hover:bg-bg-subtle transition-colors"
           >
-            <span style={{
-              width: 24, height: 24, borderRadius: 7,
-              background: 'linear-gradient(145deg,#6366F1,#8B5CF6)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#09090F', fontWeight: 700, fontSize: 13, flexShrink: 0,
-              boxShadow: '0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.35)',
-              pointerEvents: 'none',
-            }}>
-              N
-            </span>
+            <EclipseMark size={24} />
           </button>
         </div>
       ) : (
         <div className="flex items-center justify-between h-14 px-3 border-b border-border-subtle shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <span style={{
-              width: 24, height: 24, borderRadius: 7,
-              background: 'linear-gradient(145deg,#6366F1,#8B5CF6)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#09090F', fontWeight: 700, fontSize: 13, flexShrink: 0,
-              boxShadow: '0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.35)',
-            }}>
-              N
-            </span>
-            <span className="text-subheading font-medium text-text-primary select-none truncate">
-              Nocturne
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <button
+              type="button"
+              data-logo-btn=""
+              onClick={toggleFocus}
+              aria-label="Toggle 3 AM Deep Focus Mode"
+              className="flex shrink-0"
+              style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+            >
+              <EclipseMark size={24} />
+            </button>
+            <span className="select-none truncate" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, letterSpacing: '0.34em', color: 'var(--color-text-primary)' }}>
+              NOCTURNE
             </span>
           </div>
           <button
@@ -165,5 +163,7 @@ export function SideNav({ email, usedBytes, tier }: Props) {
         </div>
       )}
     </motion.nav>
+    <FocusToast show={toastOn} />
+    </>
   )
 }

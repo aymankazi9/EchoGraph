@@ -79,10 +79,20 @@ interface Props {
   /** Called once all slide files are fully loaded. entries covers every slide across every file. */
   onPdfDocReady?: (entries: SlideEntry[], totalPages: number) => void
   onPageChange?: (page: number) => void
+  /**
+   * A page to jump to as soon as the PDF is ready, set by callers outside the
+   * Lecture tab (e.g. a Notes slide-ref chip). Needed because those callers
+   * switch to the Lecture tab and call this in the same tick that PdfViewer
+   * mounts — the `goToPage` ref isn't attached yet, so the imperative call
+   * would silently no-op. This prop is read once `status === 'ready'` instead
+   * of racing the ref. Call `onJumpConsumed` to clear it after it's applied.
+   */
+  pendingJumpPage?: number | null
+  onJumpConsumed?: () => void
 }
 
 export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
-  { storagePath, fileId, slideFiles, sessionId, onSlidesExtracted, onPdfDocReady, onPageChange },
+  { storagePath, fileId, slideFiles, sessionId, onSlidesExtracted, onPdfDocReady, onPageChange, pendingJumpPage, onJumpConsumed },
   ref,
 ) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -244,6 +254,14 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
     }
   }, [activeSlideIndex, status])
 
+  // ── External page jump (e.g. a Notes slide-ref chip) — applied immediately
+  // once the PDF is ready, not debounced like the audio-driven jump above.
+  useEffect(() => {
+    if (pendingJumpPage == null || status !== 'ready') return
+    if (pendingJumpPage >= 1 && pendingJumpPage <= totalPages) setCurrentPage(pendingJumpPage)
+    onJumpConsumed?.()
+  }, [pendingJumpPage, status, totalPages]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Render page ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (status !== 'ready') return
@@ -362,7 +380,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
           <span className="text-body-sm text-text-secondary">{loadLabel}</span>
           <div className="h-1 w-full bg-bg-subtle rounded-full overflow-hidden">
             <div
-              className="h-full bg-violet-400 transition-all duration-200 ease-out rounded-full"
+              className="h-full bg-[#FF3B30] transition-all duration-200 ease-out rounded-full"
               style={{ width: `${loadPct}%` }}
             />
           </div>
@@ -371,7 +389,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(function PdfViewer(
 
       {status === 'error' && (
         <div className="flex items-center justify-center flex-1 p-4">
-          <p className="text-body-sm text-rose-300" role="alert">{error}</p>
+          <p className="text-body-sm text-[#FF3B30]" role="alert">{error}</p>
         </div>
       )}
 

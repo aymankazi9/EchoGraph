@@ -57,8 +57,7 @@ export function AppShell({ email, usedBytes, tier, pastDue = false, children }: 
   return (
     <div
       className="h-screen flex overflow-hidden bg-bg-base"
-      data-theme={prefs.theme !== 'midnight' ? prefs.theme : undefined}
-      data-accent={prefs.accent !== 'indigo' ? prefs.accent : undefined}
+      data-theme={prefs.theme !== 'surgical' ? prefs.theme : undefined}
       {...(prefs.focus_mode ? { 'data-focus-mode': '' } : {})}
     >
       <div data-app-nav="">
@@ -73,21 +72,18 @@ export function AppShell({ email, usedBytes, tier, pastDue = false, children }: 
             justifyContent: 'space-between',
             gap: 12,
             padding: '9px 20px',
-            background: 'rgba(251,191,36,0.07)',
-            borderBottom: '1px solid rgba(251,191,36,0.18)',
+            background: 'var(--color-bg-subtle)',
+            borderBottom: '1px solid var(--color-border-strong)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-              <span style={{ fontSize: 13, color: '#FCD34D' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--color-text-secondary)', flexShrink: 0 }}>!</span>
+              <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
                 Your last payment failed — update your payment method to keep your plan.
               </span>
             </div>
             <a
               href="/billing"
-              style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 500, color: '#FCD34D', textDecoration: 'underline', textUnderlineOffset: 3 }}
+              style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 500, color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}
             >
               Manage billing →
             </a>

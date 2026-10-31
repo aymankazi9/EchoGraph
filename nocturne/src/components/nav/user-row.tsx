@@ -22,6 +22,12 @@ export function UserRow({ email, collapsed }: Props) {
     router.push('/')
   }
 
+  const avatar = (size: number) => (
+    <div className="flex items-center justify-center shrink-0" style={{ width: size, height: size, background: '#111112' }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#9A9A9F' }}>{initial}</span>
+    </div>
+  )
+
   if (collapsed) {
     return (
       <TooltipProvider delayDuration={300}>
@@ -29,9 +35,7 @@ export function UserRow({ email, collapsed }: Props) {
           {/* Avatar — shows which account is active */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="w-7 h-7 rounded-full bg-indigo-500/20 flex items-center justify-center cursor-default shrink-0">
-                <span className="text-caption font-medium text-indigo-400">{initial}</span>
-              </div>
+              <div className="cursor-default">{avatar(28)}</div>
             </TooltipTrigger>
             <TooltipContent side="right">{email}</TooltipContent>
           </Tooltip>
@@ -57,10 +61,7 @@ export function UserRow({ email, collapsed }: Props) {
 
   return (
     <div className="flex items-center gap-2 px-2">
-      {/* Avatar */}
-      <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0">
-        <span className="text-caption font-medium text-indigo-400">{initial}</span>
-      </div>
+      {avatar(24)}
 
       {/* Email */}
       <span className="text-caption text-text-secondary truncate flex-1 min-w-0">

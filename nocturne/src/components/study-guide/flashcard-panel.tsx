@@ -63,21 +63,21 @@ interface Props {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const MASTERY_COLORS = {
-  new:      { bar: '#2D2B45', label: '#3F485C', dot: '#4B5563' },
-  learning: { bar: '#92400E', label: '#FDE68A', dot: '#F59E0B' },
-  mastered: { bar: '#064E3B', label: '#6EE7B7', dot: '#10B981' },
+  new:      { bar: 'rgba(255,255,255,0.08)', label: '#76767B', dot: '#4A4A4E' },
+  learning: { bar: 'rgba(255,255,255,0.3)',  label: '#9A9A9F', dot: '#9A9A9F' },
+  mastered: { bar: '#EDEDED',                label: '#EDEDED', dot: '#EDEDED' },
 }
 
 const RATINGS: { rating: Rating; label: string; color: string; border: string; bg: string }[] = [
-  { rating: 'again', label: 'Again', color: '#FDA4AF', border: 'rgba(251,113,133,0.35)', bg: 'rgba(251,113,133,0.08)' },
-  { rating: 'hard',  label: 'Hard',  color: '#FDE68A', border: 'rgba(251,191,36,0.35)',  bg: 'rgba(251,191,36,0.08)'  },
-  { rating: 'good',  label: 'Good',  color: '#A5B4FC', border: 'rgba(99,102,241,0.35)',  bg: 'rgba(99,102,241,0.08)'  },
-  { rating: 'easy',  label: 'Easy',  color: '#6EE7B7', border: 'rgba(16,185,129,0.35)',  bg: 'rgba(16,185,129,0.08)'  },
+  { rating: 'again', label: 'Again', color: '#FF3B30', border: 'rgba(255,59,48,0.35)',   bg: 'rgba(255,59,48,0.08)'   },
+  { rating: 'hard',  label: 'Hard',  color: '#9A9A9F', border: 'rgba(255,255,255,0.14)', bg: 'rgba(255,255,255,0.04)' },
+  { rating: 'good',  label: 'Good',  color: '#9A9A9F', border: 'rgba(255,255,255,0.14)', bg: 'rgba(255,255,255,0.04)' },
+  { rating: 'easy',  label: 'Easy',  color: '#9A9A9F', border: 'rgba(255,255,255,0.14)', bg: 'rgba(255,255,255,0.04)' },
 ]
 
 const ZONE_COLORS: Record<string, { badge: string; text: string; dot: string }> = {
-  red:    { badge: 'rgba(251,113,133,0.1)', text: '#FDA4AF', dot: '#EF4444' },
-  likely: { badge: 'rgba(99,102,241,0.1)',  text: '#A5B4FC', dot: '#6366F1' },
+  red:    { badge: 'rgba(255,59,48,0.1)',    text: '#FF3B30', dot: '#FF3B30' },
+  likely: { badge: 'rgba(255,255,255,0.06)', text: '#9A9A9F', dot: 'rgba(255,255,255,0.3)' },
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -181,12 +181,12 @@ function DonutRing({ mastered, learning, total }: { mastered: number; learning: 
       <div style={{ position: 'relative', width: 112, height: 112 }}>
         <svg width="112" height="112" viewBox="0 0 112 112" style={{ overflow: 'visible' }}>
           {/* Track */}
-          <circle cx="56" cy="56" r={R} fill="none" stroke="#16151F" strokeWidth="11" />
+          <circle cx="56" cy="56" r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="11" />
           {/* Learning arc — starts immediately after mastered arc */}
           {learningArc > 0.5 && (
             <circle
               cx="56" cy="56" r={R} fill="none"
-              stroke="#F59E0B" strokeWidth="11"
+              stroke="rgba(255,255,255,0.3)" strokeWidth="11"
               strokeDasharray={`${learningArc} ${C - learningArc}`}
               strokeDashoffset={-masteredArc}
               transform="rotate(-90 56 56)"
@@ -196,7 +196,7 @@ function DonutRing({ mastered, learning, total }: { mastered: number; learning: 
           {masteredArc > 0.5 && (
             <circle
               cx="56" cy="56" r={R} fill="none"
-              stroke="#10B981" strokeWidth="11"
+              stroke="#EDEDED" strokeWidth="11"
               strokeDasharray={`${masteredArc} ${C - masteredArc}`}
               strokeDashoffset={0}
               transform="rotate(-90 56 56)"
@@ -208,11 +208,11 @@ function DonutRing({ mastered, learning, total }: { mastered: number; learning: 
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 1,
         }}>
-          <span style={{ fontSize: 28, fontWeight: 700, color: '#E2E8F0', lineHeight: 1 }}>{mastered}</span>
-          <span style={{ fontSize: 11, color: '#3F485C' }}>of {total}</span>
+          <span style={{ fontSize: 28, fontWeight: 700, color: '#EDEDED', lineHeight: 1 }}>{mastered}</span>
+          <span style={{ fontSize: 11, color: '#76767B' }}>of {total}</span>
         </div>
       </div>
-      <span style={{ fontSize: 12, color: '#64748B', textAlign: 'center' }}>keywords mastered</span>
+      <span style={{ fontSize: 12, color: '#76767B', textAlign: 'center' }}>keywords mastered</span>
     </div>
   )
 }
@@ -228,7 +228,7 @@ function MasteryBar({ intervalDays }: { intervalDays: number | undefined }) {
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <span style={{ fontSize: 10, color: colors.label }}>{stateLabel}</span>
       </div>
-      <div style={{ height: 2, borderRadius: 9999, background: '#16151F', overflow: 'hidden' }}>
+      <div style={{ height: 2, borderRadius: 9999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
         <div style={{
           height: '100%', borderRadius: 9999,
           background: colors.dot,
@@ -245,6 +245,7 @@ function MasteryBar({ intervalDays }: { intervalDays: number | undefined }) {
 export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, initialFlashcardId }: Props) {
   const flashcards = useSessionStore((s) => s.flashcards)
   const loadFlashcards = useSessionStore((s) => s.loadFlashcards)
+  const loadReviewIntervals = useSessionStore((s) => s.loadReviewIntervals)
   const notify = useNotificationStore((s) => s.notify)
   const supabase = useMemo(() => createClient(), [])
 
@@ -276,6 +277,10 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
         }
         setReviewMap(map)
         setReviewsLoaded(true)
+        // Map tab's Mastery lens reads this off the store — no fetch of its own.
+        const intervals: Record<string, number> = {}
+        for (const [id, r] of Object.entries(map)) intervals[id] = r.intervalDays
+        loadReviewIntervals(intervals)
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // stable within a session
@@ -422,6 +427,11 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
     }
     setReviewMap(prev => ({ ...prev, [card.id]: updatedReview }))
     setSessionRatings(prev => ({ ...prev, [card.id]: r }))
+    // Derived from local reviewMap (already a dependency below) rather than an
+    // imperative store.getState() read — keeps this a plain data transform.
+    const nextIntervals: Record<string, number> = { [card.id]: result.intervalDays }
+    for (const [id, rv] of Object.entries(reviewMap)) if (id !== card.id) nextIntervals[id] = rv.intervalDays
+    loadReviewIntervals(nextIntervals)
 
     // Auto-advance after rating
     setFlipped(false)
@@ -795,7 +805,7 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
       <div style={{
         width: 264,
         flexShrink: 0,
-        borderRight: '1px solid #1A1A28',
+        borderRight: '1px solid rgba(255,255,255,0.08)',
         display: 'flex',
         flexDirection: 'column',
         gap: 0,
@@ -804,27 +814,27 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
         {/* Section header — includes the Cram Mode toggle */}
         <div style={{ padding: '0 0 12px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#3F485C', letterSpacing: '0.06em', textTransform: 'uppercase' }}>What to study</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#76767B', letterSpacing: '0.06em', textTransform: 'uppercase' }}>What to study</span>
             <button
               type="button"
               onClick={() => setUrgencyMode((m) => !m)}
               title={urgencyMode ? 'Exit Exam Urgency Mode' : 'Enter Exam Urgency Mode — Red Zone only, answers visible'}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                height: 22, padding: '0 8px', borderRadius: 6,
+                height: 22, padding: '0 8px', borderRadius: 2,
                 border: urgencyMode
-                  ? '1px solid rgba(251,191,36,0.45)'
-                  : '1px solid #1E1D2A',
+                  ? '1px solid rgba(255,59,48,0.45)'
+                  : '1px solid rgba(255,255,255,0.08)',
                 background: urgencyMode
-                  ? 'rgba(251,191,36,0.1)'
+                  ? 'rgba(255,59,48,0.1)'
                   : 'transparent',
-                color: urgencyMode ? '#FCD34D' : '#3F485C',
+                color: urgencyMode ? '#FF3B30' : '#76767B',
                 fontSize: 10.5, fontWeight: 600, cursor: 'pointer',
                 letterSpacing: '0.01em',
                 transition: 'all 0.15s',
               }}
             >
-              {urgencyMode ? '🌙 Exit cram' : '⚡ Cram mode'}
+              {urgencyMode ? 'Exit cram' : 'Cram mode'}
             </button>
           </div>
         </div>
@@ -834,15 +844,14 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
           <div style={{
             marginBottom: 14,
             padding: '10px 12px',
-            borderRadius: 9,
-            border: '1px solid rgba(251,191,36,0.45)',
-            background: 'rgba(251,191,36,0.07)',
+            borderRadius: 2,
+            border: '1px solid rgba(255,59,48,0.45)',
+            background: 'rgba(255,59,48,0.07)',
             display: 'flex', flexDirection: 'column', gap: 5,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 13, lineHeight: 1 }}>🌙</span>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#FCD34D', letterSpacing: '0.01em' }}>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#FF3B30', letterSpacing: '0.01em' }}>
                   Exam Urgency Mode
                 </span>
               </div>
@@ -850,19 +859,19 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                 <span style={{
                   fontFamily: 'var(--font-mono, monospace)',
                   fontSize: 12, fontWeight: 700,
-                  color: countdownMs < 3_600_000 ? '#FDA4AF' : '#FCD34D',
+                  color: countdownMs < 3_600_000 ? '#FF3B30' : 'rgba(255,59,48,0.7)',
                   flexShrink: 0,
                 }}>
                   {formatCountdown(countdownMs)}
                 </span>
               )}
               {examDate && countdownMs === 0 && (
-                <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 700, color: '#FDA4AF' }}>
+                <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 700, color: '#FF3B30' }}>
                   Exam time!
                 </span>
               )}
             </div>
-            <p style={{ fontSize: 11, color: '#FBBF24', margin: 0, lineHeight: 1.4, opacity: 0.8 }}>
+            <p style={{ fontSize: 11, color: '#9A9A9F', margin: 0, lineHeight: 1.4 }}>
               Red Zone only · answers visible · ← → to navigate
             </p>
           </div>
@@ -881,28 +890,25 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
             <div style={{
               marginBottom: 14,
               padding: '9px 11px',
-              borderRadius: 9,
+              borderRadius: 2,
               border: nightBefore
-                ? '1px solid rgba(251,191,36,0.4)'
-                : '1px solid rgba(251,113,133,0.25)',
+                ? '1px solid rgba(255,59,48,0.4)'
+                : '1px solid rgba(255,255,255,0.14)',
               background: nightBefore
-                ? 'rgba(251,191,36,0.07)'
-                : 'rgba(251,113,133,0.05)',
+                ? 'rgba(255,59,48,0.07)'
+                : 'rgba(255,255,255,0.04)',
               display: 'flex', flexDirection: 'column', gap: 3,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <span style={{ fontSize: 13, lineHeight: 1 }}>
-                  {nightBefore ? '🌙' : '📅'}
-                </span>
                 <span style={{
                   fontSize: 12, fontWeight: 700,
-                  color: nightBefore ? '#FCD34D' : '#FDA4AF',
+                  color: nightBefore ? '#FF3B30' : '#9A9A9F',
                   letterSpacing: '0.01em',
                 }}>
                   {nightBefore ? 'Night before exam' : 'Pre-exam mode'}
                 </span>
               </div>
-              <p style={{ fontSize: 11.5, color: nightBefore ? '#FBBF24' : '#F87171', margin: 0, lineHeight: 1.45, opacity: 0.8 }}>
+              <p style={{ fontSize: 11.5, color: nightBefore ? '#FF3B30' : '#9A9A9F', margin: 0, lineHeight: 1.45, opacity: nightBefore ? 0.85 : 1 }}>
                 {nightBefore
                   ? `Exam on ${displayDate} — Red Zone cards first.`
                   : `Exam ${daysLabel} · Red Zone prioritized.`}
@@ -917,22 +923,22 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
               height: 26, padding: '0 10px', borderRadius: 9999,
-              border: '1px solid rgba(251,113,133,0.45)',
-              background: 'rgba(251,113,133,0.1)',
-              color: '#FDA4AF',
+              border: '1px solid rgba(255,59,48,0.45)',
+              background: 'rgba(255,59,48,0.1)',
+              color: '#FF3B30',
               fontSize: 12, fontWeight: 500,
             }}>
               Red Zone
               <span style={{
                 fontSize: 10, fontWeight: 600,
-                color: '#FDA4AF',
-                background: 'rgba(251,113,133,0.18)',
+                color: '#FF3B30',
+                background: 'rgba(255,59,48,0.18)',
                 borderRadius: 9999, padding: '1px 5px',
               }}>
                 {filterCounts.red}
               </span>
             </span>
-            <span style={{ fontSize: 11, color: '#3F485C' }}>only</span>
+            <span style={{ fontSize: 11, color: '#76767B' }}>only</span>
           </div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
@@ -947,9 +953,9 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 5,
                     height: 26, padding: '0 10px', borderRadius: 9999,
-                    border: active ? '1px solid rgba(99,102,241,0.5)' : '1px solid #1E1D2A',
-                    background: active ? 'rgba(99,102,241,0.12)' : '#0C0C13',
-                    color: active ? '#A5B4FC' : '#4B5563',
+                    border: active ? '1px solid rgba(255,59,48,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                    background: active ? 'rgba(255,59,48,0.12)' : '#0C0C0D',
+                    color: active ? '#FF3B30' : '#76767B',
                     fontSize: 12, cursor: 'pointer',
                     transition: 'all 0.15s',
                   }}
@@ -957,8 +963,8 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                   {labels[f]}
                   <span style={{
                     fontSize: 10, fontWeight: 600,
-                    color: active ? '#818CF8' : '#2D3748',
-                    background: active ? 'rgba(99,102,241,0.2)' : '#111',
+                    color: active ? '#FF3B30' : '#76767B',
+                    background: active ? 'rgba(255,59,48,0.2)' : 'rgba(255,255,255,0.06)',
                     borderRadius: 9999, padding: '1px 5px',
                   }}>
                     {filterCounts[f]}
@@ -972,13 +978,13 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
         {/* Scrollable card list */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, paddingRight: 8 }}>
           {!reviewsLoaded ? (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: '#3F485C', fontSize: 13 }}>Loading…</div>
+            <div style={{ textAlign: 'center', padding: '32px 0', color: '#76767B', fontSize: 13 }}>Loading…</div>
           ) : activeQueue.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: '#3F485C', fontSize: 13 }}>No cards in this filter.</div>
+            <div style={{ textAlign: 'center', padding: '32px 0', color: '#76767B', fontSize: 13 }}>No cards in this filter.</div>
           ) : activeQueue.map((fc, idx) => {
             const isActive    = idx === cardIdx && !isComplete
             const mastery     = computeMastery(reviewMap[fc.id]?.intervalDays) // kept for reference
-            const zoneColor   = fc.zone === 'red' ? '#EF4444' : '#6366F1'
+            const zoneColor   = fc.zone === 'red' ? '#FF3B30' : 'rgba(255,255,255,0.3)'
             const isHovered   = hoveredCardId === fc.id
             const showIcons   = (isActive || isHovered) && deletingCardId !== fc.id
             const isConfirming = deletingCardId === fc.id
@@ -990,15 +996,15 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                   key={fc.id}
                   style={{
                     padding: '10px 12px',
-                    borderRadius: 10,
-                    border: '1px solid rgba(251,113,133,0.3)',
-                    background: 'rgba(251,113,133,0.05)',
+                    borderRadius: 2,
+                    border: '1px solid rgba(255,59,48,0.3)',
+                    background: 'rgba(255,59,48,0.05)',
                     display: 'flex', flexDirection: 'column', gap: 8,
                   }}
                 >
-                  <span style={{ fontSize: 12, color: '#94A3B8', lineHeight: 1.45 }}>
+                  <span style={{ fontSize: 12, color: '#9A9A9F', lineHeight: 1.45 }}>
                     Delete{' '}
-                    <span style={{ color: '#E2E8F0', fontWeight: 500 }}>{fc.keywordTerm}</span>
+                    <span style={{ color: '#EDEDED', fontWeight: 500 }}>{fc.keywordTerm}</span>
                     {'?'}
                   </span>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -1007,10 +1013,10 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                       onClick={() => handleDeleteCard(fc.id)}
                       disabled={deletingCard}
                       style={{
-                        flex: 1, height: 28, borderRadius: 7,
-                        border: '1px solid rgba(251,113,133,0.4)',
-                        background: deletingCard ? 'transparent' : 'rgba(251,113,133,0.12)',
-                        color: '#FB7185', fontSize: 11.5, fontWeight: 600,
+                        flex: 1, height: 28, borderRadius: 2,
+                        border: '1px solid rgba(255,59,48,0.4)',
+                        background: deletingCard ? 'transparent' : 'rgba(255,59,48,0.12)',
+                        color: '#FF3B30', fontSize: 11.5, fontWeight: 600,
                         cursor: deletingCard ? 'not-allowed' : 'pointer',
                         opacity: deletingCard ? 0.5 : 1,
                       }}
@@ -1022,9 +1028,9 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                       onClick={() => setDeletingCardId(null)}
                       disabled={deletingCard}
                       style={{
-                        flex: 1, height: 28, borderRadius: 7,
-                        border: '1px solid #1E1D2A', background: 'transparent',
-                        color: '#4B5563', fontSize: 11.5, cursor: 'pointer',
+                        flex: 1, height: 28, borderRadius: 2,
+                        border: '1px solid rgba(255,255,255,0.08)', background: 'transparent',
+                        color: '#9A9A9F', fontSize: 11.5, cursor: 'pointer',
                       }}
                     >
                       Cancel
@@ -1050,9 +1056,9 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                     width: '100%',
                     textAlign: 'left',
                     padding: '10px 10px 10px 12px',
-                    borderRadius: 10,
-                    border: isActive ? '1px solid #23222F' : '1px solid transparent',
-                    background: isActive ? '#111020' : 'transparent',
+                    borderRadius: 2,
+                    border: isActive ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
+                    background: isActive ? 'rgba(255,255,255,0.05)' : 'transparent',
                     cursor: 'pointer',
                     borderLeft: `3px solid ${isActive ? zoneColor : 'transparent'}`,
                     transition: 'all 0.12s',
@@ -1061,7 +1067,7 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
                     <span style={{
                       fontSize: 13, fontWeight: 500,
-                      color: isActive ? '#E2E8F0' : '#94A3B8',
+                      color: isActive ? '#EDEDED' : '#9A9A9F',
                       lineHeight: 1.3, wordBreak: 'break-word',
                       // Reserve space so the term doesn't slide under the icon buttons
                       paddingRight: showIcons ? 48 : 0,
@@ -1088,14 +1094,14 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                         setEditCardForm({ id: fc.id, front: fc.front, back: fc.back, zone: fc.zone })
                       }}
                       style={{
-                        width: 22, height: 22, borderRadius: 5,
-                        border: '1px solid #1E1D2A', background: '#0C0C13',
-                        color: '#3F485C', display: 'flex', alignItems: 'center',
+                        width: 22, height: 22, borderRadius: 2,
+                        border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+                        color: '#76767B', display: 'flex', alignItems: 'center',
                         justifyContent: 'center', cursor: 'pointer',
                         transition: 'color 0.1s, border-color 0.1s',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.color = '#818CF8'; e.currentTarget.style.borderColor = '#2D2B45' }}
-                      onMouseLeave={e => { e.currentTarget.style.color = '#3F485C'; e.currentTarget.style.borderColor = '#1E1D2A' }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#EDEDED'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)' }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#76767B'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
                     >
                       <Pencil size={10} strokeWidth={1.8} />
                     </button>
@@ -1107,14 +1113,14 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                         setDeletingCardId(fc.id)
                       }}
                       style={{
-                        width: 22, height: 22, borderRadius: 5,
-                        border: '1px solid #1E1D2A', background: '#0C0C13',
-                        color: '#3F485C', display: 'flex', alignItems: 'center',
+                        width: 22, height: 22, borderRadius: 2,
+                        border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+                        color: '#76767B', display: 'flex', alignItems: 'center',
                         justifyContent: 'center', cursor: 'pointer',
                         transition: 'color 0.1s, border-color 0.1s',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.color = '#FB7185'; e.currentTarget.style.borderColor = 'rgba(251,113,133,0.35)' }}
-                      onMouseLeave={e => { e.currentTarget.style.color = '#3F485C'; e.currentTarget.style.borderColor = '#1E1D2A' }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#FF3B30'; e.currentTarget.style.borderColor = 'rgba(255,59,48,0.35)' }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#76767B'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
                     >
                       <Trash2 size={10} strokeWidth={1.8} />
                     </button>
@@ -1142,9 +1148,9 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
               onClick={() => setNewCardForm({ front: '', back: '', zone: 'red' })}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
-                height: 28, padding: '0 12px', borderRadius: 8,
-                border: '1px solid #23222F', background: '#0C0C13',
-                fontSize: 12, color: '#4B5563', cursor: 'pointer',
+                height: 28, padding: '0 12px', borderRadius: 2,
+                border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+                fontSize: 12, color: '#76767B', cursor: 'pointer',
               }}
             >
               <Plus size={12} strokeWidth={1.5} />
@@ -1172,11 +1178,11 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
             onCancel={() => setNewCardForm(null)}
           />
         ) : !reviewsLoaded ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3F485C', fontSize: 13 }}>Loading…</div>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#76767B', fontSize: 13 }}>Loading…</div>
         ) : activeQueue.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, textAlign: 'center' }}>
-            <p style={{ fontSize: 15, fontWeight: 600, color: '#E2E8F0', margin: 0 }}>No cards here</p>
-            <p style={{ fontSize: 13, color: '#3F485C', margin: 0 }}>Change the filter to see cards.</p>
+            <p style={{ fontSize: 15, fontWeight: 600, color: '#EDEDED', margin: 0 }}>No cards here</p>
+            <p style={{ fontSize: 13, color: '#76767B', margin: 0 }}>Change the filter to see cards.</p>
           </div>
         ) : isComplete ? (
           /* ── Completion screen ──────────────────────────────────────────── */
@@ -1193,7 +1199,7 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0, width: '100%', maxWidth: 560, margin: '0 auto' }}>
             {/* Header: counter + zone badge */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <span style={{ fontSize: 12, color: '#3F485C', fontFamily: 'monospace' }}>
+              <span style={{ fontSize: 12, color: '#76767B', fontFamily: 'var(--font-mono)' }}>
                 Flashcard {cardIdx + 1} / {activeQueue.length}
               </span>
               <span style={{
@@ -1214,20 +1220,20 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                 width: '100%',
                 minHeight: 200,
                 padding: '24px',
-                borderRadius: 14,
+                borderRadius: 2,
                 textAlign: 'left',
-                border: `1px solid ${card.zone === 'red' ? 'rgba(251,113,133,0.22)' : 'rgba(99,102,241,0.2)'}`,
-                background: card.zone === 'red' ? 'rgba(251,113,133,0.04)' : 'rgba(99,102,241,0.04)',
+                border: `1px solid ${card.zone === 'red' ? 'rgba(255,59,48,0.22)' : 'rgba(255,255,255,0.1)'}`,
+                background: card.zone === 'red' ? 'rgba(255,59,48,0.04)' : 'rgba(255,255,255,0.03)',
                 display: 'flex', flexDirection: 'column', gap: 0,
                 marginBottom: 0,
               }}>
                 <div>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Question</span>
-                  <p style={{ fontSize: 17, fontWeight: 600, color: '#E2E8F0', margin: '0 0 16px', lineHeight: 1.4 }}>{card.front}</p>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#76767B', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Question</span>
+                  <p style={{ fontSize: 17, fontWeight: 600, color: '#EDEDED', margin: '0 0 16px', lineHeight: 1.4 }}>{card.front}</p>
                 </div>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 14 }}>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Answer</span>
-                  <p style={{ fontSize: 14, color: '#94A3B8', margin: 0, lineHeight: 1.65 }}><MathText text={card.back} /></p>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#76767B', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Answer</span>
+                  <p style={{ fontSize: 14, color: '#9A9A9F', margin: 0, lineHeight: 1.65 }}><MathText text={card.back} /></p>
                 </div>
               </div>
             ) : (
@@ -1239,11 +1245,11 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                   width: '100%',
                   minHeight: 200,
                   padding: '28px 24px',
-                  borderRadius: 14,
+                  borderRadius: 2,
                   cursor: 'pointer',
                   textAlign: 'left',
-                  border: `1px solid ${card.zone === 'red' ? 'rgba(251,113,133,0.2)' : 'rgba(99,102,241,0.2)'}`,
-                  background: card.zone === 'red' ? 'rgba(251,113,133,0.04)' : 'rgba(99,102,241,0.04)',
+                  border: `1px solid ${card.zone === 'red' ? 'rgba(255,59,48,0.2)' : 'rgba(255,255,255,0.1)'}`,
+                  background: card.zone === 'red' ? 'rgba(255,59,48,0.04)' : 'rgba(255,255,255,0.03)',
                   display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 20,
                   marginBottom: 0,
                 }}
@@ -1257,18 +1263,18 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                   >
                     {flipped ? (
                       <div>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Answer</span>
-                        <p style={{ fontSize: 14, color: '#94A3B8', margin: 0, lineHeight: 1.65 }}><MathText text={card.back} /></p>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: '#76767B', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Answer</span>
+                        <p style={{ fontSize: 14, color: '#9A9A9F', margin: 0, lineHeight: 1.65 }}><MathText text={card.back} /></p>
                       </div>
                     ) : (
                       <div>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Question</span>
-                        <p style={{ fontSize: 17, fontWeight: 600, color: '#E2E8F0', margin: 0, lineHeight: 1.4 }}>{card.front}</p>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: '#76767B', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Question</span>
+                        <p style={{ fontSize: 17, fontWeight: 600, color: '#EDEDED', margin: 0, lineHeight: 1.4 }}>{card.front}</p>
                       </div>
                     )}
                   </motion.div>
                 </AnimatePresence>
-                <span style={{ fontSize: 11, color: '#2D3748' }}>
+                <span style={{ fontSize: 11, color: '#76767B' }}>
                   {flipped ? 'Answer · click to see question' : 'tap to flip · space'}
                 </span>
               </button>
@@ -1285,7 +1291,7 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                 disabled={cardIdx === 0}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 12, color: cardIdx === 0 ? '#1E2030' : '#4B5563',
+                  fontSize: 12, color: cardIdx === 0 ? '#3A3A3D' : '#76767B',
                   background: 'none', border: 'none', cursor: cardIdx === 0 ? 'default' : 'pointer',
                   padding: '4px 0',
                 }}
@@ -1293,14 +1299,14 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                 <ChevronLeft size={14} strokeWidth={1.5} />
                 Prev
               </button>
-              <span style={{ fontSize: 12, color: '#2D3748' }}>How well did you know it?</span>
+              <span style={{ fontSize: 12, color: '#76767B' }}>How well did you know it?</span>
               <button
                 type="button"
                 onClick={() => { setCardIdx(i => Math.min(activeQueue.length, i + 1)); setFlipped(false) }}
                 disabled={cardIdx >= activeQueue.length - 1}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 12, color: cardIdx >= activeQueue.length - 1 ? '#1E2030' : '#4B5563',
+                  fontSize: 12, color: cardIdx >= activeQueue.length - 1 ? '#3A3A3D' : '#76767B',
                   background: 'none', border: 'none', cursor: cardIdx >= activeQueue.length - 1 ? 'default' : 'pointer',
                   padding: '4px 0',
                 }}
@@ -1319,7 +1325,7 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                   onClick={() => handleRate(rating)}
                   disabled={submitting}
                   style={{
-                    height: 42, borderRadius: 10,
+                    height: 42, borderRadius: 2,
                     border: `1px solid ${border}`,
                     background: bg, color,
                     fontSize: 13, fontWeight: 600,
@@ -1340,7 +1346,7 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
       <div style={{
         width: 220,
         flexShrink: 0,
-        borderLeft: '1px solid #1A1A28',
+        borderLeft: '1px solid rgba(255,255,255,0.08)',
         paddingLeft: 24,
         display: 'flex',
         flexDirection: 'column',
@@ -1361,24 +1367,24 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
                 <div key={state} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: MASTERY_COLORS[state].dot, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: '#64748B' }}>{label}</span>
+                    <span style={{ fontSize: 12, color: '#76767B' }}>{label}</span>
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8' }}>{masteryStats[state]}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#9A9A9F' }}>{masteryStats[state]}</span>
                 </div>
               ))}
             </div>
 
-            <div style={{ height: 1, background: '#1A1A28', margin: '20px 0' }} />
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '20px 0' }} />
           </>
         ) : (
           <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 12, color: '#3F485C' }}>Loading…</span>
+            <span style={{ fontSize: 12, color: '#76767B' }}>Loading…</span>
           </div>
         )}
 
         {/* Export section */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#3F485C', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Export</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#76767B', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Export</span>
           {[
             { key: 'anki' as const, label: 'Anki deck',      ext: '.apkg', handler: handleExportAnki },
             { key: 'csv'  as const, label: 'CSV',             ext: '.csv',  handler: handleExportCsv  },
@@ -1391,22 +1397,22 @@ export function FlashcardPanel({ sessionTitle, sessionId, userId, examDate, init
               disabled={exporting !== null}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '9px 12px', borderRadius: 9,
-                border: '1px solid #1E1D2A', background: '#0A0A10',
+                padding: '9px 12px', borderRadius: 2,
+                border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
                 cursor: exporting !== null ? 'not-allowed' : 'pointer',
                 opacity: exporting !== null ? 0.5 : 1,
                 transition: 'border-color 0.12s, background 0.12s',
               }}
-              onMouseEnter={e => { if (!exporting) { (e.currentTarget as HTMLButtonElement).style.borderColor = '#2D2B45'; (e.currentTarget as HTMLButtonElement).style.background = '#0F0E1A' } }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#1E1D2A'; (e.currentTarget as HTMLButtonElement).style.background = '#0A0A10' }}
+              onMouseEnter={e => { if (!exporting) { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.14)'; (e.currentTarget as HTMLButtonElement).style.background = '#111112' } }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.background = '#0C0C0D' }}
             >
-              <span style={{ fontSize: 12, color: '#94A3B8' }}>
+              <span style={{ fontSize: 12, color: '#9A9A9F' }}>
                 {exporting === key ? 'Exporting…' : label}
               </span>
-              <span style={{ fontSize: 10, color: '#3F485C', fontFamily: 'monospace' }}>{ext}</span>
+              <span style={{ fontSize: 10, color: '#76767B', fontFamily: 'var(--font-mono)' }}>{ext}</span>
             </button>
           ))}
-          <p style={{ fontSize: 11, color: '#2D3748', lineHeight: 1.5, margin: '4px 0 0' }}>
+          <p style={{ fontSize: 11, color: '#76767B', lineHeight: 1.5, margin: '4px 0 0' }}>
             Exports your Red Zone keywords and the flashcards above.
           </p>
         </div>
@@ -1437,10 +1443,10 @@ function NewCardForm({
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '10px 12px',
-    borderRadius: 9,
-    border: '1px solid #23222F',
-    background: '#0A0A10',
-    color: '#E2E8F0',
+    borderRadius: 2,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#111112',
+    color: '#EDEDED',
     fontSize: 13,
     lineHeight: 1.5,
     outline: 'none',
@@ -1452,7 +1458,7 @@ function NewCardForm({
   const labelStyle: React.CSSProperties = {
     fontSize: 11,
     fontWeight: 600,
-    color: '#3F485C',
+    color: '#76767B',
     letterSpacing: '0.06em',
     textTransform: 'uppercase',
     display: 'block',
@@ -1462,13 +1468,13 @@ function NewCardForm({
   return (
     <div style={{ width: '100%', maxWidth: 560, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#E2E8F0' }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDED' }}>
           {mode === 'edit' ? 'Edit card' : 'New card'}
         </span>
         <button
           type="button"
           onClick={onCancel}
-          style={{ fontSize: 12, color: '#3F485C', background: 'none', border: 'none', cursor: 'pointer' }}
+          style={{ fontSize: 12, color: '#76767B', background: 'none', border: 'none', cursor: 'pointer' }}
         >
           Cancel
         </button>
@@ -1505,18 +1511,18 @@ function NewCardForm({
           <div style={{ display: 'flex', gap: 8 }}>
             {(['red', 'likely'] as const).map(z => {
               const active = form.zone === z
-              const zColor = z === 'red' ? { border: 'rgba(251,113,133,0.4)', bg: 'rgba(251,113,133,0.08)', text: '#FDA4AF' }
-                : { border: 'rgba(99,102,241,0.4)', bg: 'rgba(99,102,241,0.08)', text: '#A5B4FC' }
+              const zColor = z === 'red' ? { border: 'rgba(255,59,48,0.4)', bg: 'rgba(255,59,48,0.08)', text: '#FF3B30' }
+                : { border: 'rgba(255,255,255,0.14)', bg: 'rgba(255,255,255,0.05)', text: '#9A9A9F' }
               return (
                 <button
                   key={z}
                   type="button"
                   onClick={() => onChange({ ...form, zone: z })}
                   style={{
-                    flex: 1, height: 36, borderRadius: 9,
-                    border: active ? `1px solid ${zColor.border}` : '1px solid #1E1D2A',
+                    flex: 1, height: 36, borderRadius: 2,
+                    border: active ? `1px solid ${zColor.border}` : '1px solid rgba(255,255,255,0.08)',
                     background: active ? zColor.bg : 'transparent',
-                    color: active ? zColor.text : '#3F485C',
+                    color: active ? zColor.text : '#76767B',
                     fontSize: 12, fontWeight: 600, cursor: 'pointer',
                     transition: 'all 0.12s',
                   }}
@@ -1535,10 +1541,10 @@ function NewCardForm({
             onClick={onSubmit}
             disabled={!canSubmit}
             style={{
-              flex: 1, height: 40, borderRadius: 9,
-              border: '1px solid rgba(99,102,241,0.4)',
-              background: canSubmit ? 'rgba(99,102,241,0.12)' : 'transparent',
-              color: canSubmit ? '#A5B4FC' : '#2D3748',
+              flex: 1, height: 40, borderRadius: 2,
+              border: canSubmit ? 'none' : '1px solid rgba(255,255,255,0.08)',
+              background: canSubmit ? '#FF3B30' : 'transparent',
+              color: canSubmit ? '#0A0A0A' : '#4A4A4E',
               fontSize: 13, fontWeight: 600,
               cursor: canSubmit ? 'pointer' : 'not-allowed',
               transition: 'all 0.12s',
@@ -1550,9 +1556,9 @@ function NewCardForm({
             type="button"
             onClick={onCancel}
             style={{
-              height: 40, padding: '0 16px', borderRadius: 9,
-              border: '1px solid #1E1D2A', background: 'transparent',
-              color: '#3F485C', fontSize: 13, cursor: 'pointer',
+              height: 40, padding: '0 16px', borderRadius: 2,
+              border: '1px solid rgba(255,255,255,0.08)', background: 'transparent',
+              color: '#76767B', fontSize: 13, cursor: 'pointer',
             }}
           >
             Cancel
@@ -1599,11 +1605,11 @@ function CompletionScreen({
       }}
     >
       <div>
-        <p style={{ fontSize: 22, fontWeight: 700, color: '#E2E8F0', margin: '0 0 8px' }}>Session complete</p>
-        <p style={{ fontSize: 14, color: '#64748B', margin: 0, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 22, fontWeight: 700, color: '#EDEDED', margin: '0 0 8px' }}>Session complete</p>
+        <p style={{ fontSize: 14, color: '#76767B', margin: 0, lineHeight: 1.6 }}>
           You reviewed {queue.length} card{queue.length !== 1 ? 's' : ''}.{' '}
-          {masteredThisRound > 0 && <span style={{ color: '#10B981' }}>{masteredThisRound} mastered this round.</span>}
-          {missedCount > 0 && <span style={{ color: '#F59E0B' }}> {missedCount} still need{missedCount === 1 ? 's' : ''} work.</span>}
+          {masteredThisRound > 0 && <span style={{ color: '#EDEDED' }}>{masteredThisRound} mastered this round.</span>}
+          {missedCount > 0 && <span style={{ color: '#FF3B30' }}> {missedCount} still need{missedCount === 1 ? 's' : ''} work.</span>}
         </p>
       </div>
 
@@ -1612,10 +1618,10 @@ function CompletionScreen({
           type="button"
           onClick={onStudyAgain}
           style={{
-            height: 42, borderRadius: 10,
-            border: '1px solid rgba(99,102,241,0.35)',
-            background: 'rgba(99,102,241,0.08)',
-            color: '#A5B4FC', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            height: 42, borderRadius: 2,
+            border: 'none',
+            background: '#FF3B30',
+            color: '#0A0A0A', fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}
         >
           Study again
@@ -1626,10 +1632,10 @@ function CompletionScreen({
             type="button"
             onClick={onReviewMissed}
             style={{
-              height: 42, borderRadius: 10,
-              border: '1px solid rgba(251,191,36,0.3)',
-              background: 'rgba(251,191,36,0.06)',
-              color: '#FDE68A', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              height: 42, borderRadius: 2,
+              border: '1px solid rgba(255,59,48,0.35)',
+              background: 'rgba(255,59,48,0.06)',
+              color: '#FF3B30', fontSize: 13, fontWeight: 600, cursor: 'pointer',
             }}
           >
             Review missed only ({missedCount})
@@ -1640,10 +1646,10 @@ function CompletionScreen({
           type="button"
           onClick={onBackToAll}
           style={{
-            height: 42, borderRadius: 10,
-            border: '1px solid #1E1D2A',
+            height: 42, borderRadius: 2,
+            border: '1px solid rgba(255,255,255,0.08)',
             background: 'transparent',
-            color: '#4B5563', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            color: '#76767B', fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}
         >
           Back to all cards

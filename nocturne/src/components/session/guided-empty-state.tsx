@@ -25,8 +25,8 @@ function Row({
     >
       <span
         className={[
-          'mt-0.5 w-1.5 h-1.5 rounded-full shrink-0',
-          active ? 'bg-indigo-500' : 'bg-text-tertiary',
+          'mt-0.5 w-1.5 h-1.5 shrink-0',
+          active ? 'bg-text-primary' : 'bg-text-tertiary',
         ].join(' ')}
       />
       <div className="flex flex-col gap-0.5">
@@ -91,15 +91,6 @@ export function GuidedEmptyState({ variant }: Props) {
   // transcript — center pane, primary CTA
   return (
     <div className="relative flex flex-col items-center justify-center h-full gap-6 px-8 text-center select-none overflow-hidden">
-      {/* Ambient glow behind the content */}
-      <div
-        className="ambient-glow pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 40% at 50% 60%, rgba(45,212,191,0.06) 0%, transparent 70%)',
-        }}
-      />
-
       <div className="relative flex flex-col items-center gap-3">
         <Layers size={32} strokeWidth={1.25} className="text-text-tertiary" />
         <div className="flex flex-col gap-1">
@@ -132,7 +123,8 @@ export function GuidedEmptyState({ variant }: Props) {
       <button
         type="button"
         onClick={openUploadPanel}
-        className="relative inline-flex items-center gap-1.5 h-9 px-4 rounded-btn text-body font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
+        className="relative inline-flex items-center gap-1.5 h-9 px-4 rounded-btn text-body font-medium transition-colors"
+        style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
       >
         <Upload size={14} strokeWidth={1.5} />
         Upload files

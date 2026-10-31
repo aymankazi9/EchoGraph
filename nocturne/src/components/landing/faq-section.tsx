@@ -39,49 +39,36 @@ export function FaqSection() {
   const [open, setOpen] = useState<number>(0)
 
   return (
-    <section
-      style={{
-        padding: 'clamp(72px,9vw,120px) 24px',
-        borderTop: '1px solid #191827',
-      }}
-    >
+    <section style={{ padding: 'clamp(72px,9vw,120px) clamp(20px,4vw,40px)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
-        <div data-reveal="" style={{ marginBottom: 44 }}>
-          <p
-            style={{
-              fontSize: 12,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: '#5B6478',
-              margin: '0 0 14px',
-            }}
-          >
-            Questions
+        <div style={{ marginBottom: 44 }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.16em', color: '#FF3B30', margin: '0 0 14px' }}>
+            QUESTIONS
           </p>
           <h2
             style={{
+              fontFamily: 'var(--font-display)',
+              fontStretch: '82%',
               fontSize: 'clamp(28px,4vw,40px)',
               fontWeight: 600,
               letterSpacing: '-0.02em',
               margin: 0,
-              color: '#E2E8F0',
+              color: '#EDEDED',
             }}
           >
             Good to know.
           </h2>
         </div>
 
-        <div data-reveal="" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           {FAQ_ITEMS.map((q, i) => {
             const isOpen = open === i
             return (
               <div
                 key={i}
                 style={{
-                  border: '1px solid #1E1E2E',
-                  borderRadius: 10,
-                  background: '#111118',
-                  overflow: 'hidden',
+                  borderTop: '1px solid rgba(255,255,255,0.08)',
+                  borderBottom: i === FAQ_ITEMS.length - 1 ? '1px solid rgba(255,255,255,0.08)' : undefined,
                 }}
               >
                 <button
@@ -93,27 +80,25 @@ export function FaqSection() {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: 16,
-                    padding: '18px 20px',
+                    padding: '18px 0',
                     background: 'transparent',
                     border: 'none',
                     cursor: 'pointer',
                     textAlign: 'left',
                   }}
                 >
-                  <span style={{ fontSize: 15, fontWeight: 500, color: '#E2E8F0' }}>
-                    {q.question}
-                  </span>
+                  <span style={{ fontSize: 15, fontWeight: 500, color: isOpen ? '#EDEDED' : '#CFCFD2' }}>{q.question}</span>
                   <span
                     style={{
-                      fontSize: 20,
-                      color: isOpen ? '#818CF8' : '#5B6478',
-                      transform: isOpen ? 'rotate(45deg)' : 'none',
-                      transition: 'transform .3s, color .2s',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 16,
+                      color: isOpen ? '#FF3B30' : '#76767B',
+                      transition: 'color .2s',
                       flexShrink: 0,
                       lineHeight: 1,
                     }}
                   >
-                    +
+                    {isOpen ? '−' : '+'}
                   </span>
                 </button>
 
@@ -122,21 +107,10 @@ export function FaqSection() {
                     maxHeight: isOpen ? 220 : 0,
                     opacity: isOpen ? 1 : 0,
                     overflow: 'hidden',
-                    transition:
-                      'max-height .4s cubic-bezier(.16,1,.3,1), opacity .3s',
+                    transition: 'max-height .4s cubic-bezier(.16,1,.3,1), opacity .3s',
                   }}
                 >
-                  <p
-                    style={{
-                      margin: 0,
-                      padding: '0 20px 18px',
-                      fontSize: 14,
-                      lineHeight: 1.7,
-                      color: '#94A3B8',
-                    }}
-                  >
-                    {q.answer}
-                  </p>
+                  <p style={{ margin: 0, padding: '0 0 18px', fontSize: 14, lineHeight: 1.7, color: '#9A9A9F' }}>{q.answer}</p>
                 </div>
               </div>
             )

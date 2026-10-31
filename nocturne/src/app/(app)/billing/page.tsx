@@ -24,19 +24,17 @@ const TIER_DESC: Record<Tier, string> = {
 type SubStatus = 'active' | 'trialing' | 'past_due' | 'canceled' |
                  'incomplete' | 'incomplete_expired' | 'unpaid' | 'paused'
 
-interface StatusBadge { label: string; bg: string; color: string }
-
-function statusBadge(status: string): StatusBadge {
+function statusLabel(status: string): string {
   switch (status as SubStatus) {
-    case 'active':             return { label: 'Active',      bg: 'rgba(34,197,94,0.1)',    color: '#4ADE80' }
-    case 'trialing':           return { label: 'Trial',       bg: 'rgba(99,102,241,0.12)',  color: '#A5B4FC' }
-    case 'past_due':           return { label: 'Past due',    bg: 'rgba(251,191,36,0.12)',  color: '#FCD34D' }
-    case 'canceled':           return { label: 'Canceled',    bg: 'rgba(100,116,139,0.12)', color: '#94A3B8' }
+    case 'active':             return 'Active'
+    case 'trialing':           return 'Trial'
+    case 'past_due':           return 'Past due'
+    case 'canceled':           return 'Canceled'
     case 'incomplete':
-    case 'incomplete_expired': return { label: 'Incomplete',  bg: 'rgba(251,113,133,0.1)',  color: '#FB7185' }
-    case 'unpaid':             return { label: 'Unpaid',      bg: 'rgba(251,113,133,0.1)',  color: '#FB7185' }
-    case 'paused':             return { label: 'Paused',      bg: 'rgba(100,116,139,0.12)', color: '#94A3B8' }
-    default:                   return { label: status,        bg: 'rgba(100,116,139,0.12)', color: '#94A3B8' }
+    case 'incomplete_expired': return 'Incomplete'
+    case 'unpaid':             return 'Unpaid'
+    case 'paused':             return 'Paused'
+    default:                   return status
   }
 }
 
@@ -69,7 +67,6 @@ export default async function BillingPage({
   const periodEnd  = sub?.current_period_end as string | null | undefined ?? null
   const hasPortal  = !!(sub?.stripe_customer_id)
 
-  const badge   = statusBadge(status)
   const isFree  = tier === 'dusk'
   const isCanceled = status === 'canceled'
   const isTrialing = status === 'trialing'
@@ -87,10 +84,10 @@ export default async function BillingPage({
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 27, fontWeight: 600, letterSpacing: '-0.025em', color: '#E2E8F0', margin: '0 0 6px' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontStretch: '82%', fontSize: 34, fontWeight: 600, letterSpacing: '-0.02em', color: '#EDEDED', margin: '0 0 6px' }}>
           Billing
         </h1>
-        <p style={{ fontSize: 14, color: '#5B6478', margin: 0 }}>
+        <p style={{ fontSize: 14, color: '#76767B', margin: 0 }}>
           Manage your subscription and payment details.
         </p>
       </div>
@@ -100,19 +97,14 @@ export default async function BillingPage({
         <div style={{
           marginBottom: 20,
           padding: '13px 16px',
-          borderRadius: 10,
-          border: '1px solid rgba(74,222,128,0.25)',
-          background: 'rgba(34,197,94,0.07)',
+          border: '1px solid rgba(255,255,255,0.14)',
+          background: 'rgba(255,255,255,0.03)',
           display: 'flex',
           alignItems: 'center',
           gap: 10,
         }}>
-          <span style={{ color: '#4ADE80', flexShrink: 0, lineHeight: 0 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          </span>
-          <p style={{ fontSize: 13.5, color: '#4ADE80', margin: 0 }}>
+          <span style={{ color: '#EDEDED', flexShrink: 0, fontFamily: 'var(--font-mono)' }}>[✓]</span>
+          <p style={{ fontSize: 13.5, color: '#EDEDED', margin: 0 }}>
             Subscription activated — welcome to {TIER_LABEL[tier]}.
           </p>
         </div>
@@ -121,45 +113,43 @@ export default async function BillingPage({
       {/* ── Current plan card ────────────────────────────────────────────── */}
       <div style={{
         padding: '22px 24px',
-        borderRadius: 14,
-        border: '1px solid #1E1E2E',
-        background: '#0C0C13',
+        border: '1px solid rgba(255,255,255,0.08)',
+        background: '#0C0C0D',
         marginBottom: 16,
       }}>
         {/* Plan name + status */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
           <div>
-            <p style={{ fontSize: 12, color: '#5B6478', margin: '0 0 4px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: '#76767B', margin: '0 0 4px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
               Current plan
             </p>
-            <p style={{ fontSize: 20, fontWeight: 600, color: '#E2E8F0', margin: 0, letterSpacing: '-0.01em' }}>
+            <p style={{ fontSize: 20, fontWeight: 600, color: '#EDEDED', margin: 0, letterSpacing: '-0.01em' }}>
               {TIER_LABEL[tier]}
             </p>
           </div>
           <span style={{
             flexShrink: 0,
             marginTop: 2,
-            display: 'inline-flex',
-            alignItems: 'center',
-            padding: '4px 11px',
-            borderRadius: 9999,
-            background: badge.bg,
-            fontSize: 12,
-            fontWeight: 500,
-            color: badge.color,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            padding: '3px 7px',
+            border: '1px solid rgba(255,255,255,0.14)',
+            color: '#9A9A9F',
           }}>
-            {badge.label}
+            {statusLabel(status)}
           </span>
         </div>
 
         {/* Description */}
-        <p style={{ fontSize: 13.5, color: '#5B6478', margin: '0 0 16px', lineHeight: 1.55 }}>
+        <p style={{ fontSize: 13.5, color: '#76767B', margin: '0 0 16px', lineHeight: 1.55 }}>
           {TIER_DESC[tier]}
         </p>
 
         {/* Period end */}
         {periodLabel && (
-          <p style={{ fontSize: 13, color: '#3F485C', margin: '0 0 18px' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#4A4A4E', margin: '0 0 18px' }}>
             {periodLabel}
           </p>
         )}
@@ -178,13 +168,11 @@ export default async function BillingPage({
               alignItems: 'center',
               height: 36,
               padding: '0 18px',
-              borderRadius: 8,
               fontSize: 13.5,
               fontWeight: 500,
-              background: '#6366F1',
-              color: '#09090F',
+              background: 'var(--color-accent)',
+              color: 'var(--color-text-inverse)',
               textDecoration: 'none',
-              boxShadow: '0 4px 14px rgba(99,102,241,0.28)',
             }}
           >
             Upgrade plan
@@ -196,21 +184,20 @@ export default async function BillingPage({
       {isCanceled && periodEnd && (
         <div style={{
           padding: '14px 16px',
-          borderRadius: 10,
-          border: '1px solid #1E1E2E',
-          background: '#0C0C13',
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: '#0C0C0D',
           marginBottom: 16,
         }}>
-          <p style={{ fontSize: 13.5, color: '#5B6478', margin: '0 0 10px', lineHeight: 1.55 }}>
+          <p style={{ fontSize: 13.5, color: '#76767B', margin: '0 0 10px', lineHeight: 1.55 }}>
             Your subscription was canceled. You still have full access until{' '}
-            <span style={{ color: '#94A3B8' }}>{formatDate(periodEnd)}</span>.
+            <span style={{ color: '#9A9A9F' }}>{formatDate(periodEnd)}</span>.
             Resubscribe any time to keep your plan.
           </p>
           <Link
             href="/#pricing"
             style={{
               fontSize: 13,
-              color: '#818CF8',
+              color: 'var(--color-accent)',
               textDecoration: 'none',
               fontWeight: 500,
             }}
@@ -224,20 +211,15 @@ export default async function BillingPage({
       {status === 'past_due' && (
         <div style={{
           padding: '14px 16px',
-          borderRadius: 10,
-          border: '1px solid rgba(251,191,36,0.2)',
-          background: 'rgba(251,191,36,0.05)',
+          border: '1px solid var(--color-border-strong)',
+          background: 'var(--color-bg-subtle)',
           marginBottom: 16,
           display: 'flex',
           gap: 12,
           alignItems: 'flex-start',
         }}>
-          <span style={{ color: '#FCD34D', marginTop: 1, flexShrink: 0 }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </span>
-          <p style={{ fontSize: 13.5, color: '#94A3B8', margin: 0, lineHeight: 1.55 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13.5, color: 'var(--color-text-secondary)', marginTop: 1, flexShrink: 0 }}>!</span>
+          <p style={{ fontSize: 13.5, color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.55 }}>
             Your last payment failed. Update your payment method to keep your{' '}
             {TIER_LABEL[tier]} access.
           </p>

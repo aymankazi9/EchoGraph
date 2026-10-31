@@ -26,8 +26,11 @@ export function OnboardingProgress({ currentStep, totalSteps }: Props) {
                   : { scale: 1, opacity: 0.2 }
             }
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            style={{ width: 8, height: 8, borderRadius: 9999 }}
-            className={active ? 'bg-indigo-400' : done ? 'bg-indigo-500' : 'bg-border-strong'}
+            style={{
+              width: 6,
+              height: 6,
+              background: active ? '#FF3B30' : done ? '#EDEDED' : 'rgba(255,255,255,0.14)',
+            }}
           />
         )
       })}

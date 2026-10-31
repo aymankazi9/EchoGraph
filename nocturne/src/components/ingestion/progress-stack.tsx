@@ -4,19 +4,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { staggerContainer, staggerItem, checkDraw, useMotion } from '@/lib/motion'
 import type { FileProgress, StepStatus } from '@/lib/upload'
 
-function barColor(label: string, status: StepStatus): string {
-  if (status === 'error') return 'bg-rose-300'
-  const l = label.toLowerCase()
-  if (l.includes('transcod') || l.includes('compress') || l.includes('ffmpeg') || l.includes('infer') || l.includes('bert')) return 'bg-amber-300'
-  if (l.includes('encrypt')) return 'bg-indigo-400'
-  if (l.includes('model') || l.includes('download')) return 'bg-violet-500'
-  return 'bg-indigo-500' // upload / default
+function barColor(status: StepStatus): string {
+  if (status === 'error' || status === 'active') return 'bg-[#FF3B30]'
+  return 'bg-[#EDEDED]'
 }
 
 function statusDot(status: StepStatus): string {
-  if (status === 'done') return 'text-indigo-400'
-  if (status === 'error') return 'text-rose-300'
-  if (status === 'active') return 'text-amber-200'
+  if (status === 'done') return 'text-[#EDEDED]'
+  if (status === 'error') return 'text-[#FF3B30]'
+  if (status === 'active') return 'text-[#FF3B30]'
   return 'text-text-tertiary'
 }
 
@@ -30,7 +26,7 @@ function statusLabel(status: StepStatus, pct: number): string {
 function CheckmarkIcon() {
   const { reduced } = useMotion()
   return (
-    <motion.svg width="14" height="14" viewBox="0 0 14 14" className="text-indigo-400">
+    <motion.svg width="14" height="14" viewBox="0 0 14 14" className="text-[#EDEDED]">
       <motion.path
         d="M2 7 L5.5 10.5 L12 3.5"
         fill="none"
@@ -88,7 +84,7 @@ export function ProgressStack({ progress }: Props) {
                     key={idx}
                     className="flex flex-col gap-1 rounded-sm"
                     animate={isComplete ? {
-                      backgroundColor: ['rgba(99,102,241,0)', 'rgba(99,102,241,0.08)', 'rgba(99,102,241,0)'],
+                      backgroundColor: ['rgba(255,255,255,0)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0)'],
                       transition: { duration: reduced ? 0 : 0.6 }
                     } : {}}
                   >
@@ -100,7 +96,7 @@ export function ProgressStack({ progress }: Props) {
                     </div>
                     <div className="h-1 w-full rounded-pill bg-bg-subtle overflow-hidden">
                       <div
-                        className={`h-full rounded-pill transition-all duration-150 ${barColor(step.label, step.status)}`}
+                        className={`h-full rounded-pill transition-all duration-150 ${barColor(step.status)}`}
                         style={{ width: `${step.status === 'done' ? 100 : step.pct}%` }}
                       />
                     </div>

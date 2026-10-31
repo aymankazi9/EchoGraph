@@ -57,13 +57,13 @@ export function TranscriptionControls({
       {/* ── Transcription status ────────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
         {isTranscribing && (
-          <span className="w-2 h-2 rounded-full bg-amber-200 animate-pulse-slow shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-[#FF3B30] animate-pulse-slow shrink-0" />
         )}
         {isTranscribeDone && !isSyncing && !isSynced && (
-          <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-text-primary shrink-0" />
         )}
         {isSynced && (
-          <span className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-text-primary shrink-0" />
         )}
         <motion.span
           key={rippleKey}
@@ -110,14 +110,14 @@ export function TranscriptionControls({
           </div>
           <div className="h-1 w-full bg-bg-subtle rounded-full overflow-hidden">
             <div
-              className="h-full bg-violet-400 transition-all duration-300 ease-out rounded-full"
+              className="h-full bg-[#FF3B30] transition-all duration-300 ease-out rounded-full"
               style={{ width: `${Math.max(0, ((progress.modelPct - 40) / 60) * 100)}%` }}
             />
           </div>
         </div>
       )}
 
-      {/* ── Whisper inference progress bar (amber) ──────────────────────────── */}
+      {/* ── Whisper inference progress bar ───────────────────────────────────── */}
       {phase === 'transcribing' && progress && progress.totalSegments > 0 && (
         <div className="flex flex-col gap-1">
           <div className="flex justify-between">
@@ -128,14 +128,14 @@ export function TranscriptionControls({
           </div>
           <div className="h-1 w-full bg-bg-subtle rounded-full overflow-hidden">
             <div
-              className="h-full bg-amber-200 transition-all duration-300 ease-out rounded-full"
+              className="h-full bg-[#FF3B30] transition-all duration-300 ease-out rounded-full"
               style={{ width: `${(progress.segmentsComplete / progress.totalSegments) * 100}%` }}
             />
           </div>
         </div>
       )}
 
-      {/* ── BERT model download bar (purple) ────────────────────────────────── */}
+      {/* ── BERT model download bar ──────────────────────────────────────────── */}
       {syncPhase === 'bert_loading' && syncProgress && syncProgress.modelPct < 100 && (
         <div className="flex flex-col gap-1">
           <div className="flex justify-between">
@@ -144,7 +144,7 @@ export function TranscriptionControls({
           </div>
           <div className="h-1 w-full bg-bg-subtle rounded-full overflow-hidden">
             <div
-              className="h-full bg-violet-400 transition-all duration-300 ease-out rounded-full"
+              className="h-full bg-[#FF3B30] transition-all duration-300 ease-out rounded-full"
               style={{ width: `${syncProgress.modelPct}%` }}
             />
           </div>
@@ -153,12 +153,12 @@ export function TranscriptionControls({
 
       {/* ── Transcription error ──────────────────────────────────────────────── */}
       {phase === 'error' && progress?.error && (
-        <p className="text-label text-rose-300">{progress.error}</p>
+        <p className="text-label text-[#FF3B30]">{progress.error}</p>
       )}
 
       {/* ── Sync error ───────────────────────────────────────────────────────── */}
       {syncPhase === 'error' && syncProgress?.error && (
-        <p className="text-label text-rose-300">{syncProgress.error}</p>
+        <p className="text-label text-[#FF3B30]">{syncProgress.error}</p>
       )}
 
       {/* ── Transcribe button — primary placement per CONTEXT.md goal #8 ────── */}
@@ -166,7 +166,8 @@ export function TranscriptionControls({
         <button
           type="button"
           onClick={onTranscribe}
-          className="flex items-center gap-2 h-9 px-4 rounded-btn text-body font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors self-start"
+          className="flex items-center gap-2 h-9 px-4 rounded-btn text-body font-medium transition-colors self-start"
+          style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
         >
           <Mic size={14} strokeWidth={1.5} />
           Transcribe
@@ -189,7 +190,8 @@ export function TranscriptionControls({
         <button
           type="button"
           onClick={onAnalyze}
-          className="h-9 px-4 rounded-btn text-body font-medium bg-violet-400 text-text-inverse hover:bg-violet-500 transition-colors self-start"
+          className="h-9 px-4 rounded-btn text-body font-medium transition-colors self-start"
+          style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
         >
           Analyze slides
         </button>

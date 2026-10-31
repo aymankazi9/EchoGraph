@@ -48,22 +48,20 @@ export function ManageSubscriptionButton({ secondary = false }: Props) {
           alignItems: 'center',
           height: 36,
           padding: '0 18px',
-          borderRadius: 8,
           fontSize: 13.5,
           fontWeight: 500,
           cursor: loading ? 'not-allowed' : 'pointer',
           opacity: loading ? 0.65 : 1,
-          background: secondary ? 'transparent' : '#6366F1',
-          color: secondary ? '#94A3B8' : '#09090F',
-          border: secondary ? '1px solid #2D2B45' : 'none',
-          boxShadow: secondary ? 'none' : '0 4px 14px rgba(99,102,241,0.28)',
-          transition: 'opacity .15s',
+          background: secondary ? 'transparent' : 'var(--color-accent)',
+          color: secondary ? '#9A9A9F' : 'var(--color-text-inverse)',
+          border: secondary ? '1px solid rgba(255,255,255,0.16)' : 'none',
+          transition: 'opacity .15s, background .15s',
         }}
       >
         {loading ? 'Opening portal…' : 'Manage subscription'}
       </button>
       {error && (
-        <p style={{ fontSize: 12, color: '#FB7185', margin: '8px 0 0' }}>{error}</p>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-severity)', margin: '8px 0 0' }}>{error}</p>
       )}
     </div>
   )

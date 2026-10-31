@@ -99,12 +99,12 @@ export function UploadPanel({ sessionId, userId, onSuccess }: Props) {
   return (
     <motion.div
       key="upload-panel"
-      initial={{ x: 420 }}
+      initial={{ x: '100%' }}
       animate={{ x: 0 }}
-      exit={{ x: 420 }}
+      exit={{ x: '100%' }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       className="absolute inset-y-0 right-0 z-20 flex flex-col bg-bg-overlay border-l border-border-default shadow-xl"
-      style={{ width: 420 }}
+      style={{ width: 'min(90vw, 760px)' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
@@ -134,7 +134,7 @@ export function UploadPanel({ sessionId, userId, onSuccess }: Props) {
         )}
 
         {error && (
-          <p className="text-body-sm text-rose-300">{error}</p>
+          <p className="text-body-sm" style={{ color: '#FF3B30' }}>{error}</p>
         )}
       </div>
 
@@ -145,7 +145,8 @@ export function UploadPanel({ sessionId, userId, onSuccess }: Props) {
             type="button"
             onClick={handleUpload}
             disabled={!hasFiles || isUploading}
-            className="w-full h-9 rounded-btn text-body font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full h-9 rounded-btn text-body font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
           >
             {isUploading ? 'Uploading…' : 'Upload files'}
           </button>

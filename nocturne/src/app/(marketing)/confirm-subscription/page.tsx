@@ -41,6 +41,7 @@ function Centered({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 py-20 text-center max-w-[480px] mx-auto">
       {children}
+      <style>{`.nocturne-accent-link:hover { background: var(--color-accent-hover) !important; }`}</style>
     </div>
   )
 }
@@ -56,7 +57,7 @@ export default async function ConfirmSubscriptionPage({
     return (
       <PageFade>
         <Centered>
-          <AlertTriangle size={40} strokeWidth={1.25} className="text-rose-300 mb-5" />
+          <AlertTriangle size={40} strokeWidth={1.25} className="mb-5" style={{ color: 'var(--color-severity)' }} />
           <h1 className="text-subheading font-medium text-text-primary mb-3">
             Link expired or invalid.
           </h1>
@@ -66,7 +67,8 @@ export default async function ConfirmSubscriptionPage({
           </p>
           <Link
             href="/#newsletter"
-            className="inline-flex h-9 px-5 items-center rounded-btn text-body-sm font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
+            className="nocturne-accent-link inline-flex h-9 px-5 items-center rounded-btn text-body-sm font-medium text-text-inverse transition-colors"
+            style={{ background: 'var(--color-accent)' }}
           >
             Subscribe again
           </Link>
@@ -81,7 +83,7 @@ export default async function ConfirmSubscriptionPage({
     return (
       <PageFade>
         <Centered>
-          <CheckCircle size={40} strokeWidth={1.25} className="text-indigo-400 mb-5" />
+          <CheckCircle size={40} strokeWidth={1.25} className="text-text-primary mb-5" />
           <h1 className="text-subheading font-medium text-text-primary mb-3">
             You&apos;re subscribed.
           </h1>
@@ -93,7 +95,8 @@ export default async function ConfirmSubscriptionPage({
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="inline-flex h-9 px-5 items-center rounded-btn text-body-sm font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
+              className="nocturne-accent-link inline-flex h-9 px-5 items-center rounded-btn text-body-sm font-medium text-text-inverse transition-colors"
+              style={{ background: 'var(--color-accent)' }}
             >
               Go to Nocturne
             </Link>
@@ -135,7 +138,7 @@ export default async function ConfirmSubscriptionPage({
   return (
     <PageFade>
       <Centered>
-        <AlertTriangle size={40} strokeWidth={1.25} className="text-rose-300 mb-5" />
+        <AlertTriangle size={40} strokeWidth={1.25} className="mb-5" style={{ color: 'var(--color-severity)' }} />
         <h1 className="text-subheading font-medium text-text-primary mb-3">
           Link expired or invalid.
         </h1>
@@ -145,7 +148,8 @@ export default async function ConfirmSubscriptionPage({
         </p>
         <Link
           href="/#newsletter"
-          className="inline-flex h-9 px-5 items-center rounded-btn text-body-sm font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
+          className="nocturne-accent-link inline-flex h-9 px-5 items-center rounded-btn text-body-sm font-medium text-text-inverse transition-colors"
+          style={{ background: 'var(--color-accent)' }}
         >
           Subscribe again
         </Link>

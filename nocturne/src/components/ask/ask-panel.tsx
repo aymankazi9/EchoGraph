@@ -29,7 +29,7 @@ function MarkdownMessage({ content }: { content: string }) {
         .ask-md p:last-child { margin-bottom: 0; }
         .ask-md h1,
         .ask-md h2,
-        .ask-md h3         { color: #E2E8F0; font-weight: 600; margin: 0.8em 0 0.3em; line-height: 1.35; }
+        .ask-md h3         { color: #EDEDED; font-weight: 600; margin: 0.8em 0 0.3em; line-height: 1.35; }
         .ask-md h1         { font-size: 15px; }
         .ask-md h2         { font-size: 14px; }
         .ask-md h3         { font-size: 13.5px; }
@@ -38,23 +38,23 @@ function MarkdownMessage({ content }: { content: string }) {
         .ask-md li         { line-height: 1.65; }
         .ask-md li > ul,
         .ask-md li > ol    { margin-top: 0.2em; margin-bottom: 0; }
-        .ask-md strong     { color: #E2E8F0; font-weight: 600; }
+        .ask-md strong     { color: #EDEDED; font-weight: 600; }
         .ask-md em         { font-style: italic; }
         .ask-md del        { opacity: 0.55; }
         .ask-md code       { font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-                             background: rgba(255,255,255,0.06); border-radius: 3px; padding: 1px 5px; }
-        .ask-md pre        { background: #0A0A12; border: 1px solid #1E1E2E; border-radius: 6px;
+                             background: rgba(255,255,255,0.06); border-radius: 2px; padding: 1px 5px; }
+        .ask-md pre        { background: #0A0A0A; border: 1px solid rgba(255,255,255,0.08); border-radius: 2px;
                              padding: 10px 12px; overflow-x: auto; margin: 0.5em 0; }
         .ask-md pre code   { background: none; padding: 0; font-size: 12px; }
-        .ask-md blockquote { border-left: 2px solid #2D2B45; margin: 0.4em 0; padding-left: 10px;
-                             color: #5B6478; }
+        .ask-md blockquote { border-left: 2px solid rgba(255,255,255,0.14); margin: 0.4em 0; padding-left: 10px;
+                             color: #76767B; }
         .ask-md table      { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 0.5em 0; }
-        .ask-md th         { background: #12121A; color: #A5B4FC; font-weight: 600;
-                             border: 1px solid #1E1E2E; padding: 5px 10px; text-align: left; }
-        .ask-md td         { border: 1px solid #1E1E2E; padding: 5px 10px; color: #CBD5E1; }
+        .ask-md th         { background: rgba(255,255,255,0.06); color: #EDEDED; font-weight: 600;
+                             border: 1px solid rgba(255,255,255,0.08); padding: 5px 10px; text-align: left; }
+        .ask-md td         { border: 1px solid rgba(255,255,255,0.08); padding: 5px 10px; color: #9A9A9F; }
         .ask-md tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
-        .ask-md a          { color: #818CF8; text-decoration: underline; }
-        .ask-md hr         { border: none; border-top: 1px solid #1E1E2E; margin: 0.6em 0; }
+        .ask-md a          { color: #9A9A9F; text-decoration: underline; }
+        .ask-md hr         { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 0.6em 0; }
       `}</style>
       <div className="ask-md">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -480,7 +480,7 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
   if (loadingHistory) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <p style={{ fontSize: 13, color: '#3F485C' }}>Loading…</p>
+        <p style={{ fontSize: 13, color: '#76767B' }}>Loading…</p>
       </div>
     )
   }
@@ -508,20 +508,21 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
           {courseId && (
             <ModeToggle mode={mode} onModeChange={setMode} courseName={courseName} />
           )}
-          <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#16151F', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BookOpen size={18} strokeWidth={1.5} style={{ color: '#5B6478' }} />
+          <div style={{ width: 44, height: 44, borderRadius: 2, background: '#0C0C0D', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BookOpen size={18} strokeWidth={1.5} style={{ color: '#76767B' }} />
           </div>
           <div style={{ maxWidth: 340 }}>
-            <p style={{ fontSize: 14, fontWeight: 600, color: '#E2E8F0', margin: '0 0 6px' }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: '#EDEDED', margin: '0 0 6px' }}>
               {mode === 'session' ? 'Ask this lecture anything' : `Ask across ${courseName ?? 'this course'}`}
             </p>
-            <p style={{ fontSize: 13, color: '#5B6478', lineHeight: 1.65, margin: '0 0 20px' }}>
+            <p style={{ fontSize: 13, color: '#76767B', lineHeight: 1.65, margin: '0 0 20px' }}>
               {descLabel}
             </p>
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="h-9 px-5 rounded-btn bg-indigo-500 text-text-inverse text-body font-medium hover:bg-indigo-600 transition-colors"
+              className="h-9 px-5 rounded-btn text-body font-medium transition-colors"
+              style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
             >
               {buttonLabel}
             </button>
@@ -563,8 +564,8 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 8 }}>
         {activeMessages.length === 0 && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center', paddingTop: 48 }}>
-            <p style={{ fontSize: 14, color: '#5B6478' }}>{activeEmptyHint}</p>
-            <p style={{ fontSize: 12, color: '#3F485C' }}>{activeEmptySubhint}</p>
+            <p style={{ fontSize: 14, color: '#76767B' }}>{activeEmptyHint}</p>
+            <p style={{ fontSize: 12, color: '#76767B' }}>{activeEmptySubhint}</p>
           </div>
         )}
 
@@ -582,11 +583,11 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
               style={{
                 maxWidth: '80%',
                 padding: '10px 14px',
-                borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                background: msg.role === 'user' ? 'rgba(99,102,241,0.18)' : '#0F0F19',
-                border: `1px solid ${msg.role === 'user' ? 'rgba(99,102,241,0.3)' : '#1E1E2E'}`,
+                borderRadius: 2,
+                background: msg.role === 'user' ? 'rgba(255,255,255,0.08)' : '#0C0C0D',
+                border: `1px solid ${msg.role === 'user' ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)'}`,
                 fontSize: 13.5,
-                color: msg.role === 'user' ? '#C7D2FE' : '#CBD5E1',
+                color: msg.role === 'user' ? '#EDEDED' : '#9A9A9F',
                 lineHeight: 1.65,
                 whiteSpace: msg.role === 'user' ? 'pre-wrap' : undefined,
                 wordBreak: 'break-word',
@@ -603,8 +604,8 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
                     key={n}
                     style={{
                       fontSize: 11, padding: '2px 8px', borderRadius: 9999,
-                      background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-                      color: '#818CF8',
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)',
+                      color: '#9A9A9F',
                     }}
                   >
                     Slide {n}
@@ -619,8 +620,8 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
         {submitting && (
           <div style={{ display: 'flex', alignItems: 'flex-start' }}>
             <div style={{
-              padding: '11px 14px', borderRadius: '14px 14px 14px 4px',
-              background: '#0F0F19', border: '1px solid #1E1E2E',
+              padding: '11px 14px', borderRadius: 2,
+              background: '#0C0C0D', border: '1px solid rgba(255,255,255,0.08)',
               display: 'flex', gap: 5, alignItems: 'center',
             }}>
               {([0, 1, 2] as const).map((i) => (
@@ -628,7 +629,7 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
                   key={i}
                   style={{
                     display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
-                    background: '#5B6478',
+                    background: '#76767B',
                     animation: 'askDot 1.2s ease infinite',
                     animationDelay: `${i * 0.2}s`,
                   }}
@@ -640,7 +641,7 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
 
         {/* Error */}
         {error && (
-          <p style={{ fontSize: 12, color: '#FDA4AF', textAlign: 'center', padding: '4px 0' }}>
+          <p style={{ fontSize: 12, color: '#FF3B30', textAlign: 'center', padding: '4px 0' }}>
             {error}
           </p>
         )}
@@ -653,8 +654,8 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
         style={{
           flexShrink: 0, marginTop: 16,
           display: 'flex', gap: 10, alignItems: 'flex-end',
-          padding: '12px 14px', borderRadius: 14,
-          border: '1px solid #1E1E2E', background: '#0C0C13',
+          padding: '12px 14px', borderRadius: 2,
+          border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
         }}
       >
         <textarea
@@ -665,7 +666,7 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
           rows={1}
           style={{
             flex: 1, background: 'transparent', border: 'none', outline: 'none',
-            resize: 'none', color: '#CBD5E1', caretColor: '#818CF8',
+            resize: 'none', color: '#EDEDED', caretColor: '#FF3B30',
             fontSize: 13.5, lineHeight: 1.6, fontFamily: 'inherit',
             maxHeight: 120, overflowY: 'auto',
           }}
@@ -675,15 +676,16 @@ export function AskPanel({ sessionId, userId, courseId, courseName }: Props) {
           onClick={handleSubmit}
           disabled={submitting || !input.trim()}
           style={{
-            flexShrink: 0, width: 34, height: 34, borderRadius: 10,
-            background: submitting || !input.trim() ? '#16151F' : '#6366F1',
-            border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, width: 34, height: 34, borderRadius: 2,
+            background: submitting || !input.trim() ? '#0C0C0D' : '#FF3B30',
+            border: submitting || !input.trim() ? '1px solid rgba(255,255,255,0.08)' : 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: submitting || !input.trim() ? 'not-allowed' : 'pointer',
             transition: 'background 0.15s',
           }}
           aria-label="Send"
         >
-          <Send size={13} strokeWidth={2} style={{ color: submitting || !input.trim() ? '#3F485C' : '#fff' }} />
+          <Send size={13} strokeWidth={2} style={{ color: submitting || !input.trim() ? '#4A4A4E' : '#0A0A0A' }} />
         </button>
       </div>
     </div>
@@ -705,9 +707,9 @@ function ModeToggle({
     <div
       style={{
         display: 'inline-flex',
-        background: '#0C0C13',
-        border: '1px solid #1E1E2E',
-        borderRadius: 10,
+        background: '#0C0C0D',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 2,
         padding: 3,
         gap: 2,
       }}
@@ -722,12 +724,12 @@ function ModeToggle({
             onClick={() => onModeChange(m)}
             style={{
               padding: '5px 12px',
-              borderRadius: 7,
+              borderRadius: 2,
               border: 'none',
               fontSize: 12,
               fontWeight: active ? 600 : 400,
-              color: active ? '#E2E8F0' : '#5B6478',
-              background: active ? '#16151F' : 'transparent',
+              color: active ? '#EDEDED' : '#76767B',
+              background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
               cursor: 'pointer',
               transition: 'background 0.15s, color 0.15s',
               whiteSpace: 'nowrap',

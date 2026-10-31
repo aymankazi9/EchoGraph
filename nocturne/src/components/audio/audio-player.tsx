@@ -136,7 +136,7 @@ export function AudioPlayer({ audioStoragePath, headless = false }: Props) {
   if (loadError) {
     return (
       <div className="flex items-center justify-center h-full p-4">
-        <p className="text-label text-rose-300 text-center">{loadError}</p>
+        <p className="text-label text-[#FF3B30] text-center">{loadError}</p>
       </div>
     )
   }
@@ -173,13 +173,14 @@ export function AudioPlayer({ audioStoragePath, headless = false }: Props) {
 
       {/* Controls row */}
       <div className="flex items-center gap-3">
-        {/* Play/pause — 40×40 primary teal, DESIGN_SYSTEM.md §6 */}
+        {/* Play/pause — 40×40 primary square, crimson accent */}
         <button
           type="button"
           onClick={togglePlay}
           disabled={!objectUrl || isDecrypting}
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          className="w-10 h-10 rounded-full bg-indigo-500 text-text-inverse flex items-center justify-center hover:bg-indigo-600 transition-colors disabled:opacity-40 shrink-0"
+          className="w-10 h-10 rounded-btn flex items-center justify-center transition-colors disabled:opacity-40 shrink-0"
+          style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
         >
           {isDecrypting ? (
             <span className="w-3 h-3 rounded-full border-2 border-text-inverse border-t-transparent animate-spin" />

@@ -1,18 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <defs>
-    <linearGradient id="g" x1="0.213" y1="0.09" x2="0.787" y2="0.91" gradientUnits="objectBoundingBox">
-      <stop offset="0%" stop-color="#6366F1"/>
-      <stop offset="100%" stop-color="#8B5CF6"/>
-    </linearGradient>
+    <mask id="eclipse-mask">
+      <rect width="24" height="24" fill="#FFFFFF"/>
+      <circle cx="11" cy="13" r="10.7" fill="#000000"/>
+    </mask>
   </defs>
-  <rect width="32" height="32" rx="8" fill="url(#g)"/>
-  <text
-    x="16"
-    y="22"
-    text-anchor="middle"
-    font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif"
-    font-weight="700"
-    font-size="18"
-    fill="#09090F"
-  >N</text>
+  <rect width="32" height="32" rx="8" fill="#0A0A0A"/>
+  <g transform="translate(4,4)">
+    <circle cx="13.3" cy="10.7" r="9.5" fill="#FF3B30" mask="url(#eclipse-mask)"/>
+    <circle cx="11" cy="13" r="9.4" stroke="#EDEDED" stroke-width="1" fill="none"/>
+  </g>
 </svg>

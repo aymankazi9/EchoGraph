@@ -17,36 +17,30 @@ export function NewsletterSection() {
     <section
       id="newsletter"
       style={{
-        scrollMarginTop: 80,
-        padding: 'clamp(56px,7vw,88px) 24px',
-        borderTop: '1px solid #1E1E2E',
-        background: '#111118',
+        scrollMarginTop: 64,
+        padding: 'clamp(56px,7vw,88px) clamp(20px,4vw,40px)',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        background: '#0C0C0D',
       }}
     >
-      <div data-reveal="" style={{ maxWidth: 540, margin: '0 auto', textAlign: 'center' }}>
-        <p
-          style={{
-            fontSize: 12,
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            color: '#818CF8',
-            margin: '0 0 12px',
-          }}
-        >
-          Stay in the loop
+      <div style={{ maxWidth: 540, margin: '0 auto', textAlign: 'center' }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.16em', color: '#FF3B30', margin: '0 0 12px' }}>
+          STAY IN THE LOOP
         </p>
         <h2
           style={{
+            fontFamily: 'var(--font-display)',
+            fontStretch: '82%',
             fontSize: 'clamp(24px,3vw,30px)',
             fontWeight: 600,
             letterSpacing: '-0.02em',
             margin: '0 0 10px',
-            color: '#E2E8F0',
+            color: '#EDEDED',
           }}
         >
           Be first to know.
         </h2>
-        <p style={{ fontSize: 14, color: '#94A3B8', margin: '0 0 24px' }}>
+        <p style={{ fontSize: 14, color: '#9A9A9F', margin: '0 0 24px' }}>
           Beta updates, feature releases, and study tips for STEM students. No spam.
           Unsubscribe anytime.
         </p>
@@ -59,26 +53,19 @@ export function NewsletterSection() {
               justifyContent: 'center',
               gap: 10,
               padding: 14,
-              borderRadius: 9,
-              border: '1px solid rgba(99,102,241,0.35)',
-              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              background: 'rgba(255,255,255,0.03)',
+              fontFamily: 'var(--font-mono)',
             }}
           >
-            <span style={{ color: '#818CF8' }}>✓</span>
-            <span style={{ fontSize: 14, color: '#E2E8F0' }}>
+            <span style={{ color: '#EDEDED' }}>[✓]</span>
+            <span style={{ fontSize: 14, color: '#EDEDED', fontFamily: 'var(--font-sans)' }}>
               Check your inbox to confirm your subscription.
             </span>
           </div>
         ) : (
           <>
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                maxWidth: 440,
-                margin: '0 auto',
-              }}
-            >
+            <div style={{ display: 'flex', gap: 8, maxWidth: 440, margin: '0 auto' }}>
               <input
                 ref={emailRef}
                 type="email"
@@ -88,42 +75,37 @@ export function NewsletterSection() {
                   flex: 1,
                   height: 44,
                   padding: '0 14px',
-                  borderRadius: 7,
-                  background: '#13121C',
-                  border: '1px solid #1E1E2E',
-                  color: '#E2E8F0',
+                  background: '#111112',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#EDEDED',
                   fontSize: 14,
                   outline: 'none',
                 }}
-                onFocus={(e) => {
-                  ;(e.target as HTMLInputElement).style.borderColor = '#6366F1'
-                }}
-                onBlur={(e) => {
-                  ;(e.target as HTMLInputElement).style.borderColor = '#1E1E2E'
-                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
               />
               <button
                 type="button"
                 onClick={onSubscribe}
-                data-btn=""
-                data-shine=""
                 style={{
                   height: 44,
                   padding: '0 22px',
-                  borderRadius: 7,
-                  background: '#6366F1',
-                  color: '#09090F',
+                  background: '#FF3B30',
+                  color: '#0A0A0A',
                   fontSize: 14,
                   fontWeight: 500,
                   border: 'none',
                   cursor: 'pointer',
                   flexShrink: 0,
+                  transition: 'background .2s',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#FF5147' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#FF3B30' }}
               >
                 Subscribe
               </button>
             </div>
-            <p style={{ fontSize: 12, color: '#5B6478', margin: '14px 0 0' }}>
+            <p style={{ fontSize: 12, color: '#76767B', margin: '14px 0 0' }}>
               We never share your email. View our Privacy Policy.
             </p>
           </>

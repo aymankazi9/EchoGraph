@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AuthBrandCanvas } from '@/components/auth/auth-brand-canvas'
+import { useContourField } from '@/components/surgical/use-contour-field'
+import { EclipseMark } from '@/components/surgical/eclipse-mark'
 import { vaultSetup, getPendingRecoveryBlob, clearPendingRecoveryBlob } from '@/lib/crypto/vault'
 import { downloadRecoveryKit, formatRecoveryKit } from '@/lib/crypto/recovery'
 import { createClient } from '@/lib/supabase'
@@ -39,7 +40,8 @@ function computeStrength(pw: string): number {
   return Math.min(score, 4)
 }
 
-const STRENGTH_COLORS = ['#FB7185', '#FB7185', '#FBBF24', '#A78BFA', '#2DD4BF']
+// Weak = crimson (the one thing that matters); strength climbs toward white, not a second hue.
+const STRENGTH_COLORS = ['#FF3B30', '#FF3B30', '#76767B', '#9A9A9F', '#EDEDED']
 const STRENGTH_LABELS = ['', 'Weak…', 'Fair…', 'Good…', 'Strong passphrase']
 
 const STEP_META = [
@@ -48,9 +50,15 @@ const STEP_META = [
   { label: 'Save Recovery Kit', sub: 'Your only backdoor-free backup' },
 ]
 
+const fieldFocus = (e: React.FocusEvent<HTMLInputElement>) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }
+const fieldBlurFactory = (border: string) => (e: React.FocusEvent<HTMLInputElement>) => { e.currentTarget.style.borderColor = border }
+
 export function SetupForm({ userId, initialStep = 0 }: Props) {
   const heroRef = useRef<HTMLElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const router = useRouter()
+
+  useContourField(canvasRef, { variant: 'hero' })
 
   // ── Beta invite code gate ─────────────────────────────────────────────────
   // inviteValidated starts as true when beta mode is off, or when localStorage
@@ -198,33 +206,30 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
     router.push('/vault')
   }
 
-  // Progress bars (steps 0–2)
-  const progressBars = step < 3 ? [0, 1, 2].map(i => ({ active: i === step, done: i < step })) : []
-
   // ── Beta invite code wall ─────────────────────────────────────────────────
   // Shown before the rest of the setup flow when BETA_MODE=true and the invite
   // code hasn't been validated yet.
   if (BETA_MODE && !inviteValidated) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#09090F', padding: '48px 24px' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0A0A', padding: '48px 24px' }}>
         <div style={{ width: '100%', maxWidth: 380 }}>
           {/* Wordmark */}
-          <a href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 36, textDecoration: 'none' }}>
-            <span style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(145deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#09090F', fontWeight: 700, fontSize: 15 }}>N</span>
-            <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', color: '#E2E8F0' }}>Nocturne</span>
+          <a href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 36, textDecoration: 'none' }}>
+            <EclipseMark size={28} />
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, letterSpacing: '0.34em', color: '#EDEDED' }}>NOCTURNE</span>
           </a>
 
-          <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', color: '#E2E8F0', margin: '0 0 8px' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontStretch: '82%', fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', color: '#EDEDED', margin: '0 0 8px' }}>
             Invite code required
           </h2>
-          <p style={{ fontSize: 14, color: '#94A3B8', margin: '0 0 28px', lineHeight: 1.6 }}>
+          <p style={{ fontSize: 14, color: '#9A9A9F', margin: '0 0 28px', lineHeight: 1.6 }}>
             Nocturne is in closed beta. Enter your invite code to create an account.
             Don&apos;t have one?{' '}
-            <a href="/#beta-request" style={{ color: '#818CF8', textDecoration: 'none' }}>Request access →</a>
+            <a href="/#beta-request" data-link style={{ position: 'relative', color: '#FF3B30', textDecoration: 'none' }}>Request access →</a>
           </p>
 
-          <label style={{ display: 'block', fontSize: 12.5, color: '#94A3B8', marginBottom: 8 }}>
-            Invite code
+          <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: '#76767B', marginBottom: 8 }}>
+            INVITE CODE
           </label>
           <input
             type="text"
@@ -234,14 +239,16 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
             onKeyDown={(e) => e.key === 'Enter' && handleValidateInvite()}
             autoFocus
             style={{
-              width: '100%', height: 46, borderRadius: 9,
-              background: '#13121C', border: '1px solid #2D2B45',
-              color: '#E2E8F0', padding: '0 14px', fontSize: 15,
+              width: '100%', height: 46,
+              background: '#111112', border: '1px solid rgba(255,255,255,0.08)',
+              color: '#EDEDED', padding: '0 14px', fontSize: 15,
               outline: 'none', boxSizing: 'border-box',
             }}
+            onFocus={fieldFocus}
+            onBlur={fieldBlurFactory('rgba(255,255,255,0.08)')}
           />
           {inviteError && (
-            <p style={{ fontSize: 12.5, color: '#FB7185', margin: '8px 0 0' }}>{inviteError}</p>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#FF3B30', margin: '8px 0 0' }}>{inviteError}</p>
           )}
           <button
             type="button"
@@ -250,10 +257,9 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
             style={{
               width: '100%', height: 46, marginTop: 14,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-              borderRadius: 9, fontSize: 15, fontWeight: 500,
-              background: '#6366F1', color: '#09090F',
+              fontSize: 15, fontWeight: 500,
+              background: '#FF3B30', color: '#0A0A0A',
               border: 'none', cursor: inviteChecking ? 'not-allowed' : 'pointer',
-              boxShadow: '0 8px 26px rgba(99,102,241,0.32)',
               opacity: (inviteChecking || !inviteCode.trim()) ? 0.65 : 1,
             }}
           >
@@ -265,7 +271,7 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#09090F' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', background: '#0A0A0A' }}>
       {/* BRAND PANEL */}
       <section
         data-brand
@@ -273,35 +279,30 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
         style={{
           flex: '1.05 1 0', minWidth: 0, overflow: 'hidden', position: 'relative',
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-          padding: '48px 56px', borderRight: '1px solid #191827',
+          padding: '48px 56px', borderRight: '1px solid rgba(255,255,255,0.08)',
         }}
       >
-        <AuthBrandCanvas sectionRef={heroRef} />
-
-        {/* Indigo ambient glow */}
-        <div style={{ position: 'absolute', top: '-6%', left: '-4%', width: 560, height: 360, zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(99,102,241,0.14) 0%, rgba(139,92,246,0.06) 50%, transparent 72%)', filter: 'blur(54px)' }} />
-        {/* Rose ambient glow */}
-        <div style={{ position: 'absolute', bottom: '-10%', right: '-6%', width: 520, height: 360, zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(244,63,94,0.12) 0%, rgba(139,92,246,0.05) 50%, transparent 72%)', filter: 'blur(56px)' }} />
+        <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }} />
 
         {/* Wordmark */}
-        <a href="/" style={{ zIndex: 2, position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 10, alignSelf: 'flex-start', textDecoration: 'none' }}>
-          <span style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(145deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#09090F', fontWeight: 700, fontSize: 15, boxShadow: '0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.35)' }}>N</span>
-          <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', color: '#E2E8F0' }}>Nocturne</span>
+        <a href="/" style={{ zIndex: 2, position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 12, alignSelf: 'flex-start', textDecoration: 'none' }}>
+          <EclipseMark size={28} />
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, letterSpacing: '0.34em', color: '#EDEDED' }}>NOCTURNE</span>
         </a>
 
         {/* Middle content */}
         <div style={{ zIndex: 2, position: 'relative', maxWidth: 520 }}>
           {/* Live dot badge */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '5px 13px 5px 11px', borderRadius: 9999, border: '1px solid #2D2B45', background: 'rgba(17,17,24,0.55)', backdropFilter: 'blur(8px)', marginBottom: 26 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '5px 13px 5px 11px', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(12,12,13,0.7)', backdropFilter: 'blur(8px)', marginBottom: 26 }}>
             <span style={{ position: 'relative', width: 7, height: 7, flexShrink: 0 }}>
-              <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#F43F5E', animation: 'noct-livedot 1.8s ease-in-out infinite' }} />
+              <span style={{ position: 'absolute', inset: 0, background: '#FF3B30', animation: 'noct-livedot 1.8s ease-in-out infinite' }} />
             </span>
-            <span style={{ fontSize: 12, letterSpacing: '0.04em', color: '#94A3B8' }}>End-to-end encrypted setup</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.1em', color: '#9A9A9F' }}>END-TO-END ENCRYPTED SETUP</span>
           </div>
 
-          <h1 style={{ fontSize: 'clamp(30px,3.4vw,42px)', lineHeight: 1.08, letterSpacing: '-0.025em', fontWeight: 600, margin: '0 0 32px', color: '#E2E8F0' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontStretch: '82%', fontSize: 'clamp(30px,3.4vw,42px)', lineHeight: 1.08, letterSpacing: '-0.025em', fontWeight: 600, margin: '0 0 32px', color: '#EDEDED' }}>
             Set up your<br />
-            <span style={{ background: 'linear-gradient(100deg,#A5B4FC 0%,#A78BFA 45%,#FB7185 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>private vault.</span>
+            <span style={{ color: '#FF3B30' }}>private vault.</span>
           </h1>
 
           {/* Vertical stepper */}
@@ -314,16 +315,16 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                 <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', paddingBottom: i < STEP_META.length - 1 ? 20 : 0, position: 'relative' }}>
                   {/* Connector line */}
                   {i < STEP_META.length - 1 && (
-                    <div style={{ position: 'absolute', left: 13, top: 27, bottom: 0, width: 1.5, background: isDone ? 'rgba(99,102,241,0.5)' : '#1E1E2E' }} />
+                    <div style={{ position: 'absolute', left: 13, top: 27, bottom: 0, width: 1, background: isDone ? '#FF3B30' : 'rgba(255,255,255,0.08)' }} />
                   )}
                   {/* Badge */}
                   <span style={{
-                    width: 27, height: 27, borderRadius: '50%', flexShrink: 0,
+                    width: 27, height: 27, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 600,
-                    background: isCurrent || isDone ? 'rgba(99,102,241,0.18)' : '#111118',
-                    border: isCurrent || isDone ? '1.5px solid rgba(99,102,241,0.55)' : '1.5px solid #2D2B45',
-                    color: isCurrent || isDone ? '#A5B4FC' : '#5B6478',
+                    fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+                    background: isCurrent ? 'rgba(255,255,255,0.05)' : '#0A0A0A',
+                    border: isCurrent || isDone ? '1px solid #FF3B30' : '1px solid rgba(255,255,255,0.14)',
+                    color: isDone ? '#FF3B30' : isCurrent ? '#EDEDED' : '#76767B',
                     zIndex: 1,
                   }}>
                     {isDone ? (
@@ -333,8 +334,8 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                     )}
                   </span>
                   <div style={{ paddingTop: 3 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: isCurrent ? '#E2E8F0' : isPending ? '#5B6478' : '#A5B4FC', marginBottom: 2 }}>{s.label}</div>
-                    <div style={{ fontSize: 12, color: '#5B6478' }}>{s.sub}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: isCurrent ? '#EDEDED' : isPending ? '#76767B' : '#FF3B30', marginBottom: 2 }}>{s.label}</div>
+                    <div style={{ fontSize: 12, color: '#76767B' }}>{s.sub}</div>
                   </div>
                 </div>
               )
@@ -344,8 +345,8 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
 
         {/* Trust row */}
         <div style={{ zIndex: 2, position: 'relative', display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 12.5, color: '#5B6478' }}>
-            <span style={{ width: 24, height: 24, borderRadius: 7, border: '1px solid #2D2B45', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818CF8', flexShrink: 0 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 12.5, color: '#76767B' }}>
+            <span style={{ width: 24, height: 24, border: '1px solid rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9A9A9F', flexShrink: 0 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -353,68 +354,78 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
             </span>
             Zero-knowledge encrypted
           </span>
-          <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: '#3F485C' }}>Keys never leave your device</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: '#4A4A4E' }}>Keys never leave your device</span>
         </div>
       </section>
 
       {/* FORM PANEL */}
       <section
         data-form
-        style={{ position: 'relative', width: 520, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 32px', background: '#09090F' }}
+        style={{ position: 'relative', width: 520, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 32px', background: '#0A0A0A', borderLeft: '1px solid rgba(255,255,255,0.08)' }}
       >
-        <div data-formbg style={{ display: 'none', position: 'absolute', inset: 0, background: 'radial-gradient(620px circle at 50% 0%, rgba(99,102,241,0.08), transparent 60%)', pointerEvents: 'none' }} />
+        <div data-formbg style={{ display: 'none', position: 'absolute', inset: 0, background: 'radial-gradient(620px circle at 50% 0%, rgba(255,255,255,0.04), transparent 60%)', pointerEvents: 'none' }} />
 
         <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 360 }}>
 
           {/* Step 3 — Done */}
           {step === 3 && (
             <div data-anim style={{ textAlign: 'center' }}>
-              <div data-pop style={{ width: 64, height: 64, borderRadius: 16, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', color: '#818CF8' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
+              <div data-pop style={{ display: 'flex', justifyContent: 'center', margin: '0 auto 24px' }}>
+                <EclipseMark size={56} />
               </div>
-              <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 10px', color: '#E2E8F0' }}>Your vault is ready.</h2>
-              <p style={{ fontSize: 14, lineHeight: 1.65, color: '#94A3B8', margin: '0 0 32px' }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontStretch: '82%', fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 10px', color: '#EDEDED' }}>Your vault is ready.</h2>
+              <p style={{ fontSize: 14, lineHeight: 1.65, color: '#9A9A9F', margin: '0 0 32px' }}>
                 Everything you upload is now encrypted with a key only you control. Your passphrase never touches our servers.
               </p>
               <a
                 href="/vault"
                 data-btn
                 data-shine
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, width: '100%', height: 48, borderRadius: 9, fontSize: 15, fontWeight: 500, background: '#6366F1', color: '#09090F', textDecoration: 'none', boxShadow: '0 8px 26px rgba(99,102,241,0.32)' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, width: '100%', height: 48, fontSize: 15, fontWeight: 500, background: '#FF3B30', color: '#0A0A0A', textDecoration: 'none' }}
               >
-                Go to dashboard <span data-arrow style={{ color: '#09090F' }}>→</span>
+                Go to dashboard <span data-arrow style={{ fontFamily: 'var(--font-mono)', color: '#0A0A0A' }}>→</span>
               </a>
             </div>
           )}
 
-          {/* Steps 0–2: progress bars header */}
+          {/* Steps 0–2: 4-cell step indicator */}
           {step < 3 && (
-            <div data-step style={{ marginBottom: 28 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <div style={{ display: 'flex', gap: 5 }}>
-                  {progressBars.map((bar, i) => (
-                    <div key={i} style={{ width: 28, height: 3, borderRadius: 9999, background: bar.done ? '#6366F1' : bar.active ? '#818CF8' : '#2D2B45' }} />
-                  ))}
-                </div>
-                <span style={{ fontSize: 12, color: '#5B6478' }}>Step {step + 1} of 3</span>
-              </div>
+            <div data-step style={{ marginBottom: 28, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              {[0, 1, 2, 3].map((i) => {
+                const done = i < step
+                const active = i === step
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      textAlign: 'center',
+                      padding: '7px 4px',
+                      borderLeft: i ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                      borderTop: active ? '2px solid #FF3B30' : '2px solid transparent',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      letterSpacing: '0.04em',
+                      color: done || active ? '#EDEDED' : '#5E5E62',
+                    }}
+                  >
+                    {done ? '[✓]' : i + 1}
+                  </div>
+                )
+              })}
             </div>
           )}
 
           {/* Step 0 — Create account */}
           {step === 0 && (
             <div data-anim>
-              <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 6px', color: '#E2E8F0' }}>Create your account</h2>
-              <p style={{ fontSize: 14, color: '#94A3B8', margin: '0 0 30px' }}>Start with the full core product — free forever, no card.</p>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontStretch: '82%', fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 6px', color: '#EDEDED' }}>Create your account</h2>
+              <p style={{ fontSize: 14, color: '#9A9A9F', margin: '0 0 30px' }}>Start with the full core product — free forever, no card.</p>
 
               <button
                 data-btn
                 data-shine
                 onClick={handleGoogleSignIn}
-                style={{ width: '100%', height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 11, borderRadius: 9, fontSize: 15, fontWeight: 500, color: '#E2E8F0', background: '#13121C', border: '1px solid #2D2B45', cursor: 'pointer' }}
+                style={{ width: '100%', height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 11, fontSize: 15, fontWeight: 500, color: '#0A0A0A', background: '#EDEDED', border: 'none', cursor: 'pointer' }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -426,9 +437,9 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '22px 0' }}>
-                <span style={{ flex: 1, height: 1, background: '#1E1E2E' }} />
-                <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#5B6478', whiteSpace: 'nowrap' }}>or with email</span>
-                <span style={{ flex: 1, height: 1, background: '#1E1E2E' }} />
+                <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', color: '#76767B', whiteSpace: 'nowrap' }}>OR WITH EMAIL</span>
+                <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
               </div>
 
               {emailSent ? (
@@ -439,7 +450,7 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                 />
               ) : (
                 <>
-                  <label style={{ display: 'block', fontSize: 12.5, color: '#94A3B8', margin: '0 0 8px' }}>Email address</label>
+                  <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: '#76767B', margin: '0 0 8px' }}>EMAIL ADDRESS</label>
                   <input
                     type="email"
                     placeholder="you@university.edu"
@@ -447,26 +458,30 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                     onChange={e => { setEmailVal(e.target.value); setEmailError(false); setEmailSendError(null) }}
                     onKeyDown={e => e.key === 'Enter' && onEmailSend()}
                     disabled={emailSending}
-                    style={{ width: '100%', height: 46, borderRadius: 9, background: '#13121C', border: '1px solid #2D2B45', color: '#E2E8F0', padding: '0 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: 46, background: '#111112', border: '1px solid rgba(255,255,255,0.08)', color: '#EDEDED', padding: '0 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
+                    onFocus={fieldFocus}
+                    onBlur={fieldBlurFactory('rgba(255,255,255,0.08)')}
                   />
-                  {emailError     && <p style={{ fontSize: 12, color: '#FB7185', margin: '8px 0 0' }}>Enter a valid email address.</p>}
-                  {emailSendError && <p style={{ fontSize: 12, color: '#FB7185', margin: '8px 0 0' }}>{emailSendError}</p>}
+                  {emailError     && <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#FF3B30', margin: '8px 0 0' }}>Enter a valid email address.</p>}
+                  {emailSendError && <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#FF3B30', margin: '8px 0 0' }}>{emailSendError}</p>}
 
                   <button
                     data-btn
                     data-shine
                     onClick={onEmailSend}
                     disabled={emailSending}
-                    style={{ width: '100%', height: 46, marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 9, fontSize: 15, fontWeight: 500, background: '#6366F1', color: '#09090F', border: 'none', cursor: emailSending ? 'not-allowed' : 'pointer', boxShadow: '0 8px 26px rgba(99,102,241,0.32)', opacity: emailSending ? 0.7 : 1 }}
+                    style={{ width: '100%', height: 46, marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, fontSize: 15, fontWeight: 500, background: '#FF3B30', color: '#0A0A0A', border: 'none', cursor: emailSending ? 'not-allowed' : 'pointer', opacity: emailSending ? 0.7 : 1 }}
+                    onMouseEnter={e => { if (!emailSending) e.currentTarget.style.background = '#FF5147' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#FF3B30' }}
                   >
-                    {emailSending ? 'Sending…' : <>Send sign-up link <span data-arrow style={{ color: '#09090F' }}>→</span></>}
+                    {emailSending ? 'Sending…' : <>Send sign-up link <span data-arrow style={{ fontFamily: 'var(--font-mono)', color: '#0A0A0A' }}>→</span></>}
                   </button>
                 </>
               )}
 
-              <p style={{ fontSize: 13.5, color: '#5B6478', margin: '28px 0 0', textAlign: 'center' }}>
+              <p style={{ fontSize: 13.5, color: '#76767B', margin: '28px 0 0', textAlign: 'center' }}>
                 Already have an account?{' '}
-                <Link href="/login" data-link style={{ position: 'relative', color: '#A5B4FC', fontWeight: 500, textDecoration: 'none' }}>Sign in</Link>
+                <Link href="/login" data-link style={{ position: 'relative', color: '#FF3B30', fontWeight: 500, textDecoration: 'none' }}>Sign in</Link>
               </p>
             </div>
           )}
@@ -474,12 +489,12 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
           {/* Step 1 — Vault passphrase */}
           {step === 1 && (
             <div data-anim>
-              <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 6px', color: '#E2E8F0' }}>Create your vault passphrase</h2>
-              <p style={{ fontSize: 14, color: '#94A3B8', margin: '0 0 26px' }}>This derives the key that encrypts everything — choose something memorable but strong.</p>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontStretch: '82%', fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 6px', color: '#EDEDED' }}>Create your vault passphrase</h2>
+              <p style={{ fontSize: 14, color: '#9A9A9F', margin: '0 0 26px' }}>This derives the key that encrypts everything — choose something memorable but strong.</p>
 
               {/* Passphrase input */}
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 12.5, color: '#94A3B8', margin: '0 0 8px' }}>Passphrase</label>
+                <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: '#76767B', margin: '0 0 8px' }}>PASSPHRASE</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showPass ? 'text' : 'password'}
@@ -488,12 +503,14 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                     onChange={e => setPass(e.target.value)}
                     disabled={busy}
                     autoComplete="new-password"
-                    style={{ width: '100%', height: 46, borderRadius: 9, background: '#13121C', border: '1px solid #2D2B45', color: '#E2E8F0', padding: '0 42px 0 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: 46, background: '#111112', border: '1px solid rgba(255,255,255,0.08)', color: '#EDEDED', padding: '0 42px 0 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
+                    onFocus={fieldFocus}
+                    onBlur={fieldBlurFactory('rgba(255,255,255,0.08)')}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPass(s => !s)}
-                    style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#5B6478', padding: 0 }}
+                    style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#76767B', padding: 0 }}
                     aria-label={showPass ? 'Hide passphrase' : 'Show passphrase'}
                   >
                     {showPass ? (
@@ -509,12 +526,12 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                   <div style={{ marginTop: 8 }}>
                     <div style={{ display: 'flex', gap: 4, marginBottom: 5 }}>
                       {[1, 2, 3, 4].map(level => (
-                        <div key={level} style={{ flex: 1, height: 3, borderRadius: 9999, background: strength >= level ? STRENGTH_COLORS[strength] : '#1E1E2E', transition: 'background .2s' }} />
+                        <div key={level} style={{ flex: 1, height: 2, background: strength >= level ? STRENGTH_COLORS[strength] : 'rgba(255,255,255,0.08)', transition: 'background .2s' }} />
                       ))}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, color: '#5B6478' }}>{STRENGTH_LABELS[strength]}</span>
-                      <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: '#3F485C' }}>PBKDF2 · 310,000 iterations</span>
+                      <span style={{ fontSize: 12, color: '#76767B' }}>{STRENGTH_LABELS[strength]}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: '#4A4A4E' }}>PBKDF2 · 310,000 iterations</span>
                     </div>
                   </div>
                 )}
@@ -522,7 +539,7 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
 
               {/* Confirm input */}
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 12.5, color: '#94A3B8', margin: '0 0 8px' }}>Confirm passphrase</label>
+                <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: '#76767B', margin: '0 0 8px' }}>CONFIRM PASSPHRASE</label>
                 <input
                   type="password"
                   placeholder="Repeat your passphrase"
@@ -531,26 +548,26 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                   onBlur={() => setTouchedConfirm(true)}
                   disabled={busy}
                   autoComplete="new-password"
-                  style={{ width: '100%', height: 46, borderRadius: 9, background: '#13121C', border: `1px solid ${mismatch ? 'rgba(244,63,94,0.5)' : '#2D2B45'}`, color: '#E2E8F0', padding: '0 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: 46, background: '#111112', border: `1px solid ${mismatch ? '#FF3B30' : 'rgba(255,255,255,0.08)'}`, color: '#EDEDED', padding: '0 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
                 />
-                {mismatch && <p style={{ fontSize: 12, color: '#FB7185', margin: '6px 0 0' }}>Passphrases don&apos;t match.</p>}
+                {mismatch && <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#FF3B30', margin: '6px 0 0' }}>Passphrases don&apos;t match.</p>}
               </div>
 
               {/* No-backdoor warning */}
-              <div style={{ borderRadius: 9, border: '1px solid rgba(244,63,94,0.25)', background: 'rgba(244,63,94,0.05)', padding: '12px 14px', marginBottom: 18 }}>
-                <p style={{ fontSize: 12.5, lineHeight: 1.55, color: '#94A3B8', margin: 0 }}>
-                  <span style={{ color: '#FB7185', fontWeight: 600 }}>No backdoor.</span> If you lose this passphrase and your Recovery Kit, your data is gone forever. There is no account recovery.
+              <div style={{ border: '1px solid rgba(255,59,48,0.25)', background: 'rgba(255,59,48,0.05)', padding: '12px 14px', marginBottom: 18 }}>
+                <p style={{ fontSize: 12.5, lineHeight: 1.55, color: '#9A9A9F', margin: 0 }}>
+                  <span style={{ color: '#FF3B30', fontWeight: 600 }}>No backdoor.</span> If you lose this passphrase and your Recovery Kit, your data is gone forever. There is no account recovery.
                 </p>
               </div>
 
-              {vaultError && <p style={{ fontSize: 12, color: '#FB7185', margin: '0 0 12px' }} role="alert">{vaultError}</p>}
+              {vaultError && <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#FF3B30', margin: '0 0 12px' }} role="alert">{vaultError}</p>}
 
               {/* Buttons */}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   onClick={() => setStep(0)}
                   disabled={busy}
-                  style={{ height: 46, paddingLeft: 18, paddingRight: 18, borderRadius: 9, fontSize: 14, fontWeight: 500, background: 'transparent', border: '1px solid #2D2B45', color: '#94A3B8', cursor: busy ? 'not-allowed' : 'pointer' }}
+                  style={{ height: 46, paddingLeft: 18, paddingRight: 18, fontSize: 14, fontWeight: 500, background: 'transparent', border: '1px solid rgba(255,255,255,0.16)', color: '#9A9A9F', cursor: busy ? 'not-allowed' : 'pointer' }}
                 >
                   Back
                 </button>
@@ -559,9 +576,9 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                   data-shine
                   onClick={onCreateVault}
                   disabled={busy || pass.length < 8 || pass !== confirm}
-                  style={{ flex: 1, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 9, fontSize: 15, fontWeight: 500, background: '#6366F1', color: '#09090F', border: 'none', cursor: (busy || pass.length < 8 || pass !== confirm) ? 'not-allowed' : 'pointer', boxShadow: '0 8px 26px rgba(99,102,241,0.32)', opacity: (busy || pass.length < 8 || pass !== confirm) ? 0.5 : 1 }}
+                  style={{ flex: 1, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, fontSize: 15, fontWeight: 500, background: '#FF3B30', color: '#0A0A0A', border: 'none', cursor: (busy || pass.length < 8 || pass !== confirm) ? 'not-allowed' : 'pointer', opacity: (busy || pass.length < 8 || pass !== confirm) ? 0.5 : 1 }}
                 >
-                  {busy ? (status === 'deriving' ? 'Deriving key…' : 'Saving…') : <>Create vault <span data-arrow style={{ color: '#09090F' }}>→</span></>}
+                  {busy ? (status === 'deriving' ? 'Deriving key…' : 'Saving…') : <>Create vault <span data-arrow style={{ fontFamily: 'var(--font-mono)', color: '#0A0A0A' }}>→</span></>}
                 </button>
               </div>
             </div>
@@ -570,13 +587,13 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
           {/* Step 2 — Recovery Kit */}
           {step === 2 && (
             <div data-anim>
-              <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 6px', color: '#E2E8F0' }}>Save your Recovery Kit</h2>
-              <p style={{ fontSize: 14, color: '#94A3B8', margin: '0 0 22px' }}>If you lose your passphrase, this is your only way back in. Store it somewhere safe.</p>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontStretch: '82%', fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 6px', color: '#EDEDED' }}>Save your Recovery Kit</h2>
+              <p style={{ fontSize: 14, color: '#9A9A9F', margin: '0 0 22px' }}>If you lose your passphrase, this is your only way back in. Store it somewhere safe.</p>
 
-              {/* Kit card */}
-              <div style={{ borderRadius: 9, background: '#0D0D14', border: '1px solid #1E1E2E', padding: '14px 16px', marginBottom: 16 }}>
-                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#5B6478', marginBottom: 8 }}>Your Recovery Kit</div>
-                <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#94A3B8', wordBreak: 'break-all', lineHeight: 1.6, userSelect: 'all' }}>
+              {/* Kit card — square corners; dashed border only around the key text itself */}
+              <div style={{ background: '#0C0C0D', padding: '14px 16px', marginBottom: 16 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.1em', color: '#76767B', marginBottom: 8 }}>YOUR RECOVERY KIT</div>
+                <div style={{ border: '1px dashed rgba(255,255,255,0.18)', padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 12, color: '#EDEDED', wordBreak: 'break-all', lineHeight: 1.6, userSelect: 'all' }}>
                   {recoveryBlob ? formatRecoveryKit(recoveryBlob) : '—'}
                 </div>
               </div>
@@ -585,7 +602,7 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
               <button
                 data-btn
                 onClick={onDownload}
-                style={{ width: '100%', height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 9, fontSize: 14, fontWeight: 500, background: '#13121C', border: '1px solid #2D2B45', color: downloaded ? '#A5B4FC' : '#E2E8F0', cursor: 'pointer', marginBottom: 16 }}
+                style={{ width: '100%', height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, fontSize: 14, fontWeight: 500, background: 'transparent', border: '1px solid rgba(255,255,255,0.16)', color: '#EDEDED', cursor: 'pointer', marginBottom: 16 }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                 {downloaded ? 'Download again' : 'Download Recovery Kit'}
@@ -597,16 +614,16 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                   type="checkbox"
                   checked={saved}
                   onChange={e => setSaved(e.target.checked)}
-                  style={{ marginTop: 2, accentColor: '#6366F1', width: 15, height: 15, flexShrink: 0, cursor: 'pointer' }}
+                  style={{ marginTop: 2, accentColor: '#FF3B30', width: 15, height: 15, flexShrink: 0, cursor: 'pointer' }}
                 />
-                <span style={{ fontSize: 13.5, color: '#94A3B8', lineHeight: 1.5 }}>I&apos;ve saved my Recovery Kit somewhere safe and understand I cannot recover my vault without it.</span>
+                <span style={{ fontSize: 13.5, color: '#9A9A9F', lineHeight: 1.5 }}>I&apos;ve saved my Recovery Kit somewhere safe and understand I cannot recover my vault without it.</span>
               </label>
 
               {/* Buttons */}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   onClick={() => setStep(1)}
-                  style={{ height: 46, paddingLeft: 18, paddingRight: 18, borderRadius: 9, fontSize: 14, fontWeight: 500, background: 'transparent', border: '1px solid #2D2B45', color: '#94A3B8', cursor: 'pointer' }}
+                  style={{ height: 46, paddingLeft: 18, paddingRight: 18, fontSize: 14, fontWeight: 500, background: 'transparent', border: '1px solid rgba(255,255,255,0.16)', color: '#9A9A9F', cursor: 'pointer' }}
                 >
                   Back
                 </button>
@@ -615,9 +632,9 @@ export function SetupForm({ userId, initialStep = 0 }: Props) {
                   data-shine
                   onClick={onEnterNocturne}
                   disabled={!downloaded || !saved}
-                  style={{ flex: 1, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 9, fontSize: 15, fontWeight: 500, background: '#6366F1', color: '#09090F', border: 'none', cursor: (!downloaded || !saved) ? 'not-allowed' : 'pointer', boxShadow: '0 8px 26px rgba(99,102,241,0.32)', opacity: (!downloaded || !saved) ? 0.4 : 1 }}
+                  style={{ flex: 1, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, fontSize: 15, fontWeight: 500, background: '#FF3B30', color: '#0A0A0A', border: 'none', cursor: (!downloaded || !saved) ? 'not-allowed' : 'pointer', opacity: (!downloaded || !saved) ? 0.4 : 1 }}
                 >
-                  Enter Nocturne <span data-arrow style={{ color: '#09090F' }}>→</span>
+                  Enter Nocturne <span data-arrow style={{ fontFamily: 'var(--font-mono)', color: '#0A0A0A' }}>→</span>
                 </button>
               </div>
             </div>

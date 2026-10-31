@@ -65,11 +65,11 @@ export function SeekBar() {
       <div className="relative w-full h-1 bg-border-default rounded-full overflow-visible">
         {/* Played fill */}
         <div
-          className="absolute inset-y-0 left-0 bg-indigo-500 rounded-full pointer-events-none"
+          className="absolute inset-y-0 left-0 bg-text-primary rounded-full pointer-events-none"
           style={{ width: `${pct}%` }}
         />
 
-        {/* Slide-transition tick marks — 2px wide × 8px tall, amber-200 */}
+        {/* Slide-transition tick marks — 2px wide × 8px tall */}
         {durationMs > 0 &&
           syncMap.map((seg, i) => {
             const tickPct = (seg.startMs / durationMs) * 100
@@ -77,8 +77,9 @@ export function SeekBar() {
             return (
               <div
                 key={i}
-                className="absolute bg-amber-200 pointer-events-none"
+                className="absolute pointer-events-none"
                 style={{
+                  background: 'rgba(255,255,255,0.3)',
                   left: `${tickPct}%`,
                   top: '-4px',
                   width: '2px',

@@ -71,10 +71,9 @@ export function BetaRequestSection() {
     width: '100%',
     height: 44,
     padding: '0 14px',
-    borderRadius: 8,
-    background: '#0F0F17',
-    border: '1px solid #1E1E2E',
-    color: '#E2E8F0',
+    background: '#111112',
+    border: '1px solid rgba(255,255,255,0.08)',
+    color: '#EDEDED',
     fontSize: 14,
     outline: 'none',
     boxSizing: 'border-box',
@@ -85,43 +84,37 @@ export function BetaRequestSection() {
     <section
       id="beta-request"
       style={{
-        scrollMarginTop: 80,
-        padding: 'clamp(72px,9vw,120px) 24px',
-        borderTop: '1px solid #191827',
-        background: '#0C0C13',
+        scrollMarginTop: 64,
+        padding: 'clamp(72px,9vw,120px) clamp(20px,4vw,40px)',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        background: '#0C0C0D',
       }}
     >
       <div style={{ maxWidth: 560, margin: '0 auto' }}>
         {/* Header */}
-        <div data-reveal="" style={{ textAlign: 'center', marginBottom: 40 }}>
-          <p
-            style={{
-              fontSize: 12,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: '#818CF8',
-              margin: '0 0 12px',
-            }}
-          >
-            Closed beta
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.16em', color: '#FF3B30', margin: '0 0 12px' }}>
+            CLOSED BETA
           </p>
           <h2
             style={{
+              fontFamily: 'var(--font-display)',
+              fontStretch: '82%',
               fontSize: 'clamp(26px,3.5vw,36px)',
               fontWeight: 600,
               letterSpacing: '-0.02em',
               margin: '0 0 14px',
-              color: '#E2E8F0',
+              color: '#EDEDED',
             }}
           >
             Request early access.
           </h2>
           {status === 'sent' ? (
-            <p style={{ fontSize: 15, color: '#94A3B8', margin: 0, lineHeight: 1.6, maxWidth: 440, marginInline: 'auto' }}>
-              Thanks — we&apos;ve got your request and will reach out to <strong style={{ color: '#E2E8F0' }}>{email}</strong> with an invite code soon.
+            <p style={{ fontSize: 15, color: '#9A9A9F', margin: 0, lineHeight: 1.6, maxWidth: 440, marginInline: 'auto' }}>
+              Thanks — we&apos;ve got your request and will reach out to <strong style={{ color: '#EDEDED' }}>{email}</strong> with an invite code soon.
             </p>
           ) : (
-            <p style={{ fontSize: 15, color: '#94A3B8', margin: 0, lineHeight: 1.6, maxWidth: 440, marginInline: 'auto' }}>
+            <p style={{ fontSize: 15, color: '#9A9A9F', margin: 0, lineHeight: 1.6, maxWidth: 440, marginInline: 'auto' }}>
               We&apos;re onboarding a small cohort of students. Tell us a bit about yourself and we&apos;ll reach out with an invite code.
             </p>
           )}
@@ -133,8 +126,8 @@ export function BetaRequestSection() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* Name */}
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: '#94A3B8', marginBottom: 7 }}>
-                  Name
+                <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: '#76767B', marginBottom: 7 }}>
+                  NAME
                 </label>
                 <input
                   type="text"
@@ -142,15 +135,15 @@ export function BetaRequestSection() {
                   value={name}
                   onChange={(e) => { setName(e.target.value); setErrorMsg(null) }}
                   style={inputStyle}
-                  onFocus={(e) => ((e.target as HTMLInputElement).style.borderColor = '#6366F1')}
-                  onBlur={(e)  => ((e.target as HTMLInputElement).style.borderColor = '#1E1E2E')}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)')}
+                  onBlur={(e)  => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
               </div>
 
               {/* Email */}
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: '#94A3B8', marginBottom: 7 }}>
-                  Email
+                <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: '#76767B', marginBottom: 7 }}>
+                  EMAIL
                 </label>
                 <input
                   type="email"
@@ -158,15 +151,15 @@ export function BetaRequestSection() {
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setErrorMsg(null) }}
                   style={inputStyle}
-                  onFocus={(e) => ((e.target as HTMLInputElement).style.borderColor = '#6366F1')}
-                  onBlur={(e)  => ((e.target as HTMLInputElement).style.borderColor = '#1E1E2E')}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)')}
+                  onBlur={(e)  => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
               </div>
 
               {/* School */}
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: '#94A3B8', marginBottom: 7 }}>
-                  School / Institution
+                <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: '#76767B', marginBottom: 7 }}>
+                  SCHOOL / INSTITUTION
                 </label>
                 <input
                   type="text"
@@ -174,43 +167,35 @@ export function BetaRequestSection() {
                   value={school}
                   onChange={(e) => { setSchool(e.target.value); setErrorMsg(null) }}
                   style={inputStyle}
-                  onFocus={(e) => ((e.target as HTMLInputElement).style.borderColor = '#6366F1')}
-                  onBlur={(e)  => ((e.target as HTMLInputElement).style.borderColor = '#1E1E2E')}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)')}
+                  onBlur={(e)  => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
               </div>
 
               {/* Use case */}
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: '#94A3B8', marginBottom: 7 }}>
-                  What would you use Nocturne for?
+                <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: '#76767B', marginBottom: 7 }}>
+                  WHAT WOULD YOU USE NOCTURNE FOR?
                 </label>
                 <textarea
                   placeholder="e.g. I take 4 lecture-heavy STEM courses and spend too much time re-reading everything. I'd use Nocturne to identify what my professors actually emphasize before each exam."
                   value={useCase}
                   onChange={(e) => { setUseCase(e.target.value); setErrorMsg(null) }}
                   rows={4}
-                  style={{
-                    ...inputStyle,
-                    height: 'auto',
-                    padding: '12px 14px',
-                    resize: 'vertical',
-                    lineHeight: 1.55,
-                  }}
-                  onFocus={(e) => ((e.target as HTMLTextAreaElement).style.borderColor = '#6366F1')}
-                  onBlur={(e)  => ((e.target as HTMLTextAreaElement).style.borderColor = '#1E1E2E')}
+                  style={{ ...inputStyle, height: 'auto', padding: '12px 14px', resize: 'vertical', lineHeight: 1.55 }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)')}
+                  onBlur={(e)  => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
               </div>
 
               {/* Error */}
               {errorMsg && (
-                <p style={{ fontSize: 13, color: '#FB7185', margin: 0 }}>{errorMsg}</p>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#FF3B30', margin: 0 }}>{errorMsg}</p>
               )}
 
               {/* Submit */}
               <button
                 type="submit"
-                data-btn=""
-                data-shine=""
                 disabled={status === 'sending'}
                 style={{
                   width: '100%',
@@ -219,24 +204,24 @@ export function BetaRequestSection() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 9,
-                  borderRadius: 8,
                   fontSize: 15,
                   fontWeight: 500,
-                  background: '#6366F1',
-                  color: '#09090F',
+                  background: '#FF3B30',
+                  color: '#0A0A0A',
                   border: 'none',
                   cursor: status === 'sending' ? 'not-allowed' : 'pointer',
                   opacity: status === 'sending' ? 0.7 : 1,
-                  boxShadow: '0 8px 26px rgba(99,102,241,0.32)',
-                  transition: 'opacity .15s',
+                  transition: 'background .2s, opacity .15s',
                 }}
+                onMouseEnter={(e) => { if (status !== 'sending') e.currentTarget.style.background = '#FF5147' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#FF3B30' }}
               >
                 {status === 'sending' ? 'Sending…' : (
-                  <>Request access <span data-arrow="" style={{ color: '#09090F' }}>→</span></>
+                  <>Request access <span style={{ fontFamily: 'var(--font-mono)', color: '#0A0A0A' }}>→</span></>
                 )}
               </button>
 
-              <p style={{ fontSize: 12, color: '#3F485C', textAlign: 'center', margin: 0 }}>
+              <p style={{ fontSize: 12, color: '#4A4A4E', textAlign: 'center', margin: 0 }}>
                 We&apos;ll only use your email to send the invite code and occasional beta updates.
               </p>
             </div>

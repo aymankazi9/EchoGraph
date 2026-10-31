@@ -1,6 +1,7 @@
 | Domain | Status | Tier | Link |
 |---|---|---|---|
 | Study tab | Mixed | TBD | [study-tab.md](study-tab.md) |
+| Map tab | Done | Midnight | [map-tab.md](map-tab.md) |
 | Notes tab | Mixed | TBD | [notes-tab.md](notes-tab.md) |
 | Ask tab | Mixed | TBD | [ask-tab.md](ask-tab.md) |
 | Pipeline — extraction | Mixed | TBD | [pipeline-extraction.md](pipeline-extraction.md) |

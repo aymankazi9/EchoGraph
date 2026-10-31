@@ -54,7 +54,7 @@ const GROUPS: ShortcutGroup[] = [
 
 function Kbd({ label }: { label: string }) {
   return (
-    <kbd className="bg-bg-subtle border border-border-default rounded px-1.5 py-0.5 font-mono text-caption text-text-secondary">
+    <kbd className="bg-bg-subtle border border-border-default rounded-sm px-1.5 py-0.5 font-mono text-caption text-text-secondary">
       {label}
     </kbd>
   )

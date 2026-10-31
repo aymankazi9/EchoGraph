@@ -57,7 +57,10 @@ export function ContinueCard({ session }: Props) {
       .then(({ data }) => {
         if (!data?.map_encrypted) return
         decryptText(mk, data.map_encrypted as string)
-          .then((json) => setSyncSegments(JSON.parse(json) as SyncSegment[]))
+          .then((json) => {
+            const { segments } = JSON.parse(json) as { segments: SyncSegment[] }
+            setSyncSegments(segments)
+          })
           .catch(() => {})
       })
   }, [session.id, session.title_encrypted])
@@ -80,9 +83,8 @@ export function ContinueCard({ session }: Props) {
     <div
       style={{
         padding: '18px 20px',
-        borderRadius: 'var(--radius-xl)',
-        border: '1px solid rgba(99,102,241,0.22)',
-        background: 'linear-gradient(110deg, rgba(99,102,241,0.07) 0%, rgba(13,13,20,0.15) 60%)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        background: '#0C0C0D',
         display: 'flex',
         gap: 20,
         alignItems: 'center',
@@ -92,13 +94,13 @@ export function ContinueCard({ session }: Props) {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {/* Label row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em', color: '#818CF8', textTransform: 'uppercase' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: 'var(--color-accent)', textTransform: 'uppercase' }}>
             Continue Studying
           </span>
           {session.last_opened_at && (
             <>
-              <span style={{ fontSize: 10.5, color: '#3F485C' }}>·</span>
-              <span style={{ fontSize: 10.5, color: '#5B6478' }}>
+              <span style={{ fontSize: 10.5, color: '#4A4A4E' }}>·</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: '#76767B' }}>
                 last opened {timeAgo(session.last_opened_at)}
               </span>
             </>
@@ -107,7 +109,8 @@ export function ContinueCard({ session }: Props) {
 
         {/* Title */}
         <p style={{
-          fontSize: 20, fontWeight: 600, color: '#E2E8F0', letterSpacing: '-0.02em',
+          fontFamily: 'var(--font-display)', fontStretch: '82%',
+          fontSize: 20, fontWeight: 600, color: '#EDEDED', letterSpacing: '-0.02em',
           margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {title ?? '—'}
@@ -117,19 +120,19 @@ export function ContinueCard({ session }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const }}>
           {session.course_name && (
             <>
-              <span style={{ fontSize: 12.5, color: '#64748B' }}>{session.course_name}</span>
-              <span style={{ fontSize: 12.5, color: '#2D3548' }}>·</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: '#76767B' }}>{session.course_name}</span>
+              <span style={{ fontSize: 12.5, color: '#4A4A4E' }}>·</span>
             </>
           )}
           {session.red_zone_count > 0 && (
             <>
-              <span style={{ fontSize: 12.5, color: '#F87171' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--color-severity)' }}>
                 {session.red_zone_count} Red Zone keyword{session.red_zone_count !== 1 ? 's' : ''}
               </span>
-              <span style={{ fontSize: 12.5, color: '#2D3548' }}>·</span>
+              <span style={{ fontSize: 12.5, color: '#4A4A4E' }}>·</span>
             </>
           )}
-          <span style={{ fontSize: 12.5, color: '#64748B' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: '#76767B' }}>
             {totalSlides} slide{totalSlides !== 1 ? 's' : ''}
           </span>
         </div>
@@ -138,17 +141,17 @@ export function ContinueCard({ session }: Props) {
         {showProgress && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 11.5, color: '#64748B' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: '#76767B' }}>
                 Reviewed {reviewedSlides} of {totalSlides} slides
               </span>
-              <span style={{ fontSize: 11.5, color: '#64748B' }}>{pct}%</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: '#76767B' }}>{pct}%</span>
             </div>
-            <div style={{ height: 4, borderRadius: 999, background: 'rgba(99,102,241,0.15)', overflow: 'hidden' }}>
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
               <div
                 style={{
-                  height: '100%', borderRadius: 999,
+                  height: '100%',
                   width: `${pct}%`,
-                  background: 'linear-gradient(90deg, #6366F1, #818CF8)',
+                  background: 'var(--color-accent)',
                   transition: 'width 0.4s ease',
                 }}
               />
@@ -157,7 +160,7 @@ export function ContinueCard({ session }: Props) {
         )}
       </div>
 
-      {/* Resume button */}
+      {/* Resume button — Secondary (light) per THEME_SURGICAL §4 */}
       <button
         type="button"
         onClick={() => router.push(`/session/${session.id}`)}
@@ -165,10 +168,9 @@ export function ContinueCard({ session }: Props) {
           flexShrink: 0,
           display: 'inline-flex', alignItems: 'center', gap: 8,
           height: 44, paddingInline: 20,
-          borderRadius: 'var(--radius-card)',
-          background: 'rgba(255,255,255,0.93)',
-          color: '#0D0D18',
-          fontSize: 14, fontWeight: 600,
+          background: '#EDEDED',
+          color: '#0A0A0A',
+          fontSize: 14, fontWeight: 500,
           border: 'none', cursor: 'pointer',
           whiteSpace: 'nowrap',
         }}

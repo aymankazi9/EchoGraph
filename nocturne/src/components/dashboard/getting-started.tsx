@@ -83,10 +83,10 @@ export function GettingStarted({
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 w-full bg-bg-subtle rounded-pill overflow-hidden mb-4">
+      <div className="h-px w-full bg-bg-subtle overflow-hidden mb-4">
         <div
-          className="h-full bg-indigo-500 rounded-pill transition-all duration-500"
-          style={{ width: `${(completedCount / ITEMS.length) * 100}%` }}
+          className="h-full transition-all duration-500"
+          style={{ width: `${(completedCount / ITEMS.length) * 100}%`, background: 'var(--color-accent)' }}
         />
       </div>
 
@@ -94,12 +94,13 @@ export function GettingStarted({
         {ITEMS.map((label, i) => (
           <div key={i} className="flex items-center gap-2.5">
             <div
-              className={[
-                'w-4 h-4 rounded-full shrink-0 flex items-center justify-center',
-                done[i] ? 'bg-indigo-500' : 'border border-border-strong',
-              ].join(' ')}
+              className="w-4 h-4 shrink-0 flex items-center justify-center"
+              style={{
+                background: done[i] ? '#EDEDED' : 'transparent',
+                border: done[i] ? 'none' : '1px solid var(--color-border-strong)',
+              }}
             >
-              {done[i] && <Check size={10} strokeWidth={2.5} className="text-white" />}
+              {done[i] && <Check size={10} strokeWidth={2.5} style={{ color: '#0A0A0A' }} />}
             </div>
             <span
               className={[

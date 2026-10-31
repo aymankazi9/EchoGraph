@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { FileText, Mic, BookOpen, Layers, MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal } from 'lucide-react'
 import { cardLift } from '@/lib/motion'
 import {
   AlertDialog,
@@ -24,18 +24,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { createClient } from '@/lib/supabase'
 
-// Eight distinct hues for course colour tags — deterministic from course_id UUID.
-const COURSE_COLORS = [
-  '#6366F1', '#8B5CF6', '#0EA5E9', '#14B8A6',
-  '#F59E0B', '#F43F5E', '#22D3EE', '#4ADE80',
-]
-
-function courseColorFromId(courseId: string): string {
-  const hex = courseId.replace(/-/g, '').slice(0, 8)
-  const n = parseInt(hex, 16) || 0
-  return COURSE_COLORS[n % COURSE_COLORS.length]!
-}
-
 interface Props {
   id: string
   title: string | null
@@ -52,9 +40,9 @@ interface Props {
   onRename: (id: string, newTitle: string) => Promise<void>
   /** When non-empty, highlights the matched substring in the title. */
   highlightQuery?: string
-  /** Course UUID — used to render a left-border colour tag (Midnight+). */
-  courseId?: string | null
-  /** True when the user's tier allows course colour tags. */
+  /** Course name — rendered as a mono eyebrow (Midnight+). */
+  courseName?: string | null
+  /** True when the user's tier allows the course eyebrow. */
   showCourseTag?: boolean
 }
 
@@ -67,19 +55,23 @@ function formatDate(iso: string): string {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    ingesting:    { label: 'Ingesting',    className: 'bg-amber-400/20 text-amber-300' },
-    processing:   { label: 'Processing',   className: 'bg-amber-400/20 text-amber-300' },
-    ready:        { label: 'Ready',        className: 'bg-indigo-500/20 text-indigo-300' },
-    synced:       { label: 'Ready',        className: 'bg-indigo-500/20 text-indigo-300' },
-    transcribing: { label: 'Transcribing', className: 'bg-violet-500/20 text-violet-300' },
-    syncing:      { label: 'Analyzing',    className: 'bg-violet-500/20 text-violet-300' },
+  const map: Record<string, string> = {
+    ingesting:    'Ingesting',
+    processing:   'Processing',
+    ready:        'Ready',
+    synced:       'Ready',
+    transcribing: 'Transcribing',
+    syncing:      'Analyzing',
   }
-
-  const config = map[status] ?? map['processing']
+  const label = map[status] ?? map['processing']
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-caption ${config.className}`}>
-      {config.label}
+    <span
+      style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
+        color: '#9A9A9F', border: '1px solid rgba(255,255,255,0.14)', padding: '2px 6px',
+      }}
+    >
+      {label}
     </span>
   )
 }
@@ -91,7 +83,7 @@ function HighlightedTitle({ title, query }: { title: string; query: string }) {
   return (
     <>
       {title.slice(0, idx)}
-      <mark className="bg-indigo-900/25 text-inherit">{title.slice(idx, idx + query.length)}</mark>
+      <mark style={{ background: 'color-mix(in srgb, var(--color-accent) 20%, transparent)', color: 'inherit' }}>{title.slice(idx, idx + query.length)}</mark>
       {title.slice(idx + query.length)}
     </>
   )
@@ -100,9 +92,8 @@ function HighlightedTitle({ title, query }: { title: string; query: string }) {
 export function SessionCard({
   id, title, status, hasSlides, hasAudio, hasStudyGuide, guideType,
   createdAt, redZoneCount, slideCount, sizeMB, onDelete, onRename,
-  highlightQuery = '', courseId, showCourseTag = false,
+  highlightQuery = '', courseName, showCourseTag = false,
 }: Props) {
-  const courseColor = showCourseTag && courseId ? courseColorFromId(courseId) : null
   const router = useRouter()
   const renameInputRef = useRef<HTMLInputElement>(null)
   const [deleting, setDeleting] = useState(false)
@@ -175,16 +166,32 @@ export function SessionCard({
     router.push(`/session/${id}`)
   }
 
+  const metaParts: string[] = []
+  if (hasSlides) metaParts.push('Slides')
+  if (hasAudio) metaParts.push('Audio')
+  if (hasStudyGuide && guideType === 'synthetic') metaParts.push('Auto guide')
+  if (hasStudyGuide && guideType === 'real_guide') metaParts.push('Study guide')
+  if (hasStudyGuide && guideType === 'anki_import') metaParts.push('Anki deck')
+
   return (
     <motion.div
       variants={cardLift}
       initial="rest"
       whileHover="hover"
       exit={{ opacity: 0, height: 0, marginBottom: 0, transition: { duration: 0.2 } }}
-      className="group relative flex flex-col gap-3 p-4 rounded-card border border-border-default bg-bg-elevated cursor-pointer hover:border-border-strong transition-colors duration-75"
-      style={courseColor ? { borderLeftColor: courseColor, borderLeftWidth: 3 } : undefined}
+      className="group relative flex flex-col gap-3 p-4 border cursor-pointer transition-colors duration-75"
+      style={{ background: '#0C0C0D', borderColor: 'rgba(255,255,255,0.08)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
       onClick={navigateToSession}
     >
+      {/* Row 0 — course eyebrow */}
+      {showCourseTag && courseName && (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: '#76767B', textTransform: 'uppercase' }}>
+          {courseName}
+        </span>
+      )}
+
       {/* Row 1 — status + date */}
       <div className="flex items-center justify-between">
         <StatusBadge status={status} />
@@ -206,64 +213,36 @@ export function SessionCard({
             onBlur={commitRename}
             disabled={renameSaving}
             placeholder="Session name"
-            className="text-body font-medium text-text-primary bg-bg-subtle border border-border-strong rounded px-2 py-0.5 w-full focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+            className="text-body font-medium text-text-primary bg-bg-subtle border border-border-strong px-2 py-0.5 w-full focus:outline-none disabled:opacity-50"
+            style={{ fontSize: 17 }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
           />
           {renameError && (
-            <p className="text-caption text-rose-300">{renameError}</p>
+            <p className="text-caption" style={{ color: 'var(--color-severity)' }}>{renameError}</p>
           )}
         </div>
       ) : (
-        <p className={[
-          'text-body font-medium truncate',
-          title ? 'text-text-primary' : 'text-text-tertiary italic',
-        ].join(' ')}>
+        <p className={['font-medium truncate', title ? 'text-text-primary' : 'text-text-tertiary italic'].join(' ')} style={{ fontSize: 17 }}>
           {title
             ? <HighlightedTitle title={title} query={highlightQuery} />
             : 'Untitled session'}
         </p>
       )}
 
-      {/* Row 3 — input badges */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {hasSlides && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-caption bg-bg-subtle text-text-secondary">
-            <FileText size={11} strokeWidth={1.5} />
-            Slides
-          </span>
-        )}
-        {hasAudio && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-caption bg-bg-subtle text-text-secondary">
-            <Mic size={11} strokeWidth={1.5} />
-            Audio
-          </span>
-        )}
-        {hasStudyGuide && guideType === 'synthetic' && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-caption bg-violet-500/20 text-violet-300">
-            <Layers size={11} strokeWidth={1.5} />
-            Auto guide
-          </span>
-        )}
-        {hasStudyGuide && guideType === 'real_guide' && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-caption bg-indigo-500/20 text-indigo-300">
-            <BookOpen size={11} strokeWidth={1.5} />
-            Study guide
-          </span>
-        )}
-        {hasStudyGuide && guideType === 'anki_import' && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-caption bg-indigo-500/20 text-indigo-300">
-            <BookOpen size={11} strokeWidth={1.5} />
-            Anki deck
-          </span>
-        )}
-      </div>
+      {/* Row 3 — mono meta row */}
+      {metaParts.length > 0 && (
+        <p className="text-caption text-text-tertiary" style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
+          {metaParts.join(' · ')}
+        </p>
+      )}
 
       {/* Processing progress bar */}
       {isProcessing && (
         <div className="w-full">
-          <div className="h-1 w-full rounded-full bg-bg-subtle overflow-hidden">
-            <div className="h-full w-full bg-amber-200/40 animate-pulse rounded-full" />
+          <div className="h-px w-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+            <div className="h-full w-full animate-pulse" style={{ background: 'var(--color-accent)' }} />
           </div>
-          <p className="text-caption text-amber-200 mt-1.5">
+          <p className="text-caption mt-1.5" style={{ color: '#9A9A9F' }}>
             Processing — open session to view progress
           </p>
         </div>
@@ -271,8 +250,8 @@ export function SessionCard({
 
       {/* Row 4 — stats (post-scoring) */}
       {hasKeywords && (
-        <p className="text-caption text-text-tertiary">
-          <span className="text-rose-300 font-medium">{redZoneCount} Red Zone</span>
+        <p className="text-caption text-text-tertiary" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span style={{ color: 'var(--color-severity)', fontWeight: 500 }}>{redZoneCount} Red Zone</span>
           {slideCount > 0 && <> · {slideCount} slides</>}
           {sizeMB > 0 && <> · {sizeMB.toFixed(1)} MB</>}
         </p>
@@ -283,14 +262,14 @@ export function SessionCard({
         className="flex items-center justify-between mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-75"
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="text-caption text-indigo-400">Open session</span>
+        <span className="text-caption" style={{ color: '#9A9A9F' }}>Open session</span>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
               aria-label="More actions"
-              className="w-8 h-8 flex items-center justify-center rounded-btn text-text-tertiary hover:text-text-secondary hover:bg-bg-subtle transition-colors"
+              className="w-8 h-8 flex items-center justify-center text-text-tertiary hover:text-text-secondary hover:bg-bg-subtle transition-colors"
             >
               <MoreHorizontal size={14} strokeWidth={1.5} />
             </button>
@@ -304,7 +283,7 @@ export function SessionCard({
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="text-rose-300 focus:text-rose-200 focus:bg-rose-900/30"
+              style={{ color: 'var(--color-severity)' }}
               onSelect={() => setDeleteDialogOpen(true)}
             >
               Delete
@@ -326,16 +305,17 @@ export function SessionCard({
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && (
-            <p className="text-body-sm text-rose-300">{deleteError}</p>
+            <p className="text-body-sm" style={{ color: 'var(--color-severity)' }}>{deleteError}</p>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-9 px-4 rounded-btn text-body text-text-secondary border border-border-default hover:bg-bg-subtle bg-transparent">
+            <AlertDialogCancel className="h-9 px-4 text-body text-text-secondary border border-border-default hover:bg-bg-subtle bg-transparent">
               Keep session
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => { e.stopPropagation(); handleDelete() }}
               disabled={deleting}
-              className="h-9 px-4 rounded-btn text-body font-medium bg-transparent border border-rose-900 text-red-300 hover:bg-rose-900/60 transition-colors"
+              className="h-9 px-4 text-body font-medium bg-transparent transition-colors"
+              style={{ border: '1px solid var(--color-severity)', color: 'var(--color-severity)' }}
             >
               {deleting ? 'Deleting…' : 'Delete session'}
             </AlertDialogAction>

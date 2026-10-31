@@ -48,8 +48,8 @@ const KEYWORDS = [
 ]
 
 const ZONE = {
-  red: { bg: 'rgba(244,63,94,0.12)', border: 'rgba(244,63,94,0.25)', text: '#FB7185', dot: '#F43F5E' },
-  amber: { bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.2)', text: '#FCD34D', dot: '#FBBF24' },
+  red: { bg: 'color-mix(in srgb, var(--color-severity) 12%, transparent)', border: 'color-mix(in srgb, var(--color-severity) 25%, transparent)', text: 'var(--color-severity)', dot: 'var(--color-severity)' },
+  amber: { bg: 'var(--color-bg-subtle)', border: 'var(--color-border-default)', text: 'var(--color-text-secondary)', dot: 'var(--color-text-tertiary)' },
 }
 
 const OTHER_DISCIPLINES = [
@@ -65,7 +65,7 @@ export default function LawPage() {
 
           {/* Header */}
           <div data-reveal="" className="mb-14">
-            <p className="text-caption uppercase tracking-[0.1em] text-indigo-400 mb-3">
+            <p className="text-caption uppercase tracking-[0.1em] mb-3" style={{ color: 'var(--color-accent)' }}>
               For Law
             </p>
             <h1 className="text-heading font-medium text-text-primary mb-4">
@@ -76,7 +76,7 @@ export default function LawPage() {
               examiners love. They signal it through verbal repetition during Socratic discussions
               where the slides don&apos;t change for twenty minutes. Nocturne reads that signal and
               surfaces the{' '}
-              <span className="text-rose-400 font-medium">Red Zone</span>: the holdings and rules
+              <span className="font-medium" style={{ color: 'var(--color-severity)' }}>Red Zone</span>: the holdings and rules
               ranked by how hard your professor pushed them.
             </p>
             <Link
@@ -88,13 +88,12 @@ export default function LawPage() {
                 alignItems: 'center',
                 height: 46,
                 padding: '0 26px',
-                borderRadius: 8,
+                borderRadius: 2,
                 fontSize: 15,
                 fontWeight: 500,
-                background: '#6366F1',
-                color: '#09090F',
+                background: 'var(--color-accent)',
+                color: 'var(--color-text-inverse)',
                 textDecoration: 'none',
-                boxShadow: '0 8px 28px rgba(99,102,241,0.35)',
               }}
             >
               Start for free
@@ -130,7 +129,7 @@ export default function LawPage() {
               {/* Header bar */}
               <div className="flex items-center justify-between px-5 py-3.5 border-b border-border-subtle">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-card bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-body-sm font-semibold text-indigo-400">
+                  <div className="w-8 h-8 rounded-card border border-border-default bg-bg-subtle flex items-center justify-center text-body-sm font-semibold text-text-secondary">
                     L
                   </div>
                   <div>
@@ -141,11 +140,11 @@ export default function LawPage() {
                 <span
                   style={{
                     padding: '3px 10px',
-                    borderRadius: 9999,
-                    background: 'rgba(244,63,94,0.1)',
-                    border: '1px solid rgba(244,63,94,0.2)',
+                    borderRadius: 2,
+                    background: 'color-mix(in srgb, var(--color-severity) 10%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--color-severity) 20%, transparent)',
                     fontSize: 11,
-                    color: '#FB7185',
+                    color: 'var(--color-severity)',
                     fontWeight: 500,
                   }}
                 >
@@ -166,7 +165,7 @@ export default function LawPage() {
                         {kw.rank}
                       </span>
                       <span
-                        style={{ width: 7, height: 7, borderRadius: '50%', background: c.dot, flexShrink: 0, boxShadow: `0 0 6px ${c.dot}` }}
+                        style={{ width: 7, height: 7, borderRadius: '50%', background: c.dot, flexShrink: 0 }}
                       />
                       <span className="flex-1 text-body-sm font-medium text-text-primary-soft">
                         {kw.term}
@@ -177,7 +176,7 @@ export default function LawPage() {
                         <span
                           style={{
                             padding: '2px 9px',
-                            borderRadius: 9999,
+                            borderRadius: 2,
                             background: c.bg,
                             border: `1px solid ${c.border}`,
                             fontSize: 11,
@@ -221,13 +220,12 @@ export default function LawPage() {
                 alignItems: 'center',
                 height: 46,
                 padding: '0 26px',
-                borderRadius: 8,
+                borderRadius: 2,
                 fontSize: 15,
                 fontWeight: 500,
-                background: '#6366F1',
-                color: '#09090F',
+                background: 'var(--color-accent)',
+                color: 'var(--color-text-inverse)',
                 textDecoration: 'none',
-                boxShadow: '0 8px 28px rgba(99,102,241,0.35)',
               }}
             >
               Start for free

@@ -1,523 +1,458 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
-import { SUBJECTS, ZONE_COLORS, MODE_LABELS, MODE_CAPTIONS } from '@/components/marketing/demo-data'
+import { useEffect, useRef, useState } from 'react'
+import { ConceptGraph } from '@/components/surgical/concept-graph'
+import { DEMO_LINES, GRAPH_LAYOUT, GRAPH_EDGES, DEMO_NODE_LABELS, DEMO_NODE_CONFIDENCE } from './fixtures'
 
-type Mode = 0 | 1 | 2
+const STEPS = [
+  { n: '01', l: 'The Drop', d: 'Drag in lecture audio and slides. Nocturne links them.' },
+  { n: '02', l: 'The Pipeline', d: 'Local WASM transcription streams confidence scores.' },
+  { n: '03', l: 'The Concept Map', d: 'Zoom into the knowledge graph built from the session.' },
+]
 
-function ModeTabBar({ mode, onSelect }: { mode: Mode; onSelect: (m: Mode) => void }) {
-  return (
-    <div
-      style={{
-        display: 'inline-flex',
-        padding: '3px',
-        gap: '3px',
-        borderRadius: '9px',
-        background: '#09090F',
-        border: '1px solid #1E1E2E',
-      }}
-    >
-      {MODE_LABELS.map((label, i) => {
-        const active = i === mode
-        return (
-          <button
-            key={label}
-            type="button"
-            onClick={() => onSelect(i as Mode)}
-            style={{
-              height: 30,
-              padding: '0 13px',
-              borderRadius: 7,
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 12.5,
-              fontWeight: active ? 600 : 400,
-              background: active ? '#1C1B28' : 'transparent',
-              color: active ? '#E2E8F0' : '#5B6478',
-              boxShadow: active ? '0 0 0 1px #2D2B45' : 'none',
-              transition: 'all .2s',
-              fontFamily: 'inherit',
-            }}
-          >
-            {label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-function SubjectDropdown({
-  subject,
-  open,
-  onToggle,
-  onSelect,
-}: {
-  subject: number
-  open: boolean
-  onToggle: () => void
-  onSelect: (i: number) => void
-}) {
-  const cur = SUBJECTS[subject]
-  return (
-    <div style={{ position: 'relative' }}>
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 9,
-          padding: '7px 11px',
-          borderRadius: 7,
-          border: '1px solid #1E1E2E',
-          background: '#09090F',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 12,
-          color: '#94A3B8',
-          cursor: 'pointer',
-          transition: 'border-color .2s, color .2s',
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: '#F43F5E',
-            boxShadow: '0 0 10px rgba(244,63,94,0.7)',
-            flexShrink: 0,
-          }}
-        />
-        {cur.code} · {cur.topic} · {cur.time}
-        <span style={{ color: '#5B6478', fontSize: 9, marginLeft: 1 }}>▼</span>
-      </button>
-
-      {open && (
-        <>
-          <div onClick={onToggle} style={{ position: 'fixed', inset: 0, zIndex: 29 }} />
-          <div
-            style={{
-              position: 'absolute',
-              top: 'calc(100% + 6px)',
-              left: 0,
-              zIndex: 30,
-              minWidth: 248,
-              border: '1px solid #2D2B45',
-              borderRadius: 9,
-              background: '#16151F',
-              boxShadow: '0 14px 36px rgba(0,0,0,0.55)',
-              overflow: 'hidden',
-              padding: 4,
-            }}
-          >
-            {SUBJECTS.map((sub, i) => (
-              <button
-                key={sub.code}
-                type="button"
-                onClick={() => onSelect(i)}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '9px 14px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  borderRadius: 6,
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  whiteSpace: 'nowrap',
-                  background: i === subject ? '#1C1B28' : 'transparent',
-                  color: i === subject ? '#E2E8F0' : '#94A3B8',
-                  transition: 'background .15s, color .15s',
-                }}
-              >
-                {sub.code} · {sub.topic}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-function DemoTranscript({
-  subject,
-  mode,
-  scanning,
-}: {
-  subject: number
-  mode: Mode
-  scanning: boolean
-}) {
-  const cur = SUBJECTS[subject]
-  const zoneOf = (name: string) => {
-    const kw = cur.KW.find((k) => k.name === name)
-    return kw ? kw.m[mode] : { z: 'none' as const, c: 0 }
-  }
-
-  return (
-    <div
-      data-demo-left=""
-      style={{
-        position: 'relative',
-        padding: '26px 26px 24px',
-        borderRight: '1px solid #1E1E2E',
-        overflow: 'hidden',
-      }}
-    >
-      <p
-        style={{
-          fontSize: 11,
-          textTransform: 'uppercase',
-          letterSpacing: '0.1em',
-          color: '#5B6478',
-          margin: '0 0 16px',
-        }}
-      >
-        Lecture transcript
-      </p>
-      <p style={{ fontSize: 17, lineHeight: 1.85, margin: 0, color: '#94A3B8' }}>
-        {cur.src.map((tok, i) => {
-          if ('t' in tok) {
-            return (
-              <span key={i} style={{ color: '#8B95A7', transition: 'color .4s' }}>
-                {tok.t}
-              </span>
-            )
-          }
-          const z = zoneOf(tok.k)
-          if (z.z === 'none') {
-            return (
-              <span
-                key={i}
-                style={{
-                  color: '#C2CAD6',
-                  borderBottom: '1px dashed #2D2B45',
-                  transition: 'all .45s',
-                }}
-              >
-                {tok.k}
-              </span>
-            )
-          }
-          const zc = ZONE_COLORS[z.z]
-          return (
-            <span
-              key={i}
-              style={{
-                color: zc.text,
-                background: `rgba(${zc.rgb},0.12)`,
-                borderBottom: `1px solid rgba(${zc.rgb},0.5)`,
-                borderRadius: 3,
-                padding: '1px 4px',
-                transition: 'all .45s',
-              }}
-            >
-              {tok.k}
-            </span>
-          )
-        })}
-      </p>
-
-      {scanning && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            left: 0,
-            width: 90,
-            background:
-              'linear-gradient(90deg, transparent, rgba(129,140,248,0.16), rgba(167,139,250,0.05), transparent)',
-            animation: 'noct-sweep 0.72s cubic-bezier(.4,0,.2,1)',
-            pointerEvents: 'none',
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
-function DemoSidebar({
-  subject,
-  mode,
-}: {
-  subject: number
-  mode: Mode
-}) {
-  const cur = SUBJECTS[subject]
-  const detected = cur.KW
-    .map((k) => ({ name: k.name, m: k.m[mode] }))
-    .filter((x) => x.m.c > 0)
-    .sort((a, b) => b.m.c - a.m.c)
-
-  const redCount = cur.KW.filter((k) => k.m[mode].z === 'red').length
-  const likelyCount = cur.KW.filter((k) => k.m[mode].z === 'likely').length
-  const summary =
-    redCount > 0 ? `${redCount} Red · ${likelyCount} Likely` : `${likelyCount} Likely`
-
-  return (
-    <div style={{ padding: '26px 24px 24px', display: 'flex', flexDirection: 'column' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          marginBottom: 6,
-        }}
-      >
-        <p
-          style={{
-            fontSize: 11,
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            color: '#5B6478',
-            margin: 0,
-          }}
-        >
-          Surfaced keywords
-        </p>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#94A3B8' }}>
-          {summary}
-        </span>
-      </div>
-
-      <p
-        style={{
-          fontSize: 12.5,
-          color: '#5B6478',
-          margin: '0 0 18px',
-          minHeight: 32,
-        }}
-      >
-        {MODE_CAPTIONS[mode]}
-      </p>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {detected.map((x) => {
-          const zc = ZONE_COLORS[x.m.z as keyof typeof ZONE_COLORS]
-          return (
-            <div key={x.name}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                  marginBottom: 6,
-                }}
-              >
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    fontSize: 13.5,
-                    color: '#E2E8F0',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: '50%',
-                      background: zc.bar,
-                      flexShrink: 0,
-                      boxShadow: `0 0 8px rgba(${zc.rgb},0.6)`,
-                    }}
-                  />
-                  {x.name}
-                </span>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    color: zc.text,
-                    flexShrink: 0,
-                  }}
-                >
-                  {x.m.c}%
-                </span>
-              </div>
-              <div
-                style={{
-                  height: 5,
-                  borderRadius: 9999,
-                  background: '#1C1B28',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    height: '100%',
-                    width: `${x.m.c}%`,
-                    borderRadius: 9999,
-                    background: `linear-gradient(90deg, rgba(${zc.rgb},0.5), ${zc.bar})`,
-                    transition: 'width .7s cubic-bezier(.16,1,.3,1)',
-                  }}
-                />
-              </div>
-              <span
-                style={{
-                  display: 'inline-block',
-                  marginTop: 5,
-                  fontSize: 10.5,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: zc.text,
-                  opacity: 0.8,
-                }}
-              >
-                {zc.label}
-              </span>
-            </div>
-          )
-        })}
-
-      </div>
-
-      {/* Export button — only visible in Full session mode */}
-      {mode === 2 && (
-        <Link
-          href="/login"
-          data-btn=""
-          style={{
-            marginTop: 22,
-            height: 38,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            borderRadius: 7,
-            fontSize: 13.5,
-            fontWeight: 500,
-            background: 'rgba(244,63,94,0.12)',
-            color: '#FB7185',
-            border: '1px solid rgba(244,63,94,0.32)',
-            textDecoration: 'none',
-            transition: 'background .2s, border-color .2s',
-          }}
-        >
-          Export {redCount} Red Zone flashcards → .apkg
-        </Link>
-      )}
-    </div>
-  )
-}
+const demoNodes = GRAPH_LAYOUT.map((n, i) => ({ ...n, label: DEMO_NODE_LABELS[i], confidence: DEMO_NODE_CONFIDENCE[i] }))
 
 export function DemoSection() {
-  const [mode, setModeState] = useState<Mode>(2)
-  const [scanning, setScanning] = useState(false)
-  const [subject, setSubjectState] = useState(0)
-  const [subjectOpen, setSubjectOpen] = useState(false)
-  const scanTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [step, setStep] = useState(0)
+  const [termCount, setTermCount] = useState(0)
+  const [mapZoom, setMapZoom] = useState(false)
+  const barRefs = useRef<(HTMLSpanElement | null)[]>([])
+  const termScrollRef = useRef<HTMLDivElement>(null)
+  const animRef = useRef<Animation | null>(null)
+  const hoveringRef = useRef(false)
+  const reducedRef = useRef(false)
+  const termIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const zoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  const triggerScan = () => {
-    setScanning(true)
-    if (scanTimer.current) clearTimeout(scanTimer.current)
-    scanTimer.current = setTimeout(() => setScanning(false), 740)
+  function goStep(i: number) {
+    clearInterval(termIntervalRef.current)
+    clearTimeout(zoomTimeoutRef.current)
+    animRef.current?.cancel()
+    const reduced = reducedRef.current
+
+    setStep(i)
+    setTermCount(reduced ? DEMO_LINES.length : 0)
+    setMapZoom(reduced)
+
+    barRefs.current.forEach((b, j) => { if (b) b.style.transform = j < i ? 'scaleX(1)' : 'scaleX(0)' })
+
+    if (i === 1 && !reduced) {
+      termIntervalRef.current = setInterval(() => {
+        setTermCount((c) => {
+          if (c >= DEMO_LINES.length) { clearInterval(termIntervalRef.current); return c }
+          return c + 1
+        })
+      }, 240)
+    }
+    if (i === 2 && !reduced) {
+      zoomTimeoutRef.current = setTimeout(() => setMapZoom(true), 450)
+    }
+
+    const bar = barRefs.current[i]
+    if (!bar) return
+    if (reduced) { bar.style.transform = 'scaleX(1)'; return }
+    const anim = bar.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], {
+      duration: i === 1 ? 7000 : 6000,
+      fill: 'forwards',
+      easing: 'linear',
+    })
+    animRef.current = anim
+    if (hoveringRef.current) anim.pause()
+    anim.onfinish = () => goStep((i + 1) % 3)
   }
 
-  const selectMode = (m: Mode) => {
-    if (m === mode) return
-    setModeState(m)
-    triggerScan()
-  }
+  useEffect(() => {
+    reducedRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    goStep(0)
+    return () => {
+      clearInterval(termIntervalRef.current)
+      clearTimeout(zoomTimeoutRef.current)
+      animRef.current?.cancel()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const selectSubject = (i: number) => {
-    setSubjectState(i)
-    setSubjectOpen(false)
-    triggerScan()
-  }
+  useEffect(() => {
+    const el = termScrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [termCount])
 
-  useEffect(() => () => { if (scanTimer.current) clearTimeout(scanTimer.current) }, [])
+  const scored = DEMO_LINES.slice(0, termCount).filter((l) => l.src === 'score')
 
   return (
     <section
       id="demo"
       style={{
-        scrollMarginTop: 80,
-        padding: 'clamp(72px,9vw,120px) 24px',
         position: 'relative',
-        borderTop: '1px solid #191827',
+        scrollMarginTop: 64,
+        padding: 'clamp(88px,10vw,140px) clamp(20px,4vw,40px)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}
     >
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        {/* Header */}
-        <div data-reveal="" style={{ textAlign: 'center', marginBottom: 48 }}>
-          <p
-            style={{
-              fontSize: 12,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: '#818CF8',
-              margin: '0 0 14px',
-            }}
-          >
-            The Red Zone, live
-          </p>
-          <h2
-            style={{
-              fontSize: 'clamp(28px,4vw,40px)',
-              fontWeight: 600,
-              letterSpacing: '-0.02em',
-              margin: 0,
-              color: '#E2E8F0',
-            }}
-          >
-            Watch it surface what matters.
-          </h2>
-          <p style={{ fontSize: 16, color: '#94A3B8', maxWidth: 520, margin: '16px auto 0' }}>
-            Add what you have, and Nocturne sharpens its read. Step through a real lecture moment below.
+      <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 48 }}>
+        <div data-split style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 40, alignItems: 'end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.16em', color: '#FF3B30' }}>APP BEHAVIOR</span>
+            <h2
+              style={{
+                margin: 0,
+                fontFamily: 'var(--font-display)',
+                fontStretch: '82%',
+                fontWeight: 600,
+                fontSize: 'clamp(34px,4.2vw,56px)',
+                lineHeight: 1,
+                letterSpacing: '-0.03em',
+              }}
+            >
+              One session, three states.
+            </h2>
+          </div>
+          <p style={{ margin: 0, maxWidth: 460, fontSize: 16, color: '#9A9A9F', textWrap: 'pretty' }}>
+            Step through how a single lecture moves from raw files to a ranked Red Zone and a
+            navigable concept map. Nothing here touches a server.
           </p>
         </div>
 
-        {/* Demo panel */}
         <div
-          data-reveal=""
-          style={{
-            border: '1px solid #1E1E2E',
-            borderRadius: 14,
-            background: '#111118',
-            overflow: 'hidden',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.45)',
-          }}
+          onMouseEnter={() => { hoveringRef.current = true; animRef.current?.pause() }}
+          onMouseLeave={() => { hoveringRef.current = false; animRef.current?.play() }}
+          style={{ border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D' }}
         >
-          {/* Toolbar */}
           <div
             style={{
-              display: 'flex',
+              height: 40,
+              display: 'grid',
+              gridTemplateColumns: '80px 1fr 80px',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 16,
-              flexWrap: 'wrap',
-              padding: '16px 20px',
-              borderBottom: '1px solid #1E1E2E',
-              background: 'rgba(22,21,31,0.6)',
+              padding: '0 14px',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}
           >
-            <SubjectDropdown
-              subject={subject}
-              open={subjectOpen}
-              onToggle={() => setSubjectOpen((v) => !v)}
-              onSelect={selectSubject}
-            />
-            <ModeTabBar mode={mode} onSelect={selectMode} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <span style={{ width: 8, height: 8, background: 'rgba(255,255,255,0.16)' }} />
+              <span style={{ width: 8, height: 8, background: 'rgba(255,255,255,0.16)' }} />
+              <span style={{ width: 8, height: 8, background: 'rgba(255,255,255,0.16)' }} />
+            </div>
+            <div
+              style={{
+                textAlign: 'center',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11.5,
+                color: '#76767B',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              Nocturne — BIOL 201 / Lecture 14
+            </div>
+            <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', color: '#76767B' }}>
+              OFFLINE
+            </div>
           </div>
 
-          {/* Content grid */}
-          <div
-            data-demo-grid=""
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1.45fr 1fr',
-            }}
-          >
-            <DemoTranscript subject={subject} mode={mode} scanning={scanning} />
-            <DemoSidebar subject={subject} mode={mode} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            {STEPS.map((s, i) => (
+              <button
+                key={s.n}
+                type="button"
+                onClick={() => goStep(i)}
+                style={{
+                  position: 'relative',
+                  textAlign: 'left',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  padding: '20px 22px',
+                  border: 'none',
+                  borderLeft: i ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  background: i === step ? 'rgba(255,255,255,0.03)' : 'transparent',
+                  color: i === step ? '#EDEDED' : '#76767B',
+                  cursor: 'pointer',
+                  transition: 'background .2s, color .2s',
+                }}
+              >
+                <span style={{ position: 'absolute', top: -1, left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                <span
+                  ref={(el) => { barRefs.current[i] = el }}
+                  style={{
+                    position: 'absolute',
+                    top: -1,
+                    left: 0,
+                    right: 0,
+                    height: 2,
+                    background: '#FF3B30',
+                    transform: 'scaleX(0)',
+                    transformOrigin: 'left',
+                  }}
+                />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.2em' }}>{s.n}</span>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>{s.l}</span>
+                <span data-step-desc style={{ fontSize: 12.5, lineHeight: 1.5, color: '#76767B' }}>{s.d}</span>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ position: 'relative', height: 500, overflow: 'hidden' }}>
+            {step === 0 && (
+              <div data-demo-grid style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)' }}>
+                <div style={{ padding: 32, borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex' }}>
+                  <div
+                    style={{
+                      flex: 1,
+                      border: '1px dashed rgba(255,255,255,0.18)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 22,
+                      padding: 24,
+                    }}
+                  >
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.18em', color: '#76767B' }}>
+                      DROP AUDIO + SLIDES
+                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 380 }}>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '44px 1fr auto',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '12px 14px',
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          background: '#111112',
+                          animation: 'noct-in .5s .2s ease both',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 10,
+                            letterSpacing: '0.1em',
+                            color: '#9A9A9F',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            padding: '2px 0',
+                            textAlign: 'center',
+                          }}
+                        >
+                          M4A
+                        </span>
+                        <span style={{ fontSize: 13.5 }}>lecture-14.m4a</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#76767B' }}>48:12</span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '44px 1fr auto',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '12px 14px',
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          background: '#111112',
+                          animation: 'noct-in .5s .55s ease both',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 10,
+                            letterSpacing: '0.1em',
+                            color: '#9A9A9F',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            padding: '2px 0',
+                            textAlign: 'center',
+                          }}
+                        >
+                          PDF
+                        </span>
+                        <span style={{ fontSize: 13.5 }}>L14-oxidative-phosphorylation.pdf</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#76767B' }}>38 pp</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.16em', color: '#76767B', paddingBottom: 14 }}>
+                    INGEST
+                  </span>
+                  {[
+                    ['Audio', '48:12 · 61.4 MB', '#9A9A9F', '.8s'],
+                    ['Slides', '38 extracted', '#9A9A9F', '1s'],
+                    ['Study guide', 'optional', '#76767B', '1.2s'],
+                    ['Network', 'disabled', '#9A9A9F', '1.4s'],
+                  ].map(([label, value, color, delay], i) => (
+                    <div
+                      key={label}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto',
+                        padding: '13px 0',
+                        borderTop: '1px solid rgba(255,255,255,0.08)',
+                        borderBottom: i === 3 ? '1px solid rgba(255,255,255,0.08)' : undefined,
+                        fontSize: 13.5,
+                        animation: `noct-in .4s ${delay} ease both`,
+                      }}
+                    >
+                      <span style={{ color: '#9A9A9F' }}>{label}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color }}>{value}</span>
+                    </div>
+                  ))}
+                  <div
+                    style={{
+                      marginTop: 'auto',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      letterSpacing: '0.1em',
+                      color: '#EDEDED',
+                      animation: 'noct-in .4s 1.7s ease both',
+                    }}
+                  >
+                    LINKED · READY TO RUN
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 1 && (
+              <div data-demo-grid style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)' }}>
+                <div
+                  ref={termScrollRef}
+                  style={{
+                    padding: '24px 28px',
+                    borderRight: '1px solid rgba(255,255,255,0.08)',
+                    overflowY: 'auto',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12.5,
+                    lineHeight: 1.95,
+                    background: '#0A0A0A',
+                  }}
+                >
+                  {DEMO_LINES.slice(0, termCount).map((ln) => (
+                    <div key={ln.ts} style={{ display: 'grid', gridTemplateColumns: '64px 76px minmax(0,1fr) auto', gap: 10, animation: 'noct-in .25s ease both' }}>
+                      <span style={{ color: '#5E5E62' }}>{ln.ts}</span>
+                      <span style={{ color: '#76767B' }}>[{ln.src}]</span>
+                      <span
+                        style={{
+                          color: ln.red || ln.src === 'done' ? '#EDEDED' : '#9A9A9F',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {ln.msg}
+                      </span>
+                      <span style={{ color: ln.red ? '#FF3B30' : '#9A9A9F' }}>{ln.val ?? ''}</span>
+                    </div>
+                  ))}
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 8,
+                      height: 14,
+                      background: '#EDEDED',
+                      verticalAlign: 'middle',
+                      animation: 'noct-blink 1s steps(1) infinite',
+                    }}
+                  />
+                </div>
+                <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.16em', color: '#76767B', paddingBottom: 14 }}>
+                    CONFIDENCE · LIVE
+                  </span>
+                  {scored.map((l) => (
+                    <div
+                      key={l.msg}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                        padding: '13px 0',
+                        borderTop: '1px solid rgba(255,255,255,0.08)',
+                        animation: 'noct-in .3s ease both',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13.5 }}>
+                        <span>{l.msg}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: l.red ? '#FF3B30' : '#9A9A9F' }}>{l.val}</span>
+                      </div>
+                      <div style={{ height: 1, background: 'rgba(255,255,255,0.08)' }}>
+                        <div
+                          style={{
+                            height: 1,
+                            width: `${parseFloat(l.val ?? '0') * 100}%`,
+                            background: l.red ? '#FF3B30' : '#9A9A9F',
+                            transition: 'width .6s',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div data-demo-grid style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: 'minmax(0,1.6fr) minmax(0,1fr)' }}>
+                <div style={{ position: 'relative', overflow: 'hidden', borderRight: '1px solid rgba(255,255,255,0.08)', background: '#0A0A0A' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      transformOrigin: '52% 46%',
+                      transform: mapZoom ? 'scale(1.55)' : 'scale(0.92)',
+                      transition: 'transform 1.6s cubic-bezier(.22,1,.36,1)',
+                      backgroundImage: 'radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px)',
+                      backgroundSize: '22px 22px',
+                    }}
+                  >
+                    <ConceptGraph nodes={demoNodes} edges={GRAPH_EDGES} />
+                  </div>
+                  <div style={{ position: 'absolute', left: 16, bottom: 14, fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', color: '#76767B' }}>
+                    {mapZoom ? 'ZOOM 155% · FOCUS NODE' : 'ZOOM 92%'}
+                  </div>
+                </div>
+                <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.16em', color: '#76767B', paddingBottom: 14 }}>
+                    INSPECTOR
+                  </span>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontStretch: '85%',
+                      fontSize: 24,
+                      fontWeight: 600,
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1.15,
+                      paddingBottom: 18,
+                    }}
+                  >
+                    electron transport chain
+                  </div>
+                  {[
+                    ['Confidence', '0.94', '#FF3B30'],
+                    ['First introduced', 'L09 · 21:40', undefined],
+                    ['Peak emphasis', 'L14 · slide 07', undefined],
+                    ['Linked concepts', '5', undefined],
+                  ].map(([label, value, color], i) => (
+                    <div
+                      key={label}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto',
+                        padding: '12px 0',
+                        borderTop: '1px solid rgba(255,255,255,0.08)',
+                        borderBottom: i === 3 ? '1px solid rgba(255,255,255,0.08)' : undefined,
+                        fontSize: 13,
+                      }}
+                    >
+                      <span style={{ color: '#9A9A9F' }}>{label}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: color ?? '#EDEDED' }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

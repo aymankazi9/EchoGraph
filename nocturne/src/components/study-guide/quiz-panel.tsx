@@ -65,11 +65,11 @@ function ScoreRing({ correct, total }: { correct: number; total: number }) {
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
       <div style={{ position: 'relative', width: 100, height: 100 }}>
         <svg width="100" height="100" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r={R} fill="none" stroke="#16151F" strokeWidth="10" />
+          <circle cx="50" cy="50" r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
           {arc > 0.5 && (
             <circle
               cx="50" cy="50" r={R} fill="none"
-              stroke="#10B981" strokeWidth="10"
+              stroke="#EDEDED" strokeWidth="10"
               strokeDasharray={`${arc} ${C - arc}`}
               strokeDashoffset={0}
               transform="rotate(-90 50 50)"
@@ -81,11 +81,11 @@ function ScoreRing({ correct, total }: { correct: number; total: number }) {
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 1,
         }}>
-          <span style={{ fontSize: 22, fontWeight: 700, color: '#E2E8F0', lineHeight: 1 }}>{pct}%</span>
-          <span style={{ fontSize: 10, color: '#3F485C' }}>{correct}/{total}</span>
+          <span style={{ fontSize: 22, fontWeight: 700, color: '#EDEDED', lineHeight: 1 }}>{pct}%</span>
+          <span style={{ fontSize: 10, color: '#76767B' }}>{correct}/{total}</span>
         </div>
       </div>
-      <span style={{ fontSize: 12, color: '#64748B', textAlign: 'center' }}>correct</span>
+      <span style={{ fontSize: 12, color: '#76767B', textAlign: 'center' }}>correct</span>
     </div>
   )
 }
@@ -373,7 +373,7 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
   if (sessionFlashcards.length === 0 && mode === 'session') {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <p style={{ fontSize: 13, color: '#3F485C' }}>No flashcards yet — add a study guide or score slides first.</p>
+        <p style={{ fontSize: 13, color: '#76767B' }}>No flashcards yet — add a study guide or score slides first.</p>
       </div>
     )
   }
@@ -384,14 +384,14 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
 
       {/* ── LEFT PANE: config + question list ─────────────────────────────── */}
       <div style={{
-        width: 264, flexShrink: 0, borderRight: '1px solid #1A1A28',
-        display: 'flex', flexDirection: 'column', gap: 0, paddingRight: 0,
+        width: 264, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.08)',
+        display: 'flex', flexDirection: 'column', gap: 0, paddingRight: 20,
       }}>
 
         {/* Mode toggle — only when courseId is available */}
         {courseId && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'inline-flex', background: '#0C0C13', border: '1px solid #1E1E2E', borderRadius: 10, padding: 3, gap: 2 }}>
+            <div style={{ display: 'inline-flex', background: '#0C0C0D', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 2, padding: 3, gap: 2 }}>
               {(['session', 'course'] as const).map((m) => {
                 const active = mode === m
                 const label  = m === 'session' ? 'Session' : courseName ?? 'Course'
@@ -399,10 +399,10 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
                   <button key={m} type="button"
                     onClick={() => setMode(m)}
                     style={{
-                      padding: '4px 10px', borderRadius: 7, border: 'none',
+                      padding: '4px 10px', borderRadius: 2, border: 'none',
                       fontSize: 11.5, fontWeight: active ? 600 : 400,
-                      color: active ? '#E2E8F0' : '#5B6478',
-                      background: active ? '#16151F' : 'transparent',
+                      color: active ? '#EDEDED' : '#76767B',
+                      background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
                       cursor: 'pointer', transition: 'background 0.15s, color 0.15s',
                       whiteSpace: 'nowrap',
                     }}
@@ -415,7 +415,7 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
 
         {/* Section header */}
         <div style={{ padding: '0 0 12px 0' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#3F485C', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#76767B', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             {phase === 'idle' || phase === 'generating' ? 'Configure quiz' : 'Questions'}
           </span>
         </div>
@@ -425,7 +425,7 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Zone filter pills */}
             <div>
-              <span style={{ fontSize: 11, color: '#3F485C', display: 'block', marginBottom: 8 }}>Zone filter</span>
+              <span style={{ fontSize: 11, color: '#76767B', display: 'block', marginBottom: 8 }}>Zone filter</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {(['all', 'red', 'likely'] as ZoneFilter[]).map((f) => {
                   const labels: Record<ZoneFilter, string> = { all: 'All', red: 'Red Zone', likely: 'Likely' }
@@ -436,17 +436,17 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 5,
                         height: 26, padding: '0 10px', borderRadius: 9999,
-                        border: active ? '1px solid rgba(99,102,241,0.5)' : '1px solid #1E1D2A',
-                        background: active ? 'rgba(99,102,241,0.12)' : '#0C0C13',
-                        color: active ? '#A5B4FC' : '#4B5563',
+                        border: active ? '1px solid rgba(255,59,48,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                        background: active ? 'rgba(255,59,48,0.12)' : '#0C0C0D',
+                        color: active ? '#FF3B30' : '#76767B',
                         fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
                       }}
                     >
                       {labels[f]}
                       <span style={{
                         fontSize: 10, fontWeight: 600,
-                        color: active ? '#818CF8' : '#2D3748',
-                        background: active ? 'rgba(99,102,241,0.2)' : '#111',
+                        color: active ? '#FF3B30' : '#76767B',
+                        background: active ? 'rgba(255,59,48,0.2)' : 'rgba(255,255,255,0.06)',
                         borderRadius: 9999, padding: '1px 5px',
                       }}>
                         {filterCounts[f]}
@@ -459,7 +459,7 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
 
             {/* Question count */}
             <div>
-              <span style={{ fontSize: 11, color: '#3F485C', display: 'block', marginBottom: 8 }}>Questions</span>
+              <span style={{ fontSize: 11, color: '#76767B', display: 'block', marginBottom: 8 }}>Questions</span>
               <div style={{ display: 'flex', gap: 6 }}>
                 {QUESTION_COUNTS.map((n) => {
                   const active  = questionCount === n
@@ -469,10 +469,10 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
                     <button key={n} type="button"
                       onClick={() => { if (enabled) setQuestionCount(n) }}
                       style={{
-                        width: 42, height: 30, borderRadius: 8,
-                        border: active ? '1px solid rgba(99,102,241,0.5)' : '1px solid #1E1D2A',
-                        background: active ? 'rgba(99,102,241,0.12)' : '#0C0C13',
-                        color: active ? '#A5B4FC' : enabled ? '#4B5563' : '#2D3748',
+                        width: 42, height: 30, borderRadius: 2,
+                        border: active ? '1px solid rgba(255,59,48,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                        background: active ? 'rgba(255,59,48,0.12)' : '#0C0C0D',
+                        color: active ? '#FF3B30' : enabled ? '#76767B' : '#4A4A4E',
                         fontSize: 12, fontWeight: active ? 600 : 400,
                         cursor: enabled ? 'pointer' : 'not-allowed',
                         opacity: enabled ? 1 : 0.4,
@@ -490,12 +490,12 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
               onClick={handleGenerate}
               disabled={phase === 'generating' || filterCounts[zoneFilter] < 4}
               style={{
-                height: 40, borderRadius: 10,
-                border: '1px solid rgba(99,102,241,0.4)',
+                height: 40, padding: '0 16px', borderRadius: 2,
+                border: (phase === 'generating' || filterCounts[zoneFilter] < 4) ? '1px solid rgba(255,255,255,0.08)' : 'none',
                 background: phase === 'generating' || filterCounts[zoneFilter] < 4
-                  ? 'rgba(99,102,241,0.04)' : 'rgba(99,102,241,0.12)',
+                  ? '#0C0C0D' : '#FF3B30',
                 color: phase === 'generating' || filterCounts[zoneFilter] < 4
-                  ? '#3F485C' : '#A5B4FC',
+                  ? '#4A4A4E' : '#0A0A0A',
                 fontSize: 13, fontWeight: 600,
                 cursor: phase === 'generating' || filterCounts[zoneFilter] < 4
                   ? 'not-allowed' : 'pointer',
@@ -510,7 +510,7 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
             </button>
 
             {generateError && (
-              <p style={{ fontSize: 12, color: '#FDA4AF', lineHeight: 1.5, margin: 0 }}>{generateError}</p>
+              <p style={{ fontSize: 12, color: '#FF3B30', lineHeight: 1.5, margin: 0 }}>{generateError}</p>
             )}
           </div>
         )}
@@ -521,7 +521,7 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
             {questions.map((q, idx) => {
               const attempt = attempts.get(idx)
               const isActive = idx === currentIdx && phase === 'active'
-              const statusColor = !attempt ? '#2D3748' : attempt.correct ? '#10B981' : '#EF4444'
+              const statusColor = !attempt ? 'rgba(255,255,255,0.14)' : attempt.correct ? '#EDEDED' : '#FF3B30'
 
               return (
                 <button
@@ -530,9 +530,9 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
                   onClick={() => { if (phase === 'active') { setCurrentIdx(idx); setPendingIdx(null) } }}
                   style={{
                     display: 'block', textAlign: 'left', padding: '9px 10px 9px 12px',
-                    borderRadius: 10, cursor: phase === 'active' ? 'pointer' : 'default',
-                    border: isActive ? '1px solid #23222F' : '1px solid transparent',
-                    background: isActive ? '#111020' : 'transparent',
+                    borderRadius: 2, cursor: phase === 'active' ? 'pointer' : 'default',
+                    border: isActive ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
+                    background: isActive ? 'rgba(255,255,255,0.05)' : 'transparent',
                     borderLeft: `3px solid ${isActive ? statusColor : 'transparent'}`,
                     transition: 'all 0.12s',
                   }}
@@ -545,13 +545,13 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
                     }}>
                       {attempt ? (
                         attempt.correct
-                          ? <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round"><path d="M2 6 L5 9 L10 3" /></svg>
-                          : <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"><path d="M3 3 L9 9 M9 3 L3 9" /></svg>
+                          ? <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#EDEDED" strokeWidth="2" strokeLinecap="round"><path d="M2 6 L5 9 L10 3" /></svg>
+                          : <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M3 3 L9 9 M9 3 L3 9" /></svg>
                       ) : (
-                        <span style={{ fontSize: 9, color: '#3F485C', fontWeight: 600 }}>{idx + 1}</span>
+                        <span style={{ fontSize: 9, color: '#76767B', fontWeight: 600 }}>{idx + 1}</span>
                       )}
                     </span>
-                    <span style={{ fontSize: 12, color: isActive ? '#CBD5E1' : '#64748B', lineHeight: 1.35,
+                    <span style={{ fontSize: 12, color: isActive ? '#EDEDED' : '#76767B', lineHeight: 1.35,
                       overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                     }}>
                       {q.questionText}
@@ -568,15 +568,15 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '0 32px' }}>
         {phase === 'idle' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, textAlign: 'center' }}>
-            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#0F0E1A',
-              border: '1px solid #1E1D2A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4B5563" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <div style={{ width: 48, height: 48, borderRadius: 2, background: '#0C0C0D',
+              border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#76767B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
             </div>
             <div>
-              <p style={{ fontSize: 15, fontWeight: 600, color: '#E2E8F0', margin: '0 0 6px' }}>Generate a quiz</p>
-              <p style={{ fontSize: 13, color: '#3F485C', lineHeight: 1.65, margin: 0, maxWidth: 320 }}>
+              <p style={{ fontSize: 15, fontWeight: 600, color: '#EDEDED', margin: '0 0 6px' }}>Generate a quiz</p>
+              <p style={{ fontSize: 13, color: '#76767B', lineHeight: 1.65, margin: 0, maxWidth: 320 }}>
                 Choose a filter and question count, then click Generate Quiz.
                 Questions are created from your flashcard deck using AI.
               </p>
@@ -590,10 +590,10 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
               @keyframes quizSpin { to { transform: rotate(360deg); } }
             `}</style>
             <div style={{ width: 36, height: 36, borderRadius: '50%',
-              border: '3px solid #1E1D2A', borderTopColor: '#6366F1',
+              border: '3px solid rgba(255,255,255,0.14)', borderTopColor: '#FF3B30',
               animation: 'quizSpin 0.8s linear infinite',
             }} />
-            <p style={{ fontSize: 13, color: '#5B6478', margin: 0 }}>Generating questions…</p>
+            <p style={{ fontSize: 13, color: '#76767B', margin: 0 }}>Generating questions…</p>
           </div>
         )}
 
@@ -601,10 +601,10 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
           <div style={{ width: '100%', maxWidth: 560, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 0 }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <span style={{ fontSize: 12, color: '#3F485C', fontFamily: 'monospace' }}>
+              <span style={{ fontSize: 12, color: '#76767B', fontFamily: 'var(--font-mono)' }}>
                 Question {currentIdx + 1} / {questions.length}
               </span>
-              <span style={{ fontSize: 12, color: '#4B5563' }}>
+              <span style={{ fontSize: 12, color: '#76767B' }}>
                 {answeredCount === 0 ? 'Select an answer' : `${correctCount} correct so far`}
               </span>
             </div>
@@ -618,7 +618,7 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
                 exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
               >
                 <div style={{ marginBottom: 24 }}>
-                  <p style={{ fontSize: 17, fontWeight: 600, color: '#E2E8F0', margin: '0 0 4px', lineHeight: 1.45 }}>
+                  <p style={{ fontSize: 17, fontWeight: 600, color: '#EDEDED', margin: '0 0 4px', lineHeight: 1.45 }}>
                     {currentQuestion.questionText}
                   </p>
                 </div>
@@ -630,15 +630,15 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
                     const isCorrect  = optIdx === currentQuestion.correctIndex
                     const isAnswered = pendingIdx !== null || currentAttempt !== null
 
-                    let borderColor = '#1E1D2A'
-                    let bgColor     = '#0A0A10'
-                    let textColor   = '#94A3B8'
-                    let labelColor  = '#3F485C'
+                    let borderColor = 'rgba(255,255,255,0.08)'
+                    let bgColor     = '#0C0C0D'
+                    let textColor   = '#9A9A9F'
+                    let labelColor  = '#76767B'
 
                     if (isAnswered && isCorrect) {
-                      borderColor = 'rgba(16,185,129,0.45)'; bgColor = 'rgba(16,185,129,0.08)'; textColor = '#6EE7B7'; labelColor = '#10B981'
+                      borderColor = 'rgba(255,255,255,0.3)'; bgColor = 'rgba(255,255,255,0.06)'; textColor = '#EDEDED'; labelColor = '#EDEDED'
                     } else if (isAnswered && isSelected && !isCorrect) {
-                      borderColor = 'rgba(239,68,68,0.45)'; bgColor = 'rgba(239,68,68,0.08)'; textColor = '#FCA5A5'; labelColor = '#EF4444'
+                      borderColor = 'rgba(255,59,48,0.45)'; bgColor = 'rgba(255,59,48,0.08)'; textColor = '#FF3B30'; labelColor = '#FF3B30'
                     }
 
                     return (
@@ -649,20 +649,20 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
                         disabled={isAnswered}
                         style={{
                           display: 'flex', alignItems: 'flex-start', gap: 12,
-                          padding: '13px 16px', borderRadius: 11, textAlign: 'left',
+                          padding: '13px 16px', borderRadius: 2, textAlign: 'left',
                           border: `1px solid ${borderColor}`, background: bgColor,
                           cursor: isAnswered ? 'default' : 'pointer',
                           transition: 'border-color 0.15s, background 0.15s',
                         }}
                         onMouseEnter={(e) => {
-                          if (!isAnswered) (e.currentTarget as HTMLButtonElement).style.borderColor = '#2D2B45'
+                          if (!isAnswered) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.14)'
                         }}
                         onMouseLeave={(e) => {
-                          if (!isAnswered) (e.currentTarget as HTMLButtonElement).style.borderColor = '#1E1D2A'
+                          if (!isAnswered) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.08)'
                         }}
                       >
                         <span style={{
-                          flexShrink: 0, width: 24, height: 24, borderRadius: 7,
+                          flexShrink: 0, width: 24, height: 24, borderRadius: 2,
                           border: `1.5px solid ${labelColor}`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 11, fontWeight: 700, color: labelColor,
@@ -687,7 +687,7 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
                         if (currentIdx + 1 >= questions.length) setPhase('complete')
                         else setCurrentIdx((i) => i + 1)
                       }}
-                      style={{ fontSize: 12, color: '#3F485C', background: 'none', border: 'none', cursor: 'pointer' }}
+                      style={{ fontSize: 12, color: '#76767B', background: 'none', border: 'none', cursor: 'pointer' }}
                     >
                       Skip →
                     </button>
@@ -711,7 +711,7 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
 
       {/* ── RIGHT PANE: score ring + zone breakdown ───────────────────────── */}
       <div style={{
-        width: 200, flexShrink: 0, borderLeft: '1px solid #1A1A28',
+        width: 200, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.08)',
         paddingLeft: 24, display: 'flex', flexDirection: 'column', gap: 0,
       }}>
         {(phase === 'active' || phase === 'complete') ? (
@@ -719,27 +719,27 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
             <ScoreRing correct={correctCount} total={answeredCount} />
 
             <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ height: 1, background: '#1A1A28' }} />
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.08)' }} />
 
               {/* Per-stat breakdown */}
               {[
-                { label: 'Correct',     value: correctCount,              color: '#10B981' },
-                { label: 'Wrong',       value: answeredCount - correctCount, color: '#EF4444' },
-                { label: 'Unanswered',  value: questions.length - answeredCount, color: '#3F485C' },
+                { label: 'Correct',     value: correctCount,              color: '#EDEDED' },
+                { label: 'Wrong',       value: answeredCount - correctCount, color: '#FF3B30' },
+                { label: 'Unanswered',  value: questions.length - answeredCount, color: '#76767B' },
               ].map(({ label, value, color }) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: '#64748B' }}>{label}</span>
+                    <span style={{ fontSize: 12, color: '#76767B' }}>{label}</span>
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8' }}>{value}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#9A9A9F' }}>{value}</span>
                 </div>
               ))}
 
               {phase === 'complete' && (
                 <>
-                  <div style={{ height: 1, background: '#1A1A28', marginTop: 6 }} />
-                  <p style={{ fontSize: 11, color: '#3F485C', lineHeight: 1.55, margin: 0 }}>
+                  <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', marginTop: 6 }} />
+                  <p style={{ fontSize: 11, color: '#76767B', lineHeight: 1.55, margin: 0 }}>
                     Quiz results are tracked separately from flashcard reviews.
                   </p>
                 </>
@@ -748,12 +748,12 @@ export function QuizPanel({ sessionId, userId, courseId, courseName }: Props) {
           </>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#3F485C', letterSpacing: '0.06em', textTransform: 'uppercase' }}>About Quiz</span>
-            <p style={{ fontSize: 12, color: '#3F485C', lineHeight: 1.65, margin: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#76767B', letterSpacing: '0.06em', textTransform: 'uppercase' }}>About Quiz</span>
+            <p style={{ fontSize: 12, color: '#76767B', lineHeight: 1.65, margin: 0 }}>
               Multiple-choice questions generated from your flashcard deck.
               Wrong answers are grounded in your lecture content — not random.
             </p>
-            <p style={{ fontSize: 12, color: '#3F485C', lineHeight: 1.65, margin: 0 }}>
+            <p style={{ fontSize: 12, color: '#76767B', lineHeight: 1.65, margin: 0 }}>
               Quiz performance is tracked independently from spaced-repetition reviews.
             </p>
           </div>
@@ -781,7 +781,7 @@ function QuizComplete({
   const skipped      = questions.length - attempts.size
   const pct          = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0
 
-  const verdict = pct >= 80 ? '🎯 Great work!' : pct >= 60 ? '📚 Keep studying!' : '🔁 More review needed'
+  const verdict = pct >= 80 ? 'Great work!' : pct >= 60 ? 'Keep studying!' : 'More review needed'
 
   return (
     <motion.div
@@ -794,11 +794,11 @@ function QuizComplete({
       }}
     >
       <div>
-        <p style={{ fontSize: 22, fontWeight: 700, color: '#E2E8F0', margin: '0 0 6px' }}>Quiz complete</p>
-        <p style={{ fontSize: 15, color: '#818CF8', margin: '0 0 12px', fontWeight: 600 }}>{verdict}</p>
-        <p style={{ fontSize: 14, color: '#64748B', margin: 0, lineHeight: 1.6 }}>
-          <span style={{ color: '#6EE7B7' }}>{correctCount} correct</span>
-          {wrongCount > 0 && <> · <span style={{ color: '#FCA5A5' }}>{wrongCount} wrong</span></>}
+        <p style={{ fontSize: 22, fontWeight: 700, color: '#EDEDED', margin: '0 0 6px' }}>Quiz complete</p>
+        <p style={{ fontSize: 15, color: '#9A9A9F', margin: '0 0 12px', fontWeight: 600 }}>{verdict}</p>
+        <p style={{ fontSize: 14, color: '#76767B', margin: 0, lineHeight: 1.6 }}>
+          <span style={{ color: '#EDEDED' }}>{correctCount} correct</span>
+          {wrongCount > 0 && <> · <span style={{ color: '#FF3B30' }}>{wrongCount} wrong</span></>}
           {skipped > 0 && <> · {skipped} skipped</>}
           {' '}out of {questions.length} questions
         </p>
@@ -807,17 +807,17 @@ function QuizComplete({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
         {wrongCount > 0 && (
           <button type="button" onClick={onRetryWrong} style={{
-            height: 42, borderRadius: 10,
-            border: '1px solid rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.06)',
-            color: '#FDE68A', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            height: 42, borderRadius: 2,
+            border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+            color: '#9A9A9F', fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}>
             Retry wrong ({wrongCount})
           </button>
         )}
         <button type="button" onClick={onNewQuiz} style={{
-          height: 42, borderRadius: 10,
-          border: '1px solid rgba(99,102,241,0.35)', background: 'rgba(99,102,241,0.08)',
-          color: '#A5B4FC', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          height: 42, borderRadius: 2,
+          border: 'none', background: '#FF3B30',
+          color: '#0A0A0A', fontSize: 13, fontWeight: 600, cursor: 'pointer',
         }}>
           New quiz
         </button>

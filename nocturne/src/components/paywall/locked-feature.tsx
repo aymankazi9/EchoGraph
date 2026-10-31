@@ -19,11 +19,11 @@ export function LockedFeature({ requiredTier, feature, description }: Props) {
       gap: 20, padding: 48, textAlign: 'center',
     }}>
       <div style={{
-        width: 52, height: 52, borderRadius: 16,
-        border: '1px solid rgba(99,102,241,0.22)',
-        background: 'rgba(99,102,241,0.07)',
+        width: 52, height: 52, borderRadius: 2,
+        border: '1px solid color-mix(in srgb, var(--color-accent) 22%, transparent)',
+        background: 'color-mix(in srgb, var(--color-accent) 7%, transparent)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#6366F1',
+        color: 'var(--color-accent)',
       }}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -32,15 +32,15 @@ export function LockedFeature({ requiredTier, feature, description }: Props) {
       </div>
 
       <div style={{ maxWidth: 300 }}>
-        <p style={{ fontSize: 15, fontWeight: 600, color: '#E2E8F0', margin: '0 0 7px', lineHeight: 1.4 }}>
+        <p style={{ fontSize: 15, fontWeight: 600, color: '#EDEDED', margin: '0 0 7px', lineHeight: 1.4 }}>
           {feature}
         </p>
-        <p style={{ fontSize: 13, color: '#5B6478', margin: '0 0 22px', lineHeight: 1.6 }}>
+        <p style={{ fontSize: 13, color: '#76767B', margin: '0 0 22px', lineHeight: 1.6 }}>
           {description}
         </p>
         {IS_BETA ? (
           // Beta: no checkout yet — let the tester know this tier is coming
-          <p style={{ fontSize: 13, color: '#6366F1', fontWeight: 500 }}>
+          <p style={{ fontSize: 13, color: 'var(--color-accent)', fontWeight: 500 }}>
             {TIER_LABEL[requiredTier]} — coming soon to beta testers
           </p>
         ) : (
@@ -48,18 +48,17 @@ export function LockedFeature({ requiredTier, feature, description }: Props) {
             href="/billing"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
-              height: 38, padding: '0 22px', borderRadius: 8,
-              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-              color: '#fff', fontSize: 13, fontWeight: 600,
+              height: 38, padding: '0 22px', borderRadius: 2,
+              background: 'var(--color-accent)',
+              color: 'var(--color-text-inverse)', fontSize: 13, fontWeight: 600,
               textDecoration: 'none',
-              boxShadow: '0 4px 18px rgba(99,102,241,0.32)',
             }}
           >
             Upgrade to {TIER_LABEL[requiredTier]}
           </Link>
         )}
         {!IS_BETA && (
-          <p style={{ fontSize: 11, color: '#3A4155', margin: '12px 0 0' }}>
+          <p style={{ fontSize: 11, color: '#4A4A4E', margin: '12px 0 0' }}>
             You&apos;re on the free Dusk plan
           </p>
         )}

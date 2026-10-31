@@ -141,9 +141,9 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
         type="button"
         onClick={() => setOpen((o) => !o)}
         style={{
-          height: 28, padding: '0 10px', borderRadius: 8,
-          border: '1px solid #1E1E2E', background: '#0D0D14',
-          fontSize: 12, color: courseName ? '#CBD5E1' : '#3F485C',
+          height: 28, padding: '0 10px', borderRadius: 2,
+          border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+          fontSize: 12, color: courseName ? '#9A9A9F' : '#76767B',
           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
           whiteSpace: 'nowrap', flexShrink: 0,
         }}
@@ -154,16 +154,15 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
           <circle cx="5.5" cy="8" r="1" fill="currentColor" stroke="none" />
         </svg>
         {courseName ?? 'Subject'}
-        {saving && <span style={{ color: '#5B6478' }}>…</span>}
+        {saving && <span style={{ color: '#76767B' }}>…</span>}
       </button>
 
       {/* Dropdown */}
       {open && (
         <div style={{
           position: 'absolute', top: 34, right: 0, zIndex: 100,
-          width: 230, borderRadius: 10, border: '1px solid #1E1E2E',
-          background: '#0D0D14', padding: 7,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+          width: 230, borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)',
+          background: '#0C0C0D', padding: 7,
         }}>
 
           {/* Existing courses */}
@@ -181,9 +180,9 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
                   }}
                   placeholder="Course name"
                   style={{
-                    background: '#16151E', border: '1px solid #2D2B45',
-                    borderRadius: 7, padding: '5px 9px',
-                    fontSize: 12, color: '#CBD5E1', outline: 'none',
+                    background: '#111112', border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: 2, padding: '5px 9px',
+                    fontSize: 12, color: '#EDEDED', outline: 'none',
                     fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
                   }}
                 />
@@ -193,9 +192,9 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
                   onChange={(e) => setEditDate(e.target.value)}
                   title="Exam date (optional)"
                   style={{
-                    background: '#16151E', border: '1px solid #2D2B45',
-                    borderRadius: 7, padding: '5px 9px',
-                    fontSize: 12, color: editDate ? '#CBD5E1' : '#5B6478', outline: 'none',
+                    background: '#111112', border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: 2, padding: '5px 9px',
+                    fontSize: 12, color: editDate ? '#EDEDED' : '#76767B', outline: 'none',
                     fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
                     colorScheme: 'dark',
                   }}
@@ -206,9 +205,9 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
                     onClick={() => saveCourseEdit(c.id)}
                     disabled={saving || !editName.trim()}
                     style={{
-                      flex: 1, padding: '5px 0', borderRadius: 7,
-                      background: '#6366F1', border: 'none',
-                      fontSize: 11.5, color: '#fff', cursor: saving ? 'not-allowed' : 'pointer',
+                      flex: 1, padding: '5px 0', borderRadius: 2,
+                      background: '#FF3B30', border: 'none',
+                      fontSize: 11.5, color: '#0A0A0A', cursor: saving ? 'not-allowed' : 'pointer',
                       opacity: saving || !editName.trim() ? 0.5 : 1,
                     }}
                   >
@@ -218,9 +217,9 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
                     type="button"
                     onClick={() => setEditingId(null)}
                     style={{
-                      padding: '5px 10px', borderRadius: 7,
-                      background: 'none', border: '1px solid #1E1E2E',
-                      fontSize: 11.5, color: '#5B6478', cursor: 'pointer',
+                      padding: '5px 10px', borderRadius: 2,
+                      background: 'none', border: '1px solid rgba(255,255,255,0.08)',
+                      fontSize: 11.5, color: '#9A9A9F', cursor: 'pointer',
                     }}
                   >
                     Cancel
@@ -233,8 +232,8 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
                 key={c.id}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 4,
-                  borderRadius: 7,
-                  background: courseId === c.id ? 'rgba(99,102,241,0.08)' : 'none',
+                  borderRadius: 2,
+                  background: courseId === c.id ? 'rgba(255,59,48,0.08)' : 'none',
                 }}
               >
                 <button
@@ -243,11 +242,11 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
                   style={{
                     flex: 1, textAlign: 'left', padding: '6px 8px',
                     background: 'none', border: 'none',
-                    fontSize: 12, color: courseId === c.id ? '#A5B4FC' : '#CBD5E1',
+                    fontSize: 12, color: courseId === c.id ? '#FF3B30' : '#9A9A9F',
                     cursor: 'pointer',
                   }}
                   onMouseEnter={(e) => {
-                    if (courseId !== c.id) (e.currentTarget as HTMLButtonElement).style.background = '#16151E'
+                    if (courseId !== c.id) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLButtonElement).style.background = 'none'
@@ -255,7 +254,7 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
                 >
                   <span style={{ display: 'block' }}>{c.name}</span>
                   {c.exam_date && (
-                    <span style={{ display: 'block', fontSize: 10.5, color: '#5B6478', marginTop: 1 }}>
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#76767B', marginTop: 1 }}>
                       Exam {new Date(c.exam_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                   )}
@@ -268,11 +267,11 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
                   style={{
                     flexShrink: 0, padding: '4px 6px', marginRight: 2,
                     background: 'none', border: 'none',
-                    color: '#3F485C', cursor: 'pointer', borderRadius: 5,
+                    color: '#76767B', cursor: 'pointer', borderRadius: 2,
                     lineHeight: 1,
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#818CF8' }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#3F485C' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#EDEDED' }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#76767B' }}
                 >
                   <svg width="11" height="11" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M13 2 L16 5 L7 14 L3 15 L4 11 Z" /><path d="M11 4 L14 7" />
@@ -286,18 +285,18 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
           {courseId && !editingId && (
             <>
               {courses.length > 0 && (
-                <div style={{ height: 1, background: '#16151E', margin: '5px 0' }} />
+                <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '5px 0' }} />
               )}
               <button
                 type="button"
                 onClick={() => assignCourse(null, null)}
                 style={{
                   display: 'block', width: '100%', textAlign: 'left',
-                  padding: '6px 10px', borderRadius: 7,
+                  padding: '6px 10px', borderRadius: 2,
                   background: 'none', border: 'none',
-                  fontSize: 12, color: '#FB7185', cursor: 'pointer',
+                  fontSize: 12, color: '#FF3B30', cursor: 'pointer',
                 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(251,113,133,0.08)' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,59,48,0.08)' }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
               >
                 Remove subject
@@ -307,7 +306,7 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
 
           {!editingId && (
             <>
-              <div style={{ height: 1, background: '#16151E', margin: '5px 0' }} />
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '5px 0' }} />
               {/* New course input */}
               <div style={{ display: 'flex', gap: 5 }}>
                 <input
@@ -321,9 +320,9 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
                   }}
                   placeholder="New subject…"
                   style={{
-                    flex: 1, background: '#16151E', border: '1px solid #1E1E2E',
-                    borderRadius: 7, padding: '5px 9px',
-                    fontSize: 12, color: '#CBD5E1', outline: 'none',
+                    flex: 1, background: '#111112', border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: 2, padding: '5px 9px',
+                    fontSize: 12, color: '#EDEDED', outline: 'none',
                     fontFamily: 'inherit',
                   }}
                 />
@@ -332,9 +331,9 @@ export function CourseTagPicker({ sessionId, userId, initialCourseId, initialCou
                     type="button"
                     onClick={() => createAndAssign(newName)}
                     style={{
-                      flexShrink: 0, padding: '5px 10px', borderRadius: 7,
-                      background: '#6366F1', border: 'none',
-                      fontSize: 12, color: '#fff', cursor: 'pointer',
+                      flexShrink: 0, padding: '5px 10px', borderRadius: 2,
+                      background: '#FF3B30', border: 'none',
+                      fontSize: 12, color: '#0A0A0A', cursor: 'pointer',
                     }}
                   >
                     Add

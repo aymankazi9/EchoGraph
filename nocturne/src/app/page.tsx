@@ -1,180 +1,50 @@
-import Link from 'next/link'
-import { LandingNav } from '@/components/landing/landing-nav'
-import { LandingHero } from '@/components/landing/landing-hero'
-import { FieldsMarquee } from '@/components/landing/fields-marquee'
-import { ProblemSection } from '@/components/landing/problem-section'
-import { HowItWorksSection } from '@/components/landing/how-it-works-section'
+import { StructuredData } from '@/components/landing/structured-data'
+import { SiteHeader } from '@/components/landing/site-header'
+import { HeroSection } from '@/components/landing/hero-section'
+import { EngineSection } from '@/components/landing/engine-section'
 import { DemoSection } from '@/components/landing/demo-section'
-import { FeaturesSection } from '@/components/landing/features-section'
-import { CompareSection } from '@/components/landing/compare-section'
-import { PrivacySection } from '@/components/landing/privacy-section'
-import { SocialProofSection } from '@/components/landing/social-proof-section'
+import { WorkflowsSection } from '@/components/landing/workflows-section'
+import { ArchitectureSection } from '@/components/landing/architecture-section'
 import { PricingSection } from '@/components/landing/pricing-section'
+import { SpecBar } from '@/components/landing/spec-bar'
+import { FooterCta } from '@/components/landing/footer-cta'
 import { FaqSection } from '@/components/landing/faq-section'
 import { NewsletterSection } from '@/components/landing/newsletter-section'
-import { LandingFooter } from '@/components/landing/landing-footer'
-import { RevealSetup } from '@/components/landing/reveal-setup'
 import { BetaRequestSection } from '@/components/landing/beta-request-section'
-import { StructuredData } from '@/components/landing/structured-data'
+import { SiteFooter } from '@/components/landing/site-footer'
 
 // Server component — reads env directly. Both flags must be kept in sync.
 const betaMode = process.env.BETA_MODE === 'true'
 
+// Section order follows the "Nocturne Landing v2" reference (design_handoff_nocturne) —
+// THEME_SURGICAL.md §9: Nav → Hero → Engine → Demo → Path A → Path B/Privacy/Systems-log →
+// Pricing → Spec bar → Footer CTA. FAQ/Newsletter/BetaRequest have no reference counterpart but
+// carry real content (lead capture, FAQ) that predates this redesign, so they're appended after
+// the reference's own sections and before the footer, restyled to the same system.
 export default function LandingPage() {
   return (
-    <div style={{ position: 'relative', background: '#09090F' }}>
+    <div style={{ position: 'relative', background: '#0A0A0A' }}>
       <StructuredData />
-      <RevealSetup />
-      <LandingNav />
+      <SiteHeader />
       <span id="top" />
-      <LandingHero />
-      <FieldsMarquee />
-      <ProblemSection />
-      <HowItWorksSection />
+      <HeroSection />
+      <EngineSection />
       <DemoSection />
-      <FeaturesSection />
-      <CompareSection />
-      <PrivacySection />
-
-      {/* Social proof — hidden during beta (not deleted; returns when BETA_MODE=false) */}
-      {!betaMode && <SocialProofSection />}
-
+      <WorkflowsSection />
+      <ArchitectureSection />
       <PricingSection />
-      <FaqSection />
+      <SpecBar />
+      <FooterCta />
 
       {/* Beta request form — shown only in beta mode */}
       {betaMode && <BetaRequestSection />}
 
-      {/* CTA section — "Walk into the exam" */}
-      <section
-        style={{
-          position: 'relative',
-          padding: 'clamp(80px,10vw,140px) 24px',
-          borderTop: '1px solid #191827',
-          overflow: 'hidden',
-          textAlign: 'center',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%,-50%)',
-            width: 820,
-            maxWidth: '120vw',
-            height: 420,
-            background: 'radial-gradient(ellipse at center, rgba(99,102,241,0.12) 0%, rgba(244,63,94,0.05) 45%, transparent 72%)',
-            filter: 'blur(60px)',
-            pointerEvents: 'none',
-          }}
-        />
-        <div data-reveal="" style={{ position: 'relative', maxWidth: 680, margin: '0 auto' }}>
-          <h2
-            style={{
-              fontSize: 'clamp(32px,5vw,56px)',
-              fontWeight: 600,
-              letterSpacing: '-0.025em',
-              lineHeight: 1.08,
-              margin: 0,
-              color: '#E2E8F0',
-            }}
-          >
-            Walk into the exam<br />knowing what&apos;s on it.
-          </h2>
-          <p
-            style={{
-              fontSize: 17,
-              color: '#94A3B8',
-              margin: '22px auto 0',
-              maxWidth: 480,
-            }}
-          >
-            {betaMode
-              ? 'Apply for early access — we\'re onboarding a small cohort of students before the public launch.'
-              : 'No credit card, no trial limits — just the core pipeline, free forever, running entirely in your browser.'}
-          </p>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 12,
-              justifyContent: 'center',
-              marginTop: 36,
-            }}
-          >
-            {betaMode ? (
-              // Beta: server component can't use onClick — use a plain anchor; JS
-              // in landing-hero.tsx handles smooth scroll for the equivalent hero CTA.
-              <a
-                href="#beta-request"
-                data-btn=""
-                data-shine=""
-                style={{
-                  height: 48,
-                  padding: '0 28px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 9,
-                  borderRadius: 8,
-                  fontSize: 15,
-                  fontWeight: 500,
-                  background: '#6366F1',
-                  color: '#09090F',
-                  boxShadow: '0 10px 32px rgba(99,102,241,0.4)',
-                  textDecoration: 'none',
-                }}
-              >
-                Request beta access <span data-arrow="" style={{ color: '#09090F' }}>→</span>
-              </a>
-            ) : (
-              <Link
-                href="/setup"
-                data-btn=""
-                data-shine=""
-                style={{
-                  height: 48,
-                  padding: '0 28px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 9,
-                  borderRadius: 8,
-                  fontSize: 15,
-                  fontWeight: 500,
-                  background: '#6366F1',
-                  color: '#09090F',
-                  boxShadow: '0 10px 32px rgba(99,102,241,0.4)',
-                  textDecoration: 'none',
-                }}
-              >
-                Start for free <span data-arrow="" style={{ color: '#09090F' }}>→</span>
-              </Link>
-            )}
-            <a
-              href="#pricing"
-              data-btn=""
-              style={{
-                height: 48,
-                padding: '0 24px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                borderRadius: 8,
-                fontSize: 15,
-                color: '#E2E8F0',
-                border: '1px solid #2D2B45',
-                textDecoration: 'none',
-              }}
-            >
-              {betaMode ? 'See what\'s included' : 'Compare plans'}
-            </a>
-          </div>
-        </div>
-      </section>
+      <FaqSection />
 
       {/* Newsletter — hidden during beta (not deleted; returns when BETA_MODE=false) */}
       {!betaMode && <NewsletterSection />}
 
-      <LandingFooter />
+      <SiteFooter />
     </div>
   )
 }

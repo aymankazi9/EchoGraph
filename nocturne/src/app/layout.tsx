@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
+import { Geist, Geist_Mono, Archivo } from 'next/font/google'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AppleMeta } from '@/components/pwa/apple-meta'
 import { ScrollManager } from '@/components/scroll-manager'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
-const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans' })
+const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-mono' })
+const archivo = Archivo({ subsets: ['latin'], variable: '--font-display', axes: ['wdth'] })
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://appnocturne.com'),
@@ -62,7 +63,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#0F1117',
+  themeColor: '#0A0A0A',
   width: 'device-width',
   initialScale: 1,
   minimumScale: 1,
@@ -71,7 +72,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable} h-full antialiased`}>
+    <html lang="en" className={`${geist.variable} ${geistMono.variable} ${archivo.variable} h-full antialiased`}>
       <head>
         <AppleMeta />
       </head>

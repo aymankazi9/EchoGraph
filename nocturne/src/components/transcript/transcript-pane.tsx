@@ -153,7 +153,8 @@ export function TranscriptPane({
           <button
             type="button"
             onClick={onTranscribe}
-            className="h-9 px-4 rounded-btn text-body font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
+            className="h-9 px-4 rounded-btn text-body font-medium transition-colors"
+            style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
           >
             Transcribe
           </button>
@@ -181,7 +182,7 @@ export function TranscriptPane({
           </div>
           <div className="h-1 w-full bg-bg-subtle rounded-full overflow-hidden">
             <div
-              className="h-full bg-amber-200 transition-all duration-300 ease-out rounded-full"
+              className="h-full bg-[#FF3B30] transition-all duration-300 ease-out rounded-full"
               style={{
                 width: `${progress.totalSegments > 0 ? (progress.segmentsComplete / progress.totalSegments) * 100 : 0}%`,
               }}

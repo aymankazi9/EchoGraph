@@ -49,7 +49,7 @@ export function DomainPrompt({ userId, initialField, initialDismissed }: Props) 
         className={[
           'flex-1 h-7 px-2.5 bg-bg-input border border-border-default rounded-input',
           'text-body text-text-primary placeholder:text-text-tertiary',
-          'focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40',
+          'focus:outline-none focus:border-border-strong',
           'transition-colors',
         ].join(' ')}
         autoFocus
@@ -59,7 +59,8 @@ export function DomainPrompt({ userId, initialField, initialDismissed }: Props) 
         type="button"
         onClick={handleSave}
         disabled={!value.trim() || saving}
-        className="h-7 px-3 rounded-btn text-label font-medium bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+        className="h-7 px-3 rounded-btn text-label font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+        style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
       >
         Save
       </button>

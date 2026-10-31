@@ -23,7 +23,6 @@ const INPUT_CHIPS: { value: InputFilter; label: string }[] = [
 function Chip({
   label,
   selected,
-  variant,
   onClick,
 }: {
   label: string
@@ -31,20 +30,17 @@ function Chip({
   variant: 'status' | 'input'
   onClick: () => void
 }) {
-  const base = 'inline-flex items-center px-3 py-1 rounded-full text-caption border cursor-pointer transition-colors'
-  const unselected = 'bg-bg-subtle border-border-default text-text-secondary hover:border-border-strong hover:text-text-primary'
-  const selectedStatus = 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300'
-  const selectedInput = 'bg-violet-500/20 border-violet-400/50 text-violet-300'
-
-  const cls = [
-    base,
-    selected
-      ? variant === 'status' ? selectedStatus : selectedInput
-      : unselected,
-  ].join(' ')
-
   return (
-    <button type="button" className={cls} onClick={onClick}>
+    <button
+      type="button"
+      className="inline-flex items-center px-3 py-1 text-caption border cursor-pointer transition-colors"
+      style={{
+        background: selected ? 'color-mix(in srgb, var(--color-accent) 8%, transparent)' : 'var(--color-bg-subtle)',
+        borderColor: selected ? 'color-mix(in srgb, var(--color-accent) 45%, transparent)' : 'var(--color-border-default)',
+        color: selected ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+      }}
+      onClick={onClick}
+    >
       {label}
     </button>
   )
@@ -75,7 +71,10 @@ export function FilterChips({ sortSlot }: Props) {
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-caption text-text-tertiary">Filters</span>
           {activeCount > 0 && (
-            <span className="w-4 h-4 rounded-full bg-indigo-500 text-text-inverse text-caption flex items-center justify-center font-medium leading-none">
+            <span
+              className="w-4 h-4 text-caption flex items-center justify-center font-medium leading-none"
+              style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
+            >
               {activeCount}
             </span>
           )}

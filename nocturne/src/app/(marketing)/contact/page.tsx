@@ -46,7 +46,7 @@ export default function ContactPage() {
     <div className="px-6 py-16 md:py-24">
       <div className="max-w-2xl mx-auto">
         <div className="mb-12">
-          <p className="text-caption uppercase tracking-[0.1em] text-indigo-400 mb-3">
+          <p className="text-caption uppercase tracking-[0.1em] mb-3" style={{ color: 'var(--color-accent)' }}>
             Contact
           </p>
           <h1 className="text-heading font-medium text-text-primary mb-3">
@@ -72,7 +72,7 @@ export default function ContactPage() {
                 <p className="text-body-sm font-medium text-text-primary">{label}</p>
                 <p className="text-caption text-text-tertiary">{description}</p>
               </div>
-              <span className="text-body-sm text-indigo-400 shrink-0">{email}</span>
+              <span className="text-body-sm shrink-0" style={{ color: 'var(--color-accent)' }}>{email}</span>
             </a>
           ))}
         </div>

@@ -12,9 +12,8 @@ interface Props {
   collapsed: boolean
   beta?: boolean
   /**
-   * When true, renders with an amber accent instead of the standard indigo —
-   * used exclusively for the Beta Guide nav item to visually signal that it's
-   * an informational page, not a primary workspace destination.
+   * Renders the item with a permanent tint (active or not) — used exclusively for the Beta
+   * Guide nav item to visually signal that it's an informational page, not a workspace tab.
    */
   guide?: boolean
 }
@@ -23,53 +22,33 @@ export function NavItem({ href, icon: Icon, label, collapsed, beta, guide }: Pro
   const pathname = usePathname()
   const isActive = pathname === href || (href !== '/vault' && pathname.startsWith(href))
 
-  // Amber treatment for the Beta Guide item — active or inactive both use amber,
-  // so it never reads as a regular workspace tab.
-  const guideStyle = guide
-    ? isActive
-      ? { background: 'rgba(245,158,11,0.14)', color: '#FCD34D' }
-      : { background: 'rgba(245,158,11,0.06)', color: '#D4A017' }
-    : undefined
+  const active = isActive || guide
 
   const inner = (
     <Link
       href={href}
       data-navitem
-      style={
-        guideStyle ??
-        (isActive ? { background: 'rgba(99,102,241,0.13)', color: '#C7CEF5' } : undefined)
-      }
+      style={{
+        background: active ? 'rgba(255,255,255,0.05)' : undefined,
+        color: active ? '#EDEDED' : '#9A9A9F',
+        boxShadow: active ? 'inset 2px 0 0 var(--color-accent)' : undefined,
+      }}
       className={[
-        'flex items-center gap-3 rounded-md transition-colors',
-        collapsed ? 'w-10 h-[38px] justify-center' : 'h-[38px] px-3',
-        // Guide items always have a tint; regular items only show on hover/active.
-        guide
-          ? ''
-          : isActive
-          ? ''
-          : 'text-text-secondary hover:bg-bg-subtle hover:text-text-primary',
+        'flex items-center gap-3 transition-colors',
+        collapsed ? 'w-10 h-9 justify-center' : 'h-9 px-3',
+        active ? '' : 'hover:bg-bg-subtle hover:text-text-primary',
       ].join(' ')}
     >
       <Icon size={16} strokeWidth={1.5} className="shrink-0" />
       {!collapsed && (
         <>
-          <span className="text-body flex-1">{label}</span>
-          {guide && (
+          <span className="text-body flex-1" style={{ fontSize: 13.5 }}>{label}</span>
+          {(guide || beta) && (
             <span style={{
-              fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-              color: '#D4A017', background: 'rgba(245,158,11,0.10)',
-              border: '1px solid rgba(245,158,11,0.20)',
-              borderRadius: 4, padding: '1px 5px', lineHeight: 1, flexShrink: 0,
-            }}>
-              beta
-            </span>
-          )}
-          {!guide && beta && (
-            <span style={{
-              fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-              color: '#818CF8', background: 'rgba(99,102,241,0.12)',
-              border: '1px solid rgba(99,102,241,0.25)',
-              borderRadius: 4, padding: '1px 5px', lineHeight: 1, flexShrink: 0,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase',
+              color: '#9A9A9F', border: '1px solid rgba(255,255,255,0.14)',
+              padding: '3px 7px', lineHeight: 1, flexShrink: 0,
             }}>
               beta
             </span>

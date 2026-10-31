@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Segmented } from '@/components/surgical/segmented'
 
 // Beta mode: checkout is not yet open. All CTAs scroll to the beta request form.
 const IS_BETA = process.env.NEXT_PUBLIC_BETA_MODE === 'true'
@@ -36,7 +37,7 @@ const PLAN_SRC = [
     name: 'Midnight',
     monthly: 8,
     tagline: 'Sharper transcription. More storage.',
-    badge: 'Popular',
+    badge: 'POPULAR',
     hi: true,
     coming: false,
     cta: 'Get Midnight',
@@ -57,7 +58,7 @@ const PLAN_SRC = [
     name: 'Eclipse',
     monthly: 20,
     tagline: 'Everything, with AI explanations.',
-    badge: '',
+    badge: 'SOON',
     hi: false,
     coming: true,
     cta: 'Join the waitlist',
@@ -74,7 +75,6 @@ const PLAN_SRC = [
     ],
   },
 ]
-
 
 export function PricingSection() {
   const [billing, setBilling] = useState<Billing>('yearly')
@@ -98,7 +98,7 @@ export function PricingSection() {
         console.error('[checkout] unexpected error', res.status)
         return
       }
-      const { url } = await res.json() as { url: string }
+      const { url } = (await res.json()) as { url: string }
       window.location.href = url
     } finally {
       setLoadingTier(null)
@@ -106,210 +106,101 @@ export function PricingSection() {
   }
   const yearly = billing === 'yearly'
 
-  const segBase: React.CSSProperties = {
-    height: 34,
-    padding: '0 18px',
-    borderRadius: 9999,
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 13.5,
-    fontWeight: 500,
-    display: 'inline-flex',
+  const ctaBase: React.CSSProperties = {
+    display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    transition: 'background .25s, color .25s',
+    justifyContent: 'center',
+    height: 42,
+    fontSize: 14,
+    fontWeight: 500,
+    transition: 'background .2s, border-color .2s',
+    textDecoration: 'none',
+    cursor: 'pointer',
   }
 
   return (
     <section
       id="pricing"
       style={{
-        scrollMarginTop: 80,
-        padding: 'clamp(72px,9vw,120px) 24px',
-        borderTop: '1px solid #191827',
+        position: 'relative',
+        scrollMarginTop: 64,
+        padding: 'clamp(88px,10vw,140px) clamp(20px,4vw,40px)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}
     >
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        {/* Header */}
-        <div data-reveal="" style={{ textAlign: 'center', marginBottom: 52 }}>
-          <p
-            style={{
-              fontSize: 12,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: '#5B6478',
-              margin: '0 0 14px',
-            }}
-          >
-            Pricing
-          </p>
-          <h2
-            style={{
-              fontSize: 'clamp(28px,4vw,40px)',
-              fontWeight: 600,
-              letterSpacing: '-0.02em',
-              margin: 0,
-              color: '#E2E8F0',
-            }}
-          >
-            The free tier is the full product.
-          </h2>
-          <p
-            style={{
-              fontSize: 16,
-              color: '#94A3B8',
-              maxWidth: 460,
-              margin: '16px auto 0',
-            }}
-          >
-            The complete core pipeline is free. Paid tiers add sharper ASR and more storage
-            — never access to the basics.
-          </p>
-        </div>
-
-        {/* Billing toggle */}
-        <div
-          data-reveal=""
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 12,
-            marginBottom: 38,
-          }}
-        >
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: 4,
-              borderRadius: 9999,
-              background: '#111118',
-              border: '1px solid #1E1E2E',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setBilling('monthly')}
+      <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 48 }}>
+        <div data-split style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 40, alignItems: 'end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.16em', color: '#FF3B30' }}>PRICING</span>
+            <h2
               style={{
-                ...segBase,
-                background: yearly ? 'transparent' : '#6366F1',
-                color: yearly ? '#94A3B8' : '#09090F',
+                margin: 0,
+                fontFamily: 'var(--font-display)',
+                fontStretch: '82%',
+                fontWeight: 600,
+                fontSize: 'clamp(34px,4.2vw,56px)',
+                lineHeight: 1,
+                letterSpacing: '-0.03em',
               }}
             >
-              Monthly
-            </button>
-            <button
-              type="button"
-              onClick={() => setBilling('yearly')}
-              style={{
-                ...segBase,
-                background: yearly ? '#6366F1' : 'transparent',
-                color: yearly ? '#09090F' : '#94A3B8',
-              }}
-            >
-              Yearly{' '}
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  padding: '2px 7px',
-                  borderRadius: 9999,
-                  background: yearly
-                    ? 'rgba(9,9,15,0.22)'
-                    : 'rgba(99,102,241,0.18)',
-                  color: yearly ? '#09090F' : '#A5B4FC',
-                }}
-              >
-                Save 25%
-              </span>
-            </button>
+              The free tier is the full product.
+            </h2>
           </div>
-          <p style={{ fontSize: 12.5, color: '#5B6478', margin: 0, letterSpacing: '0.01em' }}>
-            {yearly
-              ? 'Billed annually · three months free vs. paying monthly'
-              : 'Switch to yearly to save 25% — like three months free'}
-          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'flex-start' }}>
+            <p style={{ margin: 0, maxWidth: 460, fontSize: 16, color: '#9A9A9F', textWrap: 'pretty' }}>
+              The complete core pipeline is free. Paid tiers add sharper transcription and more
+              storage, never access to the basics.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <Segmented
+                value={billing}
+                onChange={setBilling}
+                options={[
+                  { value: 'monthly', label: 'MONTHLY' },
+                  { value: 'yearly', label: 'YEARLY · SAVE 25%' },
+                ]}
+              />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', color: '#76767B' }}>
+                {yearly ? 'THREE MONTHS FREE VS. MONTHLY' : 'SWITCH TO YEARLY TO SAVE 25%'}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Plan cards */}
-        <div
-          data-reveal=""
-          data-cards-3=""
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3,1fr)',
-            gap: 18,
-            alignItems: 'start',
-          }}
-        >
-          {PLAN_SRC.map((p) => {
+        <div data-plans style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D' }}>
+          {PLAN_SRC.map((p, i) => {
             const free = p.monthly === 0
             const perMo = yearly ? p.monthly * 0.75 : p.monthly
             const annual = perMo * 12
-            const saved = (p.monthly - perMo) * 12
             const showStrike = yearly && !free
-            const showSave = yearly && !free
 
             return (
               <div
                 key={p.name}
                 style={{
+                  position: 'relative',
                   display: 'flex',
                   flexDirection: 'column',
-                  padding: '26px 24px',
-                  borderRadius: 12,
-                  background: '#111118',
-                  border:
-                    '1px solid ' +
-                    (p.hi ? 'rgba(99,102,241,0.4)' : '#1E1E2E'),
-                  boxShadow: p.hi
-                    ? '0 0 0 1px rgba(99,102,241,0.15), 0 16px 50px rgba(99,102,241,0.1)'
-                    : 'none',
-                  transition:
-                    'transform .45s cubic-bezier(.22,1,.36,1), border-color .45s, box-shadow .45s',
-                }}
-                onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLDivElement).style.transform =
-                    'translateY(-6px)'
-                  ;(e.currentTarget as HTMLDivElement).style.boxShadow =
-                    '0 26px 60px -28px rgba(0,0,0,0.8)'
-                }}
-                onMouseLeave={(e) => {
-                  ;(e.currentTarget as HTMLDivElement).style.transform = 'none'
-                  ;(e.currentTarget as HTMLDivElement).style.boxShadow = p.hi
-                    ? '0 0 0 1px rgba(99,102,241,0.15), 0 16px 50px rgba(99,102,241,0.1)'
-                    : 'none'
+                  gap: 18,
+                  padding: '32px 28px',
+                  borderLeft: i ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  background: p.hi ? 'rgba(255,59,48,0.04)' : 'transparent',
                 }}
               >
-                {/* Name + badge */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 6,
-                  }}
-                >
-                  <span
-                    style={{ fontSize: 17, fontWeight: 600, color: '#E2E8F0' }}
-                  >
-                    {p.name}
+                <span style={{ position: 'absolute', top: -1, left: -1, right: -1, height: 2, background: p.hi ? '#FF3B30' : 'transparent' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, minHeight: 22 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, letterSpacing: '0.18em', color: '#EDEDED' }}>
+                    {p.name.toUpperCase()}
                   </span>
                   {p.badge && (
                     <span
                       style={{
-                        fontSize: 10.5,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.08em',
-                        padding: '3px 9px',
-                        borderRadius: 9999,
-                        background: 'rgba(99,102,241,0.18)',
-                        color: '#A5B4FC',
-                        border: '1px solid rgba(99,102,241,0.3)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 10,
+                        letterSpacing: '0.16em',
+                        padding: '3px 7px',
+                        color: p.hi ? '#FF3B30' : '#9A9A9F',
+                        border: '1px solid ' + (p.hi ? 'rgba(255,59,48,0.45)' : 'rgba(255,255,255,0.14)'),
                       }}
                     >
                       {p.badge}
@@ -317,109 +208,36 @@ export function PricingSection() {
                   )}
                 </div>
 
-                {/* Price */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    gap: 8,
-                    marginBottom: 5,
-                  }}
-                >
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                   {showStrike && (
-                    <span
-                      style={{
-                        fontSize: 18,
-                        fontWeight: 500,
-                        color: '#5B6478',
-                        textDecoration: 'line-through',
-                        textDecorationColor: '#6366F1',
-                      }}
-                    >
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: '#5E5E62', textDecoration: 'line-through' }}>
                       ${p.monthly}
                     </span>
                   )}
-                  <span
-                    style={{
-                      fontSize: 34,
-                      fontWeight: 600,
-                      letterSpacing: '-0.02em',
-                      color: '#E2E8F0',
-                    }}
-                  >
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 48, lineHeight: 1, letterSpacing: '-0.03em', color: '#EDEDED' }}>
                     {free ? '$0' : `$${perMo}`}
                   </span>
-                  <span style={{ fontSize: 13, color: '#5B6478' }}>
-                    {free ? 'forever' : '/mo'}
-                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#76767B' }}>{free ? 'forever' : '/ mo'}</span>
                 </div>
 
-                {/* Sub line */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    minHeight: 21,
-                    marginBottom: 16,
-                  }}
-                >
-                  <span style={{ fontSize: 12, color: '#5B6478' }}>
-                    {free
-                      ? 'Free forever — no card needed'
-                      : yearly
-                      ? `$${annual} billed yearly`
-                      : `$${annual}/yr billed monthly`}
-                  </span>
-                  {showSave && (
-                    <span
-                      style={{
-                        fontSize: 10.5,
-                        fontWeight: 600,
-                        letterSpacing: '0.03em',
-                        padding: '2px 7px',
-                        borderRadius: 9999,
-                        background: 'rgba(99,102,241,0.16)',
-                        color: '#A5B4FC',
-                        border: '1px solid rgba(99,102,241,0.3)',
-                      }}
-                    >
-                      Save ${saved}/yr
-                    </span>
-                  )}
-                </div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', color: '#76767B', marginTop: -8 }}>
+                  {free ? 'NO CARD REQUIRED' : yearly ? `$${annual} BILLED YEARLY` : `$${p.monthly * 12} / YR BILLED MONTHLY`}
+                </span>
 
-                {/* Tagline */}
-                <p style={{ fontSize: 13.5, color: '#94A3B8', margin: '0 0 20px' }}>
-                  {p.tagline}
-                </p>
+                <p style={{ margin: 0, fontSize: 14, color: '#9A9A9F' }}>{p.tagline}</p>
 
-                {/* CTA */}
                 {IS_BETA ? (
-                  // Beta mode: all plan CTAs scroll to the beta-request form.
                   <a
                     href="#beta-request"
-                    data-btn=""
-                    data-shine={p.primary ? '' : undefined}
                     onClick={(e) => {
                       e.preventDefault()
                       document.getElementById('beta-request')?.scrollIntoView({ behavior: 'smooth' })
                     }}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '100%',
-                      height: 40,
-                      borderRadius: 7,
-                      fontSize: 14,
-                      fontWeight: p.primary ? 600 : 500,
-                      background: p.primary ? '#6366F1' : 'transparent',
-                      color: p.primary ? '#09090F' : '#E2E8F0',
-                      border: p.primary ? 'none' : '1px solid #2D2B45',
-                      boxShadow: p.primary ? '0 8px 26px rgba(99,102,241,0.32)' : 'none',
-                      textDecoration: 'none',
-                      cursor: 'pointer',
+                      ...ctaBase,
+                      background: p.primary ? '#FF3B30' : 'transparent',
+                      color: p.primary ? '#0A0A0A' : '#EDEDED',
+                      border: p.primary ? 'none' : '1px solid rgba(255,255,255,0.16)',
                     }}
                   >
                     Request beta access
@@ -427,25 +245,14 @@ export function PricingSection() {
                 ) : p.tier ? (
                   <button
                     type="button"
-                    data-btn=""
-                    data-shine=""
                     onClick={() => handleCheckout(p.tier!)}
                     disabled={loadingTier === p.tier}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      ...ctaBase,
                       width: '100%',
-                      height: 40,
-                      borderRadius: 7,
-                      fontSize: 14,
-                      fontWeight: p.primary ? 600 : 500,
-                      background: p.primary ? '#6366F1' : 'transparent',
-                      color: p.primary ? '#09090F' : '#E2E8F0',
-                      border: p.primary ? 'none' : '1px solid #2D2B45',
-                      boxShadow: p.primary
-                        ? '0 8px 26px rgba(99,102,241,0.32)'
-                        : 'none',
+                      background: p.primary ? '#FF3B30' : 'transparent',
+                      color: p.primary ? '#0A0A0A' : '#EDEDED',
+                      border: p.primary ? 'none' : '1px solid rgba(255,255,255,0.16)',
                       cursor: loadingTier === p.tier ? 'not-allowed' : 'pointer',
                       opacity: loadingTier === p.tier ? 0.7 : 1,
                     }}
@@ -453,92 +260,38 @@ export function PricingSection() {
                     {loadingTier === p.tier ? 'Redirecting…' : p.cta}
                   </button>
                 ) : p.coming ? (
-                  <Link
-                    href="#newsletter"
-                    data-btn=""
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '100%',
-                      height: 40,
-                      borderRadius: 7,
-                      fontSize: 14,
-                      fontWeight: 500,
-                      background: 'transparent',
-                      color: '#E2E8F0',
-                      border: '1px solid #2D2B45',
-                      textDecoration: 'none',
-                    }}
-                  >
+                  <Link href="#newsletter" style={{ ...ctaBase, width: '100%', background: 'transparent', color: '#EDEDED', border: '1px solid rgba(255,255,255,0.16)' }}>
                     {p.cta}
                   </Link>
                 ) : (
-                  <Link
-                    href="/login"
-                    data-btn=""
-                    data-shine=""
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '100%',
-                      height: 40,
-                      borderRadius: 7,
-                      fontSize: 14,
-                      fontWeight: 500,
-                      background: 'transparent',
-                      color: '#E2E8F0',
-                      border: '1px solid #2D2B45',
-                      textDecoration: 'none',
-                    }}
-                  >
+                  <Link href="/setup" style={{ ...ctaBase, width: '100%', background: 'transparent', color: '#EDEDED', border: '1px solid rgba(255,255,255,0.16)' }}>
                     {p.cta}
                   </Link>
                 )}
 
-                {/* Features */}
-                <ul
-                  style={{
-                    listStyle: 'none',
-                    margin: '20px 0 0',
-                    padding: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 11,
-                  }}
-                >
+                <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: 4 }}>
                   {p.features.map((f) => (
-                    <li
+                    <div
                       key={f}
                       style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 10,
+                        display: 'grid',
+                        gridTemplateColumns: '18px 1fr',
+                        gap: 8,
+                        padding: '10px 0',
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
                         fontSize: 13.5,
-                        lineHeight: 1.5,
-                        color: '#94A3B8',
+                        color: '#CFCFD2',
                       }}
                     >
-                      <span
-                        style={{
-                          marginTop: 2,
-                          flexShrink: 0,
-                          color: p.hi ? '#818CF8' : '#6366F1',
-                          fontSize: 12,
-                        }}
-                      >
-                        ✓
-                      </span>
-                      {f}
-                    </li>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: p.hi ? '#FF3B30' : '#76767B' }}>+</span>
+                      <span>{f}</span>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )
           })}
         </div>
-
       </div>
     </section>
   )

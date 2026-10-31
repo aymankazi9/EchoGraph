@@ -64,6 +64,14 @@ interface State {
   activeKeywordId: string | null
   /** Generated flashcards for this session. */
   flashcards: Flashcard[]
+  /**
+   * SM-2 intervalDays per flashcard id (latest review only) — just enough for
+   * computeMastery(). Populated by FlashcardPanel's existing review fetch (no
+   * new query); the Map tab's Mastery lens reads this directly off the store
+   * rather than fetching anything itself. Empty until Study has been visited
+   * this session, in which case every card simply reads as "new".
+   */
+  reviewIntervalsByFlashcardId: Record<string, number>
   /** Slide density scores: pageNumber → 0-100. */
   slideDensityMap: Record<number, number>
   /** Zone classification per slide: 'likely' (synthetic), 'red' (real guide), or null. */
@@ -119,6 +127,7 @@ interface Actions {
   loadKeywords(keywords: StoredKeyword[]): void
   setActiveKeyword(id: string | null): void
   loadFlashcards(cards: Flashcard[]): void
+  loadReviewIntervals(intervals: Record<string, number>): void
   loadSlideDensity(map: Record<number, number>): void
   loadSlideZones(map: Record<number, 'likely' | 'red' | null>): void
   /** Sets YouTube per-session consent (never persisted — clears on refresh). */
@@ -164,6 +173,7 @@ const initialState: State = {
   keywords: [],
   activeKeywordId: null,
   flashcards: [],
+  reviewIntervalsByFlashcardId: {},
   slideDensityMap: {},
   slideZoneMap: {},
   youtubeConsentGranted: false,
@@ -270,6 +280,7 @@ export const useSessionStore = create<State & Actions>()(
     setActiveKeyword: (id) => set((s) => { s.activeKeywordId = id }),
 
     loadFlashcards: (cards) => set((s) => { s.flashcards = cards }),
+    loadReviewIntervals: (intervals) => set((s) => { s.reviewIntervalsByFlashcardId = intervals }),
 
     loadSlideDensity: (map) => set((s) => { s.slideDensityMap = map }),
 

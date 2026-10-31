@@ -114,31 +114,30 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
         onClick={(e) => e.stopPropagation()}
         style={{
           width: 460, maxWidth: 'calc(100vw - 32px)',
-          background: '#0F0F18',
-          border: '1px solid #22213A',
-          borderRadius: 18,
+          background: '#0C0C0D',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 2,
           overflow: 'hidden',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
         }}
       >
         {/* Header */}
         <div style={{
           padding: '18px 20px 16px',
-          borderBottom: '1px solid #1A1A2E',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div style={{ color: '#818CF8' }}><ShareIcon /></div>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#E2E8F0' }}>
+            <div style={{ color: '#FF3B30' }}><ShareIcon /></div>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#EDEDED' }}>
               Publish deck to room
             </span>
           </div>
           <button
             onClick={onClose}
             style={{
-              width: 26, height: 26, borderRadius: 7,
+              width: 26, height: 26, borderRadius: 2,
               border: 'none', background: 'transparent',
-              color: '#4A5568', cursor: 'pointer',
+              color: '#9A9A9F', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -149,20 +148,20 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
         {step === 'done' ? (
           // ── Success state ───────────────────────────────────────────────────
           <div style={{ padding: 32, textAlign: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🎉</div>
-            <p style={{ fontSize: 14, fontWeight: 600, color: '#CBD5E1', marginBottom: 6 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: '#EDEDED', marginBottom: 12 }}>[✓]</div>
+            <p style={{ fontSize: 14, fontWeight: 600, color: '#EDEDED', marginBottom: 6 }}>
               Deck published
             </p>
-            <p style={{ fontSize: 12.5, color: '#4A5568', marginBottom: 24 }}>
+            <p style={{ fontSize: 12.5, color: '#76767B', marginBottom: 24 }}>
               {filteredCards.length} cards are now visible to members of{' '}
-              <strong style={{ color: '#94A3B8' }}>{selectedRoom?.display_name ?? 'the room'}</strong>.
+              <strong style={{ color: '#EDEDED' }}>{selectedRoom?.display_name ?? 'the room'}</strong>.
             </p>
             <button
               onClick={onClose}
               style={{
-                height: 36, padding: '0 20px', borderRadius: 9,
-                border: 'none', background: '#6366F1',
-                color: '#E2E8F0', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                height: 36, padding: '0 20px', borderRadius: 2,
+                border: 'none', background: '#FF3B30',
+                color: '#0A0A0A', fontSize: 13, fontWeight: 600, cursor: 'pointer',
               }}
             >
               Done
@@ -174,18 +173,18 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
 
             {/* Room selector */}
             <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: '#4A5568', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: '#76767B', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>
                 Room
               </label>
               {rooms.length === 0 ? (
-                <p style={{ fontSize: 12.5, color: '#3F485C', margin: 0 }}>
+                <p style={{ fontSize: 12.5, color: '#76767B', margin: 0 }}>
                   You haven&apos;t joined any rooms yet. Join a room from the Community page first.
                 </p>
               ) : rooms.length === 1 ? (
                 <div style={{
-                  padding: '9px 12px', borderRadius: 9,
-                  border: '1px solid #22213A', background: '#0C0C14',
-                  fontSize: 12.5, color: '#CBD5E1',
+                  padding: '9px 12px', borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.08)', background: '#111112',
+                  fontSize: 12.5, color: '#EDEDED',
                 }}>
                   {rooms[0]!.display_name}
                 </div>
@@ -195,8 +194,8 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
                   onChange={(e) => setSelectedRoomId(e.target.value)}
                   style={{
                     width: '100%', height: 38, padding: '0 12px',
-                    borderRadius: 9, border: '1px solid #22213A',
-                    background: '#0C0C14', color: '#CBD5E1', fontSize: 13,
+                    borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)',
+                    background: '#111112', color: '#EDEDED', fontSize: 13,
                     cursor: 'pointer', appearance: 'none',
                   }}
                 >
@@ -210,7 +209,7 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
 
             {/* Deck title */}
             <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: '#4A5568', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: '#76767B', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>
                 Deck title
               </label>
               <input
@@ -221,8 +220,8 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
                 maxLength={120}
                 style={{
                   width: '100%', height: 38, padding: '0 12px',
-                  borderRadius: 9, border: '1px solid #22213A',
-                  background: '#0C0C14', color: '#CBD5E1', fontSize: 13,
+                  borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)',
+                  background: '#111112', color: '#EDEDED', fontSize: 13,
                   outline: 'none', boxSizing: 'border-box',
                 }}
               />
@@ -230,7 +229,7 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
 
             {/* Zone filter */}
             <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: '#4A5568', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: '#76767B', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>
                 Cards to include
               </label>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -242,10 +241,10 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
                       key={z}
                       onClick={() => setZoneFilter(z)}
                       style={{
-                        height: 30, padding: '0 12px', borderRadius: 8, cursor: 'pointer',
-                        border: active ? '1px solid rgba(244,63,94,0.5)' : '1px solid #22213A',
-                        background: active ? 'rgba(244,63,94,0.12)' : 'transparent',
-                        color:  active ? '#FB7185' : '#4A5568',
+                        height: 30, padding: '0 12px', borderRadius: 2, cursor: 'pointer',
+                        border: active ? '1px solid rgba(255,59,48,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                        background: active ? 'rgba(255,59,48,0.12)' : 'transparent',
+                        color:  active ? '#FF3B30' : '#76767B',
                         fontSize: 12, fontWeight: active ? 600 : 400,
                         transition: 'all 0.15s',
                       }}
@@ -259,14 +258,14 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
 
             {/* Consent notice */}
             <div style={{
-              borderRadius: 10,
-              border: '1px solid rgba(251,191,36,0.25)',
-              background: 'rgba(251,191,36,0.05)',
+              borderRadius: 2,
+              border: '1px solid rgba(255,255,255,0.14)',
+              background: 'rgba(255,255,255,0.04)',
               padding: '11px 13px',
               display: 'flex', gap: 10,
             }}>
-              <span style={{ fontSize: 14, lineHeight: 1, flexShrink: 0 }}>⚠️</span>
-              <p style={{ fontSize: 12, color: '#D4A908', margin: 0, lineHeight: 1.55 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.4, flexShrink: 0, color: '#9A9A9F' }}>!</span>
+              <p style={{ fontSize: 12, color: '#9A9A9F', margin: 0, lineHeight: 1.55 }}>
                 <strong>This deck&apos;s content will be visible to other members of this room,
                 unlike your private vault.</strong>{' '}
                 Published cards are stored as plaintext and cannot be retracted once other
@@ -276,7 +275,7 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
 
             {/* Error */}
             {step === 'error' && error && (
-              <p style={{ fontSize: 12, color: '#F87171', margin: 0 }}>{error}</p>
+              <p style={{ fontSize: 12, color: '#FF3B30', margin: 0 }}>{error}</p>
             )}
 
             {/* Actions */}
@@ -284,9 +283,9 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
               <button
                 onClick={onClose}
                 style={{
-                  height: 36, padding: '0 16px', borderRadius: 9,
-                  border: '1px solid #22213A', background: 'transparent',
-                  color: '#4A5568', fontSize: 13, cursor: 'pointer',
+                  height: 36, padding: '0 16px', borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.08)', background: 'transparent',
+                  color: '#9A9A9F', fontSize: 13, cursor: 'pointer',
                 }}
               >
                 Cancel
@@ -300,14 +299,14 @@ export function PublishDeckModal({ sessionId, sessionTitle, flashcards, onClose 
                   !title.trim()
                 }
                 style={{
-                  height: 36, padding: '0 18px', borderRadius: 9,
+                  height: 36, padding: '0 18px', borderRadius: 2,
                   border: 'none',
                   background: (step === 'publishing' || !selectedRoomId || filteredCards.length === 0 || !title.trim())
-                    ? '#1A1A2E'
-                    : '#6366F1',
+                    ? '#0C0C0D'
+                    : '#FF3B30',
                   color: (step === 'publishing' || !selectedRoomId || filteredCards.length === 0 || !title.trim())
-                    ? '#3A4155'
-                    : '#E2E8F0',
+                    ? '#4A4A4E'
+                    : '#0A0A0A',
                   fontSize: 13, fontWeight: 600,
                   cursor: (step === 'publishing' || !selectedRoomId || filteredCards.length === 0 || !title.trim())
                     ? 'not-allowed'

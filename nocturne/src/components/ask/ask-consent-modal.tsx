@@ -75,7 +75,7 @@ export function AskConsentModal({ open, onAllow, onDeny, mode = 'session', sessi
             className="w-full max-w-[480px] mx-4 bg-bg-elevated rounded-modal border border-border-default shadow-lg p-6 flex flex-col gap-5"
           >
             <div className="flex items-start gap-3">
-              <Shield size={20} strokeWidth={1.5} className="text-indigo-400 shrink-0 mt-0.5" />
+              <Shield size={20} strokeWidth={1.5} className="text-[#FF3B30] shrink-0 mt-0.5" />
               <div>
                 <h2
                   id="ask-consent-title"
@@ -93,7 +93,8 @@ export function AskConsentModal({ open, onAllow, onDeny, mode = 'session', sessi
               <button
                 type="button"
                 onClick={onAllow}
-                className="w-full h-9 rounded-btn bg-indigo-500 text-text-inverse text-body font-medium hover:bg-indigo-600 transition-colors"
+                className="w-full h-9 rounded-btn text-text-inverse text-body font-medium transition-colors"
+                style={{ background: 'var(--color-accent)' }}
               >
                 {allowLabel}
               </button>

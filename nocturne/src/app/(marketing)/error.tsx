@@ -1,17 +1,28 @@
 'use client'
 
-export default function MarketingError({ reset }: { error: Error; reset: () => void }) {
+import { ErrorPage } from '@/components/surgical/error-page'
+
+export default function MarketingError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  const terminal = [
+    { src: 'sys', msg: 'request failed', value: error.digest ?? 'no digest' },
+    ...(process.env.NODE_ENV === 'development' ? [{ src: 'dev', msg: 'message', value: error.message }] : []),
+  ]
+
   return (
-    <div className="flex min-h-screen items-center justify-center p-8">
-      <div className="flex flex-col items-center gap-4 text-center">
-        <p className="text-body font-medium text-text-primary">Something went wrong</p>
-        <button
-          onClick={reset}
-          className="h-8 px-4 rounded-btn text-body-sm font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
-        >
-          Reload page
-        </button>
-      </div>
-    </div>
+    <ErrorPage
+      code="500"
+      severity
+      headline="Something went wrong"
+      body="A server-side error interrupted this page. Nothing was lost — try reloading or head back home."
+      primary={{ label: 'Reload page', onClick: reset }}
+      secondary={{ label: 'Back to home', href: '/' }}
+      terminal={terminal}
+    />
   )
 }

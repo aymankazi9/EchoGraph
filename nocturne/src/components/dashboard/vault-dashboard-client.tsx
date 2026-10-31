@@ -34,6 +34,14 @@ interface RawSession {
   status: string
   created_at: string
   course_id?: string | null
+  // Supabase's inferred join shape is inconsistent between contexts (object vs. one-element
+  // array) — read defensively via courseNameOf() below, same workaround vault/page.tsx uses.
+  courses?: unknown
+}
+
+function courseNameOf(courses: unknown): string | null {
+  const row = Array.isArray(courses) ? courses[0] : courses
+  return (row as { name?: string } | null)?.name ?? null
 }
 
 interface Props {
@@ -107,6 +115,7 @@ export function VaultDashboardClient({
         red_zone_count: redZoneCounts[s.id] ?? 0,
         storage_used_bytes: fileSizeBytes[s.id] ?? 0,
         course_id: s.course_id ?? null,
+        course_name: courseNameOf(s.courses),
       }))
       setSessions(rows)
     }
@@ -181,18 +190,22 @@ export function VaultDashboardClient({
     try {
       const { data } = await supabase
         .from('sessions')
-        .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, created_at, course_id')
+        .select('id, title_encrypted, has_slides, has_audio, has_study_guide, guide_type, status, created_at, course_id, courses(name)')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
       if (data) {
         const existing = useDashboardStore.getState().sessions
         const existingMap = Object.fromEntries(existing.map((s) => [s.id, s]))
-        const rows: SessionRow[] = data.map((s) => ({
-          ...s,
-          red_zone_count: existingMap[s.id]?.red_zone_count ?? 0,
-          storage_used_bytes: existingMap[s.id]?.storage_used_bytes ?? 0,
-          course_id: (s as { course_id?: string | null }).course_id ?? null,
-        }))
+        const rows: SessionRow[] = data.map((s) => {
+          const row = s as unknown as RawSession
+          return {
+            ...row,
+            red_zone_count: existingMap[s.id]?.red_zone_count ?? 0,
+            storage_used_bytes: existingMap[s.id]?.storage_used_bytes ?? 0,
+            course_id: row.course_id ?? null,
+            course_name: courseNameOf(row.courses),
+          }
+        })
         useDashboardStore.getState().setSessions(rows)
       }
     } finally {
@@ -269,7 +282,7 @@ export function VaultDashboardClient({
 
       {/* Page header */}
       <div className="flex items-center justify-between mb-2">
-        <h1 style={{ fontSize: 27, fontWeight: 600, letterSpacing: '-0.025em', color: '#E2E8F0', margin: 0 }}>Your vault</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontStretch: '82%', fontSize: 34, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--color-text-primary)', margin: 0 }}>Your vault</h1>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -277,13 +290,14 @@ export function VaultDashboardClient({
             disabled={isRefreshing}
             title="Refresh sessions"
             aria-label="Refresh sessions"
-            className="w-9 h-9 flex items-center justify-center rounded-btn text-text-tertiary hover:text-text-secondary hover:bg-bg-subtle transition-colors disabled:opacity-40"
+            className="w-9 h-9 flex items-center justify-center text-text-tertiary hover:text-text-secondary hover:bg-bg-subtle transition-colors disabled:opacity-40"
           >
             <RefreshCw size={16} strokeWidth={1.5} className={isRefreshing ? 'animate-spin' : ''} />
           </button>
           <Link
             href="/session/new"
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-btn text-body font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-4 text-body font-medium transition-colors"
+            style={{ background: 'var(--color-accent)', color: 'var(--color-text-inverse)' }}
           >
             <Plus size={14} strokeWidth={1.5} />
             New session
@@ -355,7 +369,7 @@ export function VaultDashboardClient({
                 onDelete={handleDelete}
                 onRename={handleRename}
                 highlightQuery={searchQuery}
-                courseId={s.course_id}
+                courseName={s.course_name}
                 showCourseTag={showCourseTag}
               />
             ))}

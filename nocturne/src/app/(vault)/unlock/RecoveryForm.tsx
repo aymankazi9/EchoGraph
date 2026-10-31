@@ -51,14 +51,14 @@ export function RecoveryForm({ recoverySalt, onBack }: Props) {
       {/* Header */}
       <div>
         <div style={{ marginBottom: 16 }}>
-          <KeyRound size={28} strokeWidth={1.25} style={{ color: '#818CF8' }} />
+          <KeyRound size={28} strokeWidth={1.25} style={{ color: '#9A9A9F' }} />
         </div>
-        <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 6px', color: '#E2E8F0' }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontStretch: '82%', fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', margin: '0 0 6px', color: '#EDEDED' }}>
           Recover vault access
         </h2>
-        <p style={{ fontSize: 14, color: '#94A3B8', margin: 0, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 14, color: '#9A9A9F', margin: 0, lineHeight: 1.6 }}>
           Paste the contents of your{' '}
-          <span style={{ fontFamily: 'monospace', fontSize: 13 }}>nocturne-recovery-kit.txt</span>{' '}
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>nocturne-recovery-kit.txt</span>{' '}
           file below.
         </p>
       </div>
@@ -66,8 +66,8 @@ export function RecoveryForm({ recoverySalt, onBack }: Props) {
       {/* Form */}
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <label htmlFor="recovery-key" style={{ fontSize: 12.5, color: '#94A3B8', letterSpacing: '0.02em' }}>
-            Recovery Kit
+          <label htmlFor="recovery-key" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: '#76767B' }}>
+            RECOVERY KIT
           </label>
           <textarea
             id="recovery-key"
@@ -79,13 +79,12 @@ export function RecoveryForm({ recoverySalt, onBack }: Props) {
             spellCheck={false}
             style={{
               width: '100%',
-              borderRadius: 9,
-              background: '#13121C',
-              border: `1px solid ${error ? '#FB7185' : '#2D2B45'}`,
-              color: '#E2E8F0',
+              background: '#111112',
+              border: `1px solid ${error ? '#FF3B30' : 'rgba(255,255,255,0.08)'}`,
+              color: '#EDEDED',
               padding: '10px 14px',
               fontSize: 13,
-              fontFamily: 'monospace',
+              fontFamily: 'var(--font-mono)',
               resize: 'none',
               outline: 'none',
               boxSizing: 'border-box',
@@ -96,7 +95,7 @@ export function RecoveryForm({ recoverySalt, onBack }: Props) {
         </div>
 
         {error && (
-          <p style={{ fontSize: 12.5, color: '#FB7185', margin: 0 }} role="alert">
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#FF3B30', margin: 0 }} role="alert">
             {error}
           </p>
         )}
@@ -106,7 +105,9 @@ export function RecoveryForm({ recoverySalt, onBack }: Props) {
           disabled={busy || !rawKey.trim()}
           data-btn
           data-shine
-          style={{ width: '100%', height: 46, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, fontSize: 15, fontWeight: 500, background: '#6366F1', color: '#09090F', border: 'none', cursor: busy || !rawKey.trim() ? 'not-allowed' : 'pointer', boxShadow: '0 8px 26px rgba(99,102,241,0.32)', opacity: busy || !rawKey.trim() ? 0.6 : 1 }}
+          style={{ width: '100%', height: 46, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, background: '#FF3B30', color: '#0A0A0A', border: 'none', cursor: busy || !rawKey.trim() ? 'not-allowed' : 'pointer', opacity: busy || !rawKey.trim() ? 0.6 : 1 }}
+          onMouseEnter={e => { if (!busy && rawKey.trim()) e.currentTarget.style.background = '#FF5147' }}
+          onMouseLeave={e => { e.currentTarget.style.background = '#FF3B30' }}
         >
           {busy ? 'Unlocking…' : 'Unlock with Recovery Kit'}
         </button>
@@ -115,7 +116,8 @@ export function RecoveryForm({ recoverySalt, onBack }: Props) {
           type="button"
           onClick={onBack}
           disabled={busy}
-          style={{ background: 'none', border: 'none', padding: 0, fontSize: 13.5, color: '#5B6478', cursor: busy ? 'not-allowed' : 'pointer', textAlign: 'center', marginTop: 4 }}
+          data-link
+          style={{ position: 'relative', background: 'none', border: 'none', padding: 0, fontSize: 13.5, color: '#76767B', cursor: busy ? 'not-allowed' : 'pointer', textAlign: 'center', marginTop: 4 }}
         >
           ← Back to passphrase
         </button>

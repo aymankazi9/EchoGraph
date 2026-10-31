@@ -24,8 +24,8 @@ export function FactCheckPanel({ flags, activeExcerpt, onFlagClick, onClose }: P
       style={{
         width: 288,
         flexShrink: 0,
-        borderLeft: '1px solid #1E1E2E',
-        background: '#0B0B11',
+        borderLeft: '1px solid rgba(255,255,255,0.08)',
+        background: '#0A0A0A',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
@@ -40,12 +40,12 @@ export function FactCheckPanel({ flags, activeExcerpt, onFlagClick, onClose }: P
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px 14px 10px',
-          borderBottom: '1px solid #1E1E2E',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <AlertTriangle size={13} strokeWidth={1.75} style={{ color: '#FBBF24', flexShrink: 0 }} />
-          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E2E8F0', letterSpacing: '-0.01em' }}>
+          <AlertTriangle size={13} strokeWidth={1.75} style={{ color: '#76767B', flexShrink: 0 }} />
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#EDEDED', letterSpacing: '-0.01em' }}>
             Fact-check
           </span>
           {flags.length > 0 && (
@@ -56,9 +56,9 @@ export function FactCheckPanel({ flags, activeExcerpt, onFlagClick, onClose }: P
                 lineHeight: 1,
                 padding: '2px 6px',
                 borderRadius: 9999,
-                background: 'rgba(251,191,36,0.12)',
-                color: '#FDE68A',
-                border: '1px solid rgba(251,191,36,0.25)',
+                background: 'rgba(255,255,255,0.06)',
+                color: '#9A9A9F',
+                border: '1px solid rgba(255,255,255,0.14)',
               }}
             >
               {flags.length}
@@ -72,10 +72,10 @@ export function FactCheckPanel({ flags, activeExcerpt, onFlagClick, onClose }: P
           style={{
             width: 22,
             height: 22,
-            borderRadius: 6,
+            borderRadius: 2,
             border: 'none',
             background: 'transparent',
-            color: '#5B6478',
+            color: '#76767B',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -100,8 +100,8 @@ export function FactCheckPanel({ flags, activeExcerpt, onFlagClick, onClose }: P
               textAlign: 'center',
             }}
           >
-            <CheckCircle size={22} strokeWidth={1.5} style={{ color: '#34D399' }} />
-            <p style={{ fontSize: 12.5, color: '#5B6478', margin: 0, lineHeight: 1.6 }}>
+            <CheckCircle size={22} strokeWidth={1.5} style={{ color: '#EDEDED' }} />
+            <p style={{ fontSize: 12.5, color: '#76767B', margin: 0, lineHeight: 1.6 }}>
               No inconsistencies found — your notes match the lecture content.
             </p>
           </div>
@@ -119,23 +119,23 @@ export function FactCheckPanel({ flags, activeExcerpt, onFlagClick, onClose }: P
                     width: '100%',
                     textAlign: 'left',
                     padding: '10px 10px 10px 12px',
-                    borderRadius: 8,
+                    borderRadius: 2,
                     border: isActive
-                      ? '1px solid rgba(251,191,36,0.3)'
+                      ? '1px solid rgba(255,255,255,0.14)'
                       : '1px solid transparent',
                     background: isActive
-                      ? 'rgba(251,191,36,0.06)'
+                      ? 'rgba(255,255,255,0.05)'
                       : 'transparent',
                     cursor: 'pointer',
                     transition: 'background 0.12s, border-color 0.12s',
-                    borderLeft: `3px solid ${isActive ? '#FBBF24' : 'rgba(251,191,36,0.3)'}`,
+                    borderLeft: `3px solid ${isActive ? '#EDEDED' : 'rgba(255,255,255,0.14)'}`,
                   }}
                 >
                   {/* Excerpt */}
                   <p
                     style={{
                       fontSize: 11.5,
-                      color: '#94A3B8',
+                      color: '#9A9A9F',
                       margin: '0 0 6px',
                       lineHeight: 1.55,
                       fontStyle: 'italic',
@@ -152,7 +152,7 @@ export function FactCheckPanel({ flags, activeExcerpt, onFlagClick, onClose }: P
                   <p
                     style={{
                       fontSize: 12,
-                      color: '#CBD5E1',
+                      color: '#EDEDED',
                       margin: 0,
                       lineHeight: 1.55,
                     }}
@@ -165,14 +165,14 @@ export function FactCheckPanel({ flags, activeExcerpt, onFlagClick, onClose }: P
                     <p
                       style={{
                         fontSize: 11,
-                        color: '#5B6478',
+                        color: '#76767B',
                         margin: '6px 0 0',
                         lineHeight: 1.5,
                         paddingTop: 6,
-                        borderTop: '1px solid #1E1E2E',
+                        borderTop: '1px solid rgba(255,255,255,0.08)',
                       }}
                     >
-                      <span style={{ color: '#3F485C', fontWeight: 600, textTransform: 'uppercase', fontSize: 9.5, letterSpacing: '0.05em' }}>
+                      <span style={{ color: '#76767B', fontWeight: 600, textTransform: 'uppercase', fontSize: 9.5, letterSpacing: '0.05em' }}>
                         Lecture says:{' '}
                       </span>
                       {flag.lectureEvidence}

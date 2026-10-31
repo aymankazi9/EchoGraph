@@ -11,17 +11,17 @@ export function StorageIndicator({ usedBytes, maxBytes }: Props) {
   return (
     <div className="flex flex-col gap-1.5 px-2">
       <div className="flex items-center justify-between">
-        <span className="text-caption uppercase tracking-[0.07em] text-text-tertiary">
+        <span className="text-caption uppercase" style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.07em', color: '#76767B' }}>
           Vault storage
         </span>
       </div>
-      <div className="h-1 w-full rounded-full bg-bg-subtle overflow-hidden">
+      <div className="h-px w-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
         <div
-          className="h-full rounded-full bg-indigo-500 transition-all duration-300"
-          style={{ width: `${pct}%` }}
+          className="h-full transition-all duration-300"
+          style={{ width: `${pct}%`, background: 'var(--color-accent)' }}
         />
       </div>
-      <span className="text-caption text-text-tertiary">
+      <span className="text-caption" style={{ fontFamily: 'var(--font-mono)', color: '#76767B' }}>
         {formatBytes(usedBytes)} of {formatBytes(maxBytes)}
       </span>
     </div>

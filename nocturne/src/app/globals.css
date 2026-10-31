@@ -23,10 +23,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
-  --color-ring: var(--color-indigo-500);
+  --color-ring: var(--color-accent);
   --color-input: var(--color-bg-input);
   --color-border: var(--color-border-default);
-  --color-destructive: var(--color-rose-400);
+  --color-destructive: var(--color-accent);
   --color-accent-foreground: var(--color-text-primary);
   --color-accent: var(--color-bg-subtle);
   --color-muted-foreground: var(--color-text-secondary);
@@ -34,7 +34,7 @@
   --color-secondary-foreground: var(--color-text-primary);
   --color-secondary: var(--color-bg-subtle);
   --color-primary-foreground: var(--color-text-inverse);
-  --color-primary: var(--color-indigo-500);
+  --color-primary: var(--color-accent);
   --color-popover-foreground: var(--color-text-primary);
   --color-popover: var(--color-bg-overlay);
   --color-card-foreground: var(--color-text-primary);
@@ -94,52 +94,69 @@
   --color-teal-300: #5EEAD4;
   --color-teal-400: #2DD4BF;
 
-  /* Surfaces — page → rail/card → raised → input → overlay → subtle */
-  --color-bg-base: #09090F;
-  --color-bg-rail: #0B0B11;
-  --color-bg-card: #0C0C13;
-  --color-bg-raised: #0D0D14;
-  --color-bg-elevated: #111118;
-  --color-bg-input: #13121C;
-  --color-bg-overlay: #16151F;
-  --color-bg-subtle: #1C1B28;
+  /* Surfaces — Surgical skeleton (THEME_SURGICAL.md §1.1). "Rail" (sidebar) sits at page
+     level, not a separate step — the right hairline is what defines its edge. */
+  --color-bg-base: #0A0A0A;
+  --color-bg-rail: #0A0A0A;
+  --color-bg-card: #0C0C0D;
+  --color-bg-raised: #111112;
+  --color-bg-elevated: #0C0C0D;
+  --color-bg-input: #111112;
+  --color-bg-overlay: #0C0C0D;
+  --color-bg-subtle: rgba(255,255,255,0.03);
 
-  /* Borders */
-  --color-border-default: #1E1E2E;
-  --color-border-subtle: #191827;
-  --color-border-strong: #2D2B45;
+  /* Borders — white-alpha hairlines (§1.2) */
+  --color-border-default: rgba(255,255,255,0.08);
+  --color-border-subtle: rgba(255,255,255,0.05);
+  --color-border-strong: rgba(255,255,255,0.14);
 
-  /* Text */
-  --color-text-primary: #E2E8F0;
-  --color-text-primary-soft: #CBD5E1;
-  --color-text-secondary: #94A3B8;
-  --color-text-tertiary: #5B6478;
-  --color-text-disabled: #3F485C;
-  --color-text-inverse: #09090F;
+  /* Text (§1.3) */
+  --color-text-primary: #EDEDED;
+  --color-text-primary-soft: #CFCFD2;
+  --color-text-secondary: #9A9A9F;
+  --color-text-tertiary: #76767B;
+  --color-text-disabled: #4A4A4E;
+  --color-text-inverse: #0A0A0A;
 
-  /* Privacy / Local Mode */
-  --color-local-bg: #0D0C1A;
-  --color-local-border: #6366F1;
-  --color-local-text: #818CF8;
+  /* The one accent — remapped per data-theme preset (globals.css "Visual themes" section) */
+  --color-accent: #FF3B30;
+  --color-accent-hover: #FF5147;
+  --color-accent-wash: rgba(255,59,48,0.04);
 
-  /* Border radius — marketing/auth chrome: btn/card (6–8px); app surfaces: md→3xl (9–18px) */
+  /* Fixed crimson for Red Zone / destructive / error semantics — NEVER remapped by any
+     [data-theme] block. Distinct from --color-accent, which changes per preset. */
+  --color-severity: #FF3B30;
+
+  /* Map tab ONLY — nodes are colored by detected cluster (src/lib/graph/detect-clusters.ts),
+     not by zone; Red Zone nodes override to --color-severity regardless of cluster. Six
+     muted, desaturated tones distinct from the crimson accent and from the text grays, per
+     the "restrained night-sky star map" direction. Not for reuse outside the Map tab. */
+  --color-graph-cluster-1: #6B8CAE;
+  --color-graph-cluster-2: #7FA88C;
+  --color-graph-cluster-3: #9381A8;
+  --color-graph-cluster-4: #B08C78;
+  --color-graph-cluster-5: #7FA3A3;
+  --color-graph-cluster-6: #A8A072;
+
+  /* Border radius — 0 everywhere except true buttons/inputs (§3) */
   --radius-input: 2px;
-  --radius-btn: 6px;
-  --radius-card: 8px;
-  --radius-md: 9px;
-  --radius-lg: 12px;
-  --radius-modal: 12px;
-  --radius-xl: 14px;
-  --radius-2xl: 16px;
-  --radius-3xl: 18px;
+  --radius-btn: 2px;
+  --radius-card: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-modal: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
   --radius-pill: 9999px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
-  --shadow-indigo: 0 0 0 1px rgba(99, 102, 241, 0.4);
-  --shadow-rose: 0 0 0 1px rgba(244, 63, 94, 0.4);
+  /* Shadows — zero box-shadow in default mode (§3 Elevation); kept as tokens so any
+     remaining shadow-* utility resolves to a no-op instead of a dangling reference. */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-indigo: none;
+  --shadow-rose: none;
 
   /* Type scale — DESIGN_SYSTEM.md §3 */
   --text-display: 28px;
@@ -349,28 +366,10 @@
 [data-shine] { position: relative; overflow: hidden; }
 [data-shine]::before { content: ""; position: absolute; top: 0; left: -85%; width: 55%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent); transform: skewX(-20deg); transition: left .6s cubic-bezier(.22,1,.36,1); pointer-events: none; }
 [data-shine]:hover::before { left: 150%; }
-[data-marquee]:hover [data-marquee-track] { animation-play-state: paused; }
-[data-feat]::before { content: ""; position: absolute; inset: 0; background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(99,102,241,0.09), transparent 62%); opacity: 0; transition: opacity .4s; pointer-events: none; z-index: 0; }
-[data-feat]:hover::before { opacity: 1; }
-[data-feat]:hover { background: #16151F !important; }
-[data-feat-glyph] { transition: transform .4s cubic-bezier(.34,1.4,.42,1), border-color .4s, color .4s; }
-[data-feat]:hover [data-feat-glyph] { transform: translateY(-3px) rotate(-5deg); border-color: #6366F1; }
-[data-feat-red]:hover::before { background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(244,63,94,0.09), transparent 62%); }
-[data-feat-red]:hover [data-feat-glyph] { border-color: #F43F5E; }
-[data-kc="arrow"] { position: relative; }
-[data-kc="arrow"]::before { content: ""; position: absolute; left: 19px; top: -3px; width: 1.5px; height: calc(100% + 6px); background: linear-gradient(#818CF8, rgba(129,140,248,0.3)); }
-@keyframes noct-float { 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-7px);} }
-@keyframes noct-ringpulse { 0%{ transform:scale(0.6); opacity:0.55;} 80%,100%{ transform:scale(2.4); opacity:0;} }
-@keyframes noct-marquee { from { transform:translateX(0); } to { transform:translateX(-50%); } }
-@keyframes noct-barpulse { 0%,100%{ box-shadow:0 0 9px rgba(244,63,94,0.4);} 50%{ box-shadow:0 0 20px rgba(244,63,94,0.85);} }
-@keyframes noct-scanfield { 0%{ left:-13%;} 100%{ left:100%;} }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 880px) { [data-desktop="nav"] { display: none !important; } [data-desktop="signin"] { display: none !important; } }
 @media (max-width: 760px) {
-  [data-cards-3] { grid-template-columns: 1fr !important; }
-  [data-privacy-grid] { grid-template-columns: 1fr !important; gap: 36px !important; }
   [data-demo-grid] { grid-template-columns: 1fr !important; }
-  [data-demo-left] { border-right: none !important; border-bottom: 1px solid #1E1E2E !important; }
   [data-footer-grid] { grid-template-columns: repeat(2,1fr) !important; }
 }
 
@@ -382,7 +381,7 @@
 [data-step] { animation:noct-stepin .55s cubic-bezier(.16,1,.3,1) both; }
 [data-pop] { animation:noct-pop .6s cubic-bezier(.34,1.56,.42,1) both; }
 [data-link] { position:relative; }
-[data-link]::after { content:""; position:absolute; left:0; right:0; bottom:-2px; height:1px; background:#818CF8; transform:scaleX(0); transform-origin:right; transition:transform .3s cubic-bezier(.22,1,.36,1); }
+[data-link]::after { content:""; position:absolute; left:0; right:0; bottom:-2px; height:1px; background:#FF3B30; transform:scaleX(0); transform-origin:right; transition:transform .3s cubic-bezier(.22,1,.36,1); }
 [data-link]:hover::after { transform:scaleX(1); transform-origin:left; }
 @media (max-width:940px) {
   [data-brand] { display:none !important; }
@@ -420,143 +419,149 @@
 [data-doctoc] { transition:color .2s, border-color .2s; }
 
 /* ── Visual themes ─────────────────────────────────────────────────────────────
-   Three base themes controlled by data-theme on the AppShell root div.
-   Each overrides the surface / text / border custom properties defined in @theme.
-   Midnight is the default (no overrides needed).
-   Accent colours (data-accent) remap --color-indigo-* for the whole subtree —
-   accent blocks come AFTER theme blocks so they take precedence in cascade order.
+   Theme presets controlled by data-theme on the AppShell root div (Settings →
+   Appearance, src/lib/theme/types.ts). Nocturne Classic (value "surgical") is the
+   default (no attribute, no override needed — its values are the base @theme above).
+   Eclipse and Aurora share Classic's grayscale skeleton and only remap --color-accent*,
+   since every app-zone component should reference var(--color-accent) rather
+   than a hardcoded hex (THEME_SURGICAL.md's Landing/Auth pages stay hardcoded
+   crimson intentionally — they have no theme picker). --color-severity is never
+   remapped by any preset — Red Zone/destructive/error content stays crimson always.
+
+   Legacy keeps Classic's dark skeleton with the old indigo accent. Parchment keeps a
+   dark (warm brown) skeleton with cream text and the crimson accent. Light is the one
+   preset that also flips --color-bg-* / --color-border-* / --color-text-* to a warm
+   white skeleton — the only theme where those tokens differ from the Surgical dark base.
 
    Focus mode (data-focus-mode) hides the sidebar navigation.           ──────── */
 
-/* ── Dusk — deep navy, dusky-blue-toned, slightly lighter than Midnight ── */
-[data-theme="dusk"] {
-  --color-bg-base:     #0B0F1A;
-  --color-bg-rail:     #0D121E;
-  --color-bg-card:     #0F1422;
-  --color-bg-raised:   #111828;
-  --color-bg-elevated: #151D30;
-  --color-bg-input:    #1A2338;
-  --color-bg-overlay:  #1D2840;
-  --color-bg-subtle:   #232F48;
-
-  --color-border-subtle:  #182038;
-  --color-border-default: #1E2D42;
-  --color-border-strong:  #2C3D56;
-
-  --color-text-primary:      #DCE8F5;
-  --color-text-primary-soft: #BCCFE5;
-  --color-text-secondary:    #7A95B0;
-  --color-text-tertiary:     #4D6A85;
-  --color-text-disabled:     #354F68;
-  --color-text-inverse:      #0B0F1A;
-}
-
-/* ── Eclipse — near-black canvas, warm gold accent remapping ── */
+/* ── Eclipse — warm gold accent, tier-gated (Settings → Appearance) ── */
 [data-theme="eclipse"] {
-  --color-bg-base:     #07070A;
-  --color-bg-rail:     #09090D;
-  --color-bg-card:     #0A0A0F;
-  --color-bg-raised:   #0C0C12;
-  --color-bg-elevated: #0F0F16;
-  --color-bg-input:    #111119;
-  --color-bg-overlay:  #141420;
-  --color-bg-subtle:   #191924;
-
-  --color-border-subtle:  #161623;
-  --color-border-default: #1C1C28;
-  --color-border-strong:  #272738;
-
-  --color-text-primary:      #F5F5FA;
-  --color-text-primary-soft: #D5D5F0;
-  --color-text-secondary:    #9898B8;
-  --color-text-tertiary:     #5C5C7C;
-  --color-text-disabled:     #404058;
-  --color-text-inverse:      #07070A;
-
-  /* Remap the indigo scale to warm gold — all text-indigo-* / bg-indigo-* classes
-     that reference var(--color-indigo-N) automatically render as gold on Eclipse. */
-  --color-indigo-50:  #FFFBEB;
-  --color-indigo-100: #FEF3C7;
-  --color-indigo-200: #FDE68A;
-  --color-indigo-300: #FCD34D;
-  --color-indigo-400: #FBBF24;
-  --color-indigo-500: #F59E0B;
-  --color-indigo-600: #D97706;
-  --color-indigo-700: #B45309;
-  --color-indigo-800: #92400E;
-  --color-indigo-900: #451A03;
+  --color-accent: #F59E0B;
+  --color-accent-hover: #FBBF24;
+  --color-accent-wash: rgba(245,158,11,0.06);
 }
 
-/* ── Accent colours — override --color-indigo-* to switch the action colour ──
-   These come AFTER theme blocks so an explicit accent selection always wins,
-   including over Eclipse's built-in gold remap.                              ── */
-
-[data-accent="violet"] {
-  --color-indigo-50:  #F5F3FF;
-  --color-indigo-100: #EDE9FE;
-  --color-indigo-200: #DDD6FE;
-  --color-indigo-300: #C4B5FD;
-  --color-indigo-400: #A78BFA;
-  --color-indigo-500: #8B5CF6;
-  --color-indigo-600: #7C3AED;
-  --color-indigo-700: #6D28D9;
-  --color-indigo-800: #5B21B6;
-  --color-indigo-900: #2E1065;
+/* ── Aurora — cool teal accent, tier-gated (Settings → Appearance) ── */
+[data-theme="aurora"] {
+  --color-accent: #14B8A6;
+  --color-accent-hover: #2DD4BF;
+  --color-accent-wash: rgba(20,184,166,0.06);
 }
 
-[data-accent="sky"] {
-  --color-indigo-50:  #F0F9FF;
-  --color-indigo-100: #E0F2FE;
-  --color-indigo-200: #BAE6FD;
-  --color-indigo-300: #7DD3FC;
-  --color-indigo-400: #38BDF8;
-  --color-indigo-500: #0EA5E9;
-  --color-indigo-600: #0284C7;
-  --color-indigo-700: #0369A1;
-  --color-indigo-800: #075985;
-  --color-indigo-900: #0C4A6E;
+/* ── Legacy — dark skeleton, old indigo accent ── */
+[data-theme="legacy"] {
+  --color-accent: #6366F1;
+  --color-accent-hover: #818CF8;
+  --color-accent-wash: rgba(99,102,241,0.06);
 }
 
-[data-accent="teal"] {
-  --color-indigo-50:  #F0FDFA;
-  --color-indigo-100: #CCFBF1;
-  --color-indigo-200: #99F6E4;
-  --color-indigo-300: #5EEAD4;
-  --color-indigo-400: #2DD4BF;
-  --color-indigo-500: #14B8A6;
-  --color-indigo-600: #0D9488;
-  --color-indigo-700: #0F766E;
-  --color-indigo-800: #115E59;
-  --color-indigo-900: #134E4A;
+/* ── Parchment — dark warm-brown skeleton, cream text, crimson accent ── */
+[data-theme="parchment"] {
+  --color-bg-base: #1C1512;
+  --color-bg-rail: #1C1512;
+  --color-bg-card: #241B17;
+  --color-bg-raised: #2A2019;
+  --color-bg-elevated: #241B17;
+  --color-bg-input: #2A2019;
+  --color-bg-overlay: #241B17;
+  --color-bg-subtle: rgba(255,245,230,0.04);
+  --color-border-default: rgba(255,245,230,0.1);
+  --color-border-subtle: rgba(255,245,230,0.06);
+  --color-border-strong: rgba(255,245,230,0.18);
+  --color-text-primary: #F3E9DC;
+  --color-text-primary-soft: #E8DBC8;
+  --color-text-secondary: #C9B8A3;
+  --color-text-tertiary: #9C8A74;
+  --color-text-disabled: #6B5D4D;
+  --color-text-inverse: #1C1512;
 }
 
-[data-accent="amber"] {
-  --color-indigo-50:  #FFFBEB;
-  --color-indigo-100: #FEF3C7;
-  --color-indigo-200: #FDE68A;
-  --color-indigo-300: #FCD34D;
-  --color-indigo-400: #FBBF24;
-  --color-indigo-500: #F59E0B;
-  --color-indigo-600: #D97706;
-  --color-indigo-700: #B45309;
-  --color-indigo-800: #92400E;
-  --color-indigo-900: #451A03;
-}
-
-[data-accent="rose"] {
-  --color-indigo-50:  #FFF1F2;
-  --color-indigo-100: #FFE4E6;
-  --color-indigo-200: #FECDD3;
-  --color-indigo-300: #FDA4AF;
-  --color-indigo-400: #FB7185;
-  --color-indigo-500: #F43F5E;
-  --color-indigo-600: #E11D48;
-  --color-indigo-700: #BE123C;
-  --color-indigo-800: #9F1239;
-  --color-indigo-900: #4C0519;
+/* ── Light — warm white skeleton, warm near-black text, crimson accent ──
+   Only theme so far whose Tier-2 screens (Session Workspace, Momentum — still 100%
+   literal dark-theme hex) will look like an unthemed dark island until that retrofit
+   lands; everything on var(--color-bg-*)/var(--color-text-*) re-themes correctly today. */
+[data-theme="light"] {
+  --color-bg-base: #F7F3EE;
+  --color-bg-rail: #F7F3EE;
+  --color-bg-card: #FFFFFF;
+  --color-bg-raised: #FFFFFF;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-input: #FFFFFF;
+  --color-bg-overlay: #FFFFFF;
+  --color-bg-subtle: rgba(26,22,20,0.03);
+  --color-border-default: rgba(26,22,20,0.1);
+  --color-border-subtle: rgba(26,22,20,0.06);
+  --color-border-strong: rgba(26,22,20,0.18);
+  --color-text-primary: #1A1614;
+  --color-text-primary-soft: #2E2824;
+  --color-text-secondary: #6B625C;
+  --color-text-tertiary: #9C928A;
+  --color-text-disabled: #C4BCB4;
+  --color-text-inverse: #FFFFFF;
+  --color-accent: #FF3B30;
+  --color-accent-hover: #E0291F;
+  --color-accent-wash: rgba(255,59,48,0.06);
 }
 
 /* ── Focus mode — hide the sidebar nav ── */
 [data-focus-mode] [data-app-nav] {
   display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Surgical theme — Landing page (design_handoff_nocturne/THEME_SURGICAL.md)
+   Scoped additively: new keyframes + "3 AM Deep Focus Mode" overrides, ported
+   from the Nocturne Landing v2 reference. Does not touch the indigo @theme
+   tokens above — those are migrated page-by-page in a later pass (§11).
+   ══════════════════════════════════════════════════════════════════════════ */
+@keyframes noct-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes noct-toast { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+@keyframes noct-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+/* Focus Mode overrides — THEME_SURGICAL.md §8. Matches the literal rgb()/rgba() strings the
+   browser serializes from the surgical components' inline `background`/`border`/`color`
+   shorthands (React renders the same inline `style` attribute shape the reference used), so no
+   per-component focus-state plumbing is needed — these rules just override in place. */
+[data-focus="on"],
+[data-focus="on"] [style*="background: rgb(10, 10, 10)"],
+[data-focus="on"] [style*="background: rgb(12, 12, 13)"],
+[data-focus="on"] [style*="background: rgb(17, 17, 18)"] { background-color: #000000 !important; }
+[data-focus="on"] [style*="rgba(12, 12, 13"] { background-color: rgba(0,0,0,0.6) !important; }
+[data-focus="on"] [style*="rgba(255, 255, 255, 0.08)"],
+[data-focus="on"] [style*="rgba(255, 255, 255, 0.05)"],
+[data-focus="on"] [style*="rgba(255, 255, 255, 0.1)"] { border-color: rgba(255,255,255,0.035) !important; }
+[data-focus="on"] [style*="color: rgb(255, 59, 48)"]:not([style*="background"]) { text-shadow: 0 0 14px rgba(255,59,48,0.65); }
+[data-focus="on"] [style*="background: rgb(255, 59, 48)"] { box-shadow: 0 0 16px rgba(255,59,48,0.5); }
+[data-focus="on"] [style*="solid rgb(255, 59, 48)"] { box-shadow: 0 0 14px rgba(255,59,48,0.35); }
+[data-focus="on"] [data-logo-btn] svg { filter: drop-shadow(0 0 6px rgba(255,59,48,0.8)); }
+[data-focus="on"] [data-fade="hl"] { background: linear-gradient(90deg, #000 0%, rgba(0,0,0,0.7) 38%, rgba(0,0,0,0) 70%) !important; }
+[data-focus="on"] [data-fade="hb"] { background: linear-gradient(180deg, rgba(0,0,0,0), #000) !important; }
+[data-focus="on"] [data-fade="ft"] { background: radial-gradient(ellipse 60% 70% at 50% 45%, rgba(0,0,0,0.92), rgba(0,0,0,0.2)) !important; }
+
+/* Token-driven surfaces (app shell and beyond use @theme utilities, not inline styles, so the
+   attribute-substring rules above never match them) — overriding the custom properties
+   themselves cascades to every bg-bg-* / border-* utility consumer for free. */
+[data-focus="on"] {
+  --color-bg-base: #000000;
+  --color-bg-rail: #000000;
+  --color-bg-card: #000000;
+  --color-bg-raised: #000000;
+  --color-bg-elevated: #000000;
+  --color-bg-input: #000000;
+  --color-bg-overlay: #000000;
+  --color-border-default: rgba(255,255,255,0.035);
+  --color-border-subtle: rgba(255,255,255,0.035);
+  --color-border-strong: rgba(255,255,255,0.035);
+}
+
+/* Responsive collapse — THEME_SURGICAL.md §3 (960px breakpoint) */
+@media (max-width: 960px) {
+  [data-nav-links] { visibility: hidden !important; width: 0 !important; overflow: hidden !important; }
+  [data-hero-grid], [data-split], [data-demo-grid], [data-priv-grid], [data-plans] { grid-template-columns: 1fr !important; }
+  [data-sticky] { position: static !important; }
+  [data-spec] { grid-template-columns: repeat(2,1fr) !important; }
+  [data-step-desc] { display: none !important; }
+  [data-vault-copy] { top: auto !important; bottom: 28px !important; transform: none !important; gap: 18px !important; }
+  [data-vault-h2], [data-vlabel], [data-vault-desc] { display: none !important; }
 }

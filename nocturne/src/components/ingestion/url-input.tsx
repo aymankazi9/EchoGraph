@@ -85,10 +85,11 @@ export function UrlInput({ onFetched, disabled = false }: Props) {
           disabled={fetching || disabled}
           className={[
             'flex-1 h-9 rounded-card border bg-bg-input text-body text-text-primary px-2.5',
-            'placeholder:text-text-tertiary focus:outline-none focus:border-indigo-500 focus:shadow-teal',
-            error ? 'border-rose-400 shadow-red' : 'border-border-default',
+            'placeholder:text-text-tertiary focus:outline-none focus:border-border-strong',
+            error ? '' : 'border-border-default',
             fetching || disabled ? 'opacity-60 cursor-not-allowed' : '',
           ].join(' ')}
+          style={error ? { borderColor: '#FF3B30' } : undefined}
         />
         <button
           type="button"
@@ -110,14 +111,14 @@ export function UrlInput({ onFetched, disabled = false }: Props) {
       {fetching && progress > 0 && (
         <div className="h-1 w-full rounded-pill bg-bg-subtle overflow-hidden">
           <div
-            className="h-full rounded-pill bg-indigo-500 transition-all duration-150"
-            style={{ width: `${progress}%` }}
+            className="h-full rounded-pill transition-all duration-150"
+            style={{ width: `${progress}%`, background: '#FF3B30' }}
           />
         </div>
       )}
 
       {error && (
-        <p className="text-label text-rose-300" role="alert">
+        <p className="text-label" style={{ color: '#FF3B30' }} role="alert">
           {error}
         </p>
       )}

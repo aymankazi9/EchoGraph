@@ -48,7 +48,7 @@ export default function ChangelogPage() {
     <div className="px-6 py-16 md:py-24">
       <div className="max-w-2xl mx-auto">
         <div className="mb-12">
-          <p className="text-caption uppercase tracking-[0.1em] text-indigo-400 mb-3">
+          <p className="text-caption uppercase tracking-[0.1em] mb-3" style={{ color: 'var(--color-accent)' }}>
             Changelog
           </p>
           <h1 className="text-heading font-medium text-text-primary mb-3">
@@ -64,7 +64,10 @@ export default function ChangelogPage() {
             <div key={entry.version}>
               <div className="flex items-center gap-3 mb-5">
                 <span className="text-body-sm font-medium text-text-primary">{entry.version}</span>
-                <span className="text-caption uppercase tracking-[0.1em] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                <span
+                  className="text-caption uppercase tracking-[0.1em] px-2 py-0.5 border"
+                  style={{ color: 'var(--color-accent)', borderColor: 'color-mix(in srgb, var(--color-accent) 40%, transparent)', background: 'var(--color-accent-wash)' }}
+                >
                   {entry.label}
                 </span>
                 <span className="text-caption text-text-tertiary ml-auto">{entry.date}</span>
@@ -73,7 +76,7 @@ export default function ChangelogPage() {
                 <ul className="flex flex-col gap-2.5">
                   {entry.items.map((item) => (
                     <li key={item} className="flex items-start gap-2.5">
-                      <Check size={13} strokeWidth={2} className="text-indigo-400 mt-0.5 shrink-0" />
+                      <Check size={13} strokeWidth={2} className="mt-0.5 shrink-0" style={{ color: 'var(--color-accent)' }} />
                       <span className="text-body-sm text-text-secondary">{item}</span>
                     </li>
                   ))}

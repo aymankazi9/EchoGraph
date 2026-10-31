@@ -6,11 +6,16 @@ import { pipeline, env } from '@huggingface/transformers'
 
 env.allowLocalModels = false
 
-type InMsg = { type: 'SCORE'; slideTexts: string[]; segmentTexts: string[] }
+type InMsg =
+  | { type: 'SCORE'; slideTexts: string[]; segmentTexts: string[] }
+  // Map tab: raw embeddings for a flat list of keyword terms (order preserved),
+  // used for the embedding-cosine signal in buildGraph — no cross-comparison.
+  | { type: 'EMBED'; texts: string[] }
 type OutMsg =
   | { type: 'MODEL_LOADING'; progress: number; file: string }
   | { type: 'MODEL_READY' }
   | { type: 'SCORES'; scores: number[][] }
+  | { type: 'EMBEDDINGS'; vectors: number[][] }
   | { type: 'ERROR'; message: string }
 
 const post = (msg: OutMsg) =>
@@ -46,11 +51,22 @@ function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 self.addEventListener('message', async (event: MessageEvent<InMsg>) => {
-  if (event.data.type !== 'SCORE') return
+  if (event.data.type !== 'SCORE' && event.data.type !== 'EMBED') return
 
   try {
     const ext = await getExtractor()
     post({ type: 'MODEL_READY' })
+
+    if (event.data.type === 'EMBED') {
+      const { texts } = event.data
+      if (texts.length === 0) { post({ type: 'EMBEDDINGS', vectors: [] }); return }
+      const output = await (ext as (
+        input: string[],
+        opts: Record<string, unknown>,
+      ) => Promise<{ tolist(): number[][] }>)(texts, { pooling: 'mean', normalize: true })
+      post({ type: 'EMBEDDINGS', vectors: output.tolist() })
+      return
+    }
 
     const { slideTexts, segmentTexts } = event.data
 

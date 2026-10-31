@@ -167,6 +167,31 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: 'map',
+    title: 'Map tab',
+    content: [
+      {
+        type: 'p',
+        text:
+          'The Map tab visualizes a session\'s scored keywords as a graph — terms that share a slide, ' +
+          'get mentioned close together in the lecture, or are semantically related are connected by an edge. ' +
+          'Click any term to see its definition, confidence, and related terms without losing your place on the map.',
+      },
+      {
+        type: 'p',
+        text:
+          'Switch the lens between Importance (colored by Red/Likely Zone) and Mastery (colored by how well ' +
+          'you know each term\'s flashcard, from new to mastered) to see different views of the same graph.',
+      },
+      {
+        type: 'callout',
+        text:
+          'The graph is built entirely in your browser from content already loaded into the session — ' +
+          'nothing about it is sent to a server, and the connections themselves are never saved.',
+      },
+    ],
+  },
+  {
     id: 'momentum',
     title: 'Momentum',
     content: [

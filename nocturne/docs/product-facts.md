@@ -39,6 +39,7 @@ Every user-facing capability, verified against source code. **Nothing here is de
 | AI notes generation | Built | Midnight | Generates structured markdown notes from slides and transcript via Claude. Source: `src/app/api/generate/notes/route.ts`. |
 | AI notes fact-check | Built | Midnight | Checks saved notes against the actual lecture content and highlights factual errors or unsupported claims. Source: `src/app/api/fact-check/route.ts`. |
 | AI quiz generation | Built | Eclipse | Generates multiple-choice questions with AI-crafted plausible distractors drawn from the lecture deck. Source: `src/app/api/generate/quiz/route.ts`. |
+| Knowledge graph (Map tab) | Built | Midnight | Visualizes this session's scored keywords as a graph — edges weighted by shared slides, lecture co-occurrence, and (when available) semantic embedding similarity. Built entirely client-side from already-loaded session data; nothing is sent to a server and edges are not persisted. Source: `src/lib/graph/buildGraph.ts`, `src/components/map/`. |
 
 ---
 
@@ -137,4 +138,4 @@ Items appearing in pricing or landing copy that are **not fully Built**:
 
 ---
 
-*Last verified: 2026-10-13. Update this file whenever a capability ships, changes tier, or is removed.*
+*Last verified: 2026-10-30. Update this file whenever a capability ships, changes tier, or is removed.*

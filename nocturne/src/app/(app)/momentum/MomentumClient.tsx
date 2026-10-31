@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { hasAccess, type Tier } from '@/lib/tiers/features'
 import { LockedFeature } from '@/components/paywall/locked-feature'
 import { computeMastery, type MasteryState } from '@/lib/scoring/srs'
+import { useContourField } from '@/components/surgical/use-contour-field'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,17 +15,14 @@ interface RedeemItem {
   name: string
   sub: string
   cost: number
-  iconColor: string // rgb string e.g. "251,191,36"
   icon: React.ReactNode
 }
 
 interface MilestoneItem {
-  icon: React.ReactNode
   title: string
   sub: string
   earned: boolean
   progress?: string // e.g. "12/14"
-  color: string    // rgb e.g. "251,191,36"
 }
 
 interface CourseData {
@@ -57,22 +55,6 @@ const BoltIcon = ({ size = 17 }: { size?: number }) => (
     <path d="M10 1.5 L4 10 h4 l-1 6.5 L14 7 h-4 Z" />
   </svg>
 )
-const FlameIcon = ({ size = 30 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 1.5 c2 3 4 4.2 4 7.5 a4 4 0 0 1 -8 0 c0 -1.6 0.8 -2.8 1.6 -3.6 C7 6.5 7.3 7.6 8 8 c0.3 -2 0 -4.5 1 -6.5 Z" />
-  </svg>
-)
-const CheckIcon = ({ size = 11, stroke = '#09090F' }: { size?: number; stroke?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke={stroke} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 9.5 L7.5 13 L14 5" />
-  </svg>
-)
-const CheckCircleIcon = ({ size = 16 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="9" cy="9" r="7" />
-    <path d="M5.5 9 L8 11.5 L12.5 6.5" />
-  </svg>
-)
 const WaveIcon = ({ size = 13 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     <path d="M2 9 q2.25 -4 4.5 0 t4.5 0 t4.5 0" />
@@ -81,31 +63,6 @@ const WaveIcon = ({ size = 13 }: { size?: number }) => (
 const CrownIcon = ({ size = 13 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M2.5 5 L6 9 L9 3.5 L12 9 L15.5 5 L14 14 H4 Z" />
-  </svg>
-)
-const StackIcon = ({ size = 14 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 2 L16 6 L9 10 L2 6 Z" />
-    <path d="M2 11 L9 15 L16 11" />
-  </svg>
-)
-const CardsIcon = ({ size = 14 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2.5" y="5" width="10" height="9" rx="1.5" />
-    <path d="M6 5 V3.6 a1 1 0 0 1 1 -1 h7 a1 1 0 0 1 1 1 v8 a1 1 0 0 1 -1 1 h-1.5" />
-  </svg>
-)
-const TargetIcon = ({ size = 14 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="9" cy="9" r="7" />
-    <circle cx="9" cy="9" r="3.4" />
-    <circle cx="9" cy="9" r="0.4" fill="currentColor" />
-  </svg>
-)
-const TrophyIcon = ({ size = 14 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 2.5 h8 v3 a4 4 0 0 1 -8 0 Z" />
-    <path d="M5 3.5 H3 a1.5 1.5 0 0 0 0 3 h0.5 M13 3.5 h2 a1.5 1.5 0 0 1 0 3 h-0.5 M9 9.5 V12 M6.5 15 h5 M7.5 12 h3 v1.5 h-3 Z" />
   </svg>
 )
 const LockIcon = ({ size = 13 }: { size?: number }) => (
@@ -170,11 +127,11 @@ function titleCase(s: string): string {
 // Heatmap constants
 // ---------------------------------------------------------------------------
 const HEATMAP_SCALE = [
-  '#13121C',
-  'rgba(99,102,241,0.28)',
-  'rgba(99,102,241,0.5)',
-  'rgba(99,102,241,0.74)',
-  '#818CF8',
+  'rgba(255,255,255,0.04)',
+  'rgba(255,255,255,0.18)',
+  'rgba(255,255,255,0.38)',
+  'rgba(255,255,255,0.62)',
+  '#EDEDED',
 ]
 const WEEKS_N = 17
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -219,7 +176,7 @@ function computeStreaks(dates: string[]): { current: number; best: number } {
   return { current, best }
 }
 
-function buildWeekDays(activitySet: Set<string>): Array<{ label: string; done: boolean }> {
+function buildWeekDays(activitySet: Set<string>): Array<{ label: string; done: boolean; isToday: boolean }> {
   const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const monday = new Date(today)
@@ -227,8 +184,9 @@ function buildWeekDays(activitySet: Set<string>): Array<{ label: string; done: b
   return labels.map((label, i) => {
     const day = new Date(monday)
     day.setDate(monday.getDate() + i)
-    if (day > today) return { label, done: false }
-    return { label, done: activitySet.has(day.toISOString().slice(0, 10)) }
+    const isToday = day.getTime() === today.getTime()
+    if (day > today) return { label, done: false, isToday }
+    return { label, done: activitySet.has(day.toISOString().slice(0, 10)), isToday }
   })
 }
 
@@ -291,52 +249,42 @@ function buildMilestoneItems(
   const firstMastered = courses.find((c) => c.pct >= 80)
   return [
     {
-      icon: <FlameIcon size={14} />,
       title: 'Two-week warrior',
       sub: earned.has('streak_14') ? '14 day streak achieved' : `${streak} of 14 day streak`,
       earned: earned.has('streak_14'),
       progress: earned.has('streak_14') ? undefined : `${streak}/14`,
-      color: '251,191,36',
     },
     {
-      icon: <TargetIcon />,
       title: 'First subject mastered',
       sub: firstMastered ? firstMastered.name : 'Reach 80% on any subject',
       earned: earned.has('subject_mastered'),
       progress: earned.has('subject_mastered') ? undefined : `${masteredCount}/1`,
-      color: '45,212,191',
     },
     {
-      icon: <StackIcon />,
       title: '25 lectures captured',
       sub: earned.has('sessions_25') ? '25 sessions in your vault' : `${sessionCount} of 25`,
       earned: earned.has('sessions_25'),
       progress: earned.has('sessions_25') ? undefined : `${sessionCount}/25`,
-      color: '99,102,241',
     },
     {
-      icon: <CardsIcon />,
       title: '500 cards drilled',
       sub: earned.has('cards_500') ? '500 reviews completed' : `${cardCount} of 500 reviewed`,
       earned: earned.has('cards_500'),
       progress: earned.has('cards_500') ? undefined : `${cardCount}/500`,
-      color: '139,92,246',
     },
     {
-      icon: <TrophyIcon />,
       title: 'Course conqueror',
       sub: earned.has('subjects_3') ? '3 subjects mastered' : `${masteredCount} of 3 subjects`,
       earned: earned.has('subjects_3'),
       progress: earned.has('subjects_3') ? undefined : `${masteredCount}/3`,
-      color: '244,63,94',
     },
   ]
 }
 
-function masteryTag(pct: number): { label: string; color: string; bg: string; border: string } {
-  if (pct >= 80) return { label: 'Exam-ready', color: '#2DD4BF', bg: 'rgba(45,212,191,0.12)', border: 'rgba(45,212,191,0.3)' }
-  if (pct >= 55) return { label: 'On track',   color: '#818CF8', bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.3)' }
-  return { label: 'Needs work', color: '#FBBF24', bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.28)' }
+function masteryTag(pct: number): { label: string; color: string; bg: string; border: string; glyph: string } {
+  if (pct >= 80) return { label: 'Exam-ready', color: '#EDEDED', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.18)', glyph: '[✓] ' }
+  if (pct >= 55) return { label: 'On track',   color: '#9A9A9F', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.12)', glyph: '' }
+  return { label: 'Needs work', color: '#9A9A9F', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.12)', glyph: '! ' }
 }
 
 const STREAK_TARGETS = [7, 14, 21, 30, 60, 100]
@@ -346,6 +294,8 @@ const STREAK_TARGETS = [7, 14, 21, 30, 60, 100]
 // ---------------------------------------------------------------------------
 export function MomentumClient({ userId, userTier }: { userId: string; userTier: Tier }) {
   const router = useRouter()
+  const heroCanvasRef = useRef<HTMLCanvasElement>(null)
+  useContourField(heroCanvasRef, { variant: 'card' })
 
   // -- Persistent UI state --
   const [balance,      setBalance]      = useState(0)
@@ -359,8 +309,8 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
   // -- Momentum data state --
   const [currentStreak,  setCurrentStreak]  = useState(0)
   const [bestStreak,     setBestStreak]     = useState(0)
-  const [weekDays,       setWeekDays]       = useState<Array<{ label: string; done: boolean }>>(
-    ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label) => ({ label, done: false })),
+  const [weekDays,       setWeekDays]       = useState<Array<{ label: string; done: boolean; isToday: boolean }>>(
+    ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label) => ({ label, done: false, isToday: false })),
   )
   const [heatData,       setHeatData]       = useState<HeatData>(() =>
     buildHeatmapFromActivity([]),
@@ -385,9 +335,9 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
   const milestonesEarned = milestones.filter((m) => m.earned).length
 
   const redeemItems: RedeemItem[] = useMemo(() => [
-    { name: 'Priority transcription', sub: '30 min · skip the queue',     cost: 400,  iconColor: '251,191,36', icon: <BoltIcon size={13} /> },
-    { name: '9B ASR boost',           sub: 'Sharper transcripts · 1 lecture', cost: 650,  iconColor: '45,212,191', icon: <WaveIcon size={13} /> },
-    { name: '1 week of Pro',          sub: 'Extend your plan',             cost: 1000, iconColor: '99,102,241',  icon: <CrownIcon size={13} /> },
+    { name: 'Priority transcription', sub: '30 min · skip the queue',     cost: 400,  icon: <BoltIcon size={13} /> },
+    { name: '9B ASR boost',           sub: 'Sharper transcripts · 1 lecture', cost: 650,  icon: <WaveIcon size={13} /> },
+    { name: '1 week of Pro',          sub: 'Extend your plan',             cost: 1000, icon: <CrownIcon size={13} /> },
   ], [])
 
   // -- Load data on mount --
@@ -604,21 +554,21 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 7 }}>
-            <h1 style={{ fontSize: 27, fontWeight: 600, letterSpacing: '-0.025em', color: '#E2E8F0', margin: 0 }}>
+            <h1 style={{ fontSize: 27, fontWeight: 600, letterSpacing: '-0.025em', color: '#EDEDED', margin: 0 }}>
               Momentum
             </h1>
             <span style={{
               display: 'inline-flex', alignItems: 'center',
-              padding: '3px 9px', borderRadius: 9999,
-              border: '1px solid rgba(251,191,36,0.3)',
-              background: 'rgba(251,191,36,0.12)',
+              padding: '3px 9px', borderRadius: 2,
+              border: '1px solid rgba(255,255,255,0.14)',
+              background: 'rgba(255,255,255,0.05)',
               fontSize: 10.5, fontWeight: 600, letterSpacing: '0.04em',
-              textTransform: 'uppercase', color: '#FBBF24',
+              textTransform: 'uppercase', color: '#9A9A9F',
             }}>
               Beta
             </span>
           </div>
-          <p style={{ fontSize: 13, color: '#5B6478', margin: 0, fontFamily: 'var(--font-mono, monospace)' }}>
+          <p style={{ fontSize: 13, color: '#76767B', margin: 0, fontFamily: 'var(--font-mono, monospace)' }}>
             computed on your device
           </p>
         </div>
@@ -626,16 +576,16 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
         {/* Momentum balance chip */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
-          padding: '9px 15px', borderRadius: 12,
-          border: '1px solid rgba(251,191,36,0.28)',
-          background: 'rgba(251,191,36,0.07)',
+          padding: '9px 15px', borderRadius: 2,
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: '#0C0C0D',
         }}>
-          <span style={{ color: '#FBBF24', display: 'flex' }}><BoltIcon size={17} /></span>
+          <span style={{ color: '#76767B', display: 'flex' }}><BoltIcon size={17} /></span>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: '#FCD34D', lineHeight: 1, fontFamily: 'var(--font-mono, monospace)' }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: '#EDEDED', lineHeight: 1, fontFamily: 'var(--font-mono, monospace)' }}>
               {balance.toLocaleString()}
             </div>
-            <div style={{ fontSize: 10.5, color: '#94A3B8', marginTop: 3 }}>momentum</div>
+            <div style={{ fontSize: 10.5, color: '#76767B', marginTop: 3 }}>momentum</div>
           </div>
         </div>
       </div>
@@ -646,16 +596,11 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
       <div style={{
         position: 'relative', overflow: 'hidden',
         marginTop: 20,
-        border: '1px solid rgba(251,191,36,0.25)',
-        borderRadius: 18,
-        background: 'linear-gradient(120deg, rgba(251,191,36,0.14) 0%, rgba(244,63,94,0.08) 50%, rgba(13,13,20,0.5) 100%)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 2,
+        background: '#0A0A0A',
       }}>
-        <div style={{
-          position: 'absolute', top: '-50%', left: '-3%',
-          width: 380, height: 300,
-          background: 'radial-gradient(ellipse at center, rgba(251,191,36,0.16) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
+        <canvas ref={heroCanvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
 
         <div style={{
           position: 'relative',
@@ -663,31 +608,19 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
           padding: '28px 32px', flexWrap: 'wrap',
         }}>
           {/* Big streak */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-            <div style={{
-              width: 66, height: 66, flexShrink: 0, borderRadius: 18,
-              background: 'radial-gradient(circle at 50% 30%, rgba(251,191,36,0.3), rgba(244,63,94,0.12))',
-              border: '1px solid rgba(251,191,36,0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#FBBF24',
-              animation: 'noct-flame 2.4s ease-in-out infinite',
-            }}>
-              <FlameIcon size={30} />
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <span style={{ fontSize: 56, fontWeight: 700, letterSpacing: '-0.03em', color: '#FF3B30', lineHeight: 1, fontFamily: 'var(--font-mono)' }}>
+                {currentStreak}
+              </span>
+              <span style={{ fontSize: 11, color: '#76767B', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Day streak</span>
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span style={{ fontSize: 46, fontWeight: 700, letterSpacing: '-0.03em', color: '#FCD34D', lineHeight: 1, fontFamily: 'var(--font-mono, monospace)' }}>
-                  {currentStreak}
-                </span>
-                <span style={{ fontSize: 14, color: '#94A3B8' }}>day streak</span>
-              </div>
-              <div style={{ fontSize: 11.5, color: '#5B6478', marginTop: 6 }}>
-                Personal best{' '}
-                <span style={{ color: '#CBD5E1', fontWeight: 500 }}>{bestStreak} days</span>
-              </div>
-              <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 2 }}>
-                {studiedThisWeek} / 7 days this week
-              </div>
+            <div style={{ fontSize: 11.5, color: '#76767B', marginTop: 6 }}>
+              Personal best{' '}
+              <span style={{ color: '#9A9A9F', fontWeight: 500 }}>{bestStreak} days</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: '#76767B', marginTop: 2 }}>
+              {studiedThisWeek} / 7 days this week
             </div>
           </div>
 
@@ -696,19 +629,22 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
             {weekDays.map((d, i) => (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
                 <span style={d.done ? {
-                  width: 26, height: 26, borderRadius: 8,
+                  width: 28, height: 28, borderRadius: 2,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'linear-gradient(145deg,#FBBF24,#F59E0B)',
-                  boxShadow: '0 0 12px rgba(251,191,36,0.5)',
+                  background: '#EDEDED',
+                  outline: d.isToday ? '1px solid #FF3B30' : 'none',
+                  outlineOffset: 1,
                 } : {
-                  width: 26, height: 26, borderRadius: 8,
-                  border: '1.5px dashed #2D2B45',
-                  background: '#0D0D14',
+                  width: 28, height: 28, borderRadius: 2,
+                  border: d.isToday ? '1px solid #FF3B30' : '1px solid rgba(255,255,255,0.14)',
+                  background: 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  {d.done && <CheckIcon />}
+                  {d.done
+                    ? <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#0A0A0A', fontWeight: 600 }}>{d.label}</span>
+                    : null}
                 </span>
-                <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 10, color: '#5B6478' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: d.isToday ? '#FF3B30' : '#76767B' }}>
                   {d.label}
                 </span>
               </div>
@@ -718,24 +654,23 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
           {/* Next milestone */}
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: '#5B6478', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ fontSize: 12, color: '#76767B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 Next milestone:{' '}
-                <span style={{ color: '#FCD34D', fontWeight: 500 }}>{nextTarget}-day streak</span>
+                <span style={{ color: '#9A9A9F', fontWeight: 500 }}>{nextTarget}-day streak</span>
               </span>
-              <span style={{ fontSize: 11.5, color: '#5B6478', fontFamily: 'var(--font-mono, monospace)', flexShrink: 0 }}>
+              <span style={{ fontSize: 11.5, color: '#76767B', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
                 {currentStreak} / {nextTarget}
               </span>
             </div>
-            <div style={{ height: 6, width: '100%', borderRadius: 9999, background: '#16151F', overflow: 'hidden' }}>
+            <div style={{ height: 2, width: '100%', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
               <div style={{
                 height: '100%',
                 width: `${Math.round(Math.min(currentStreak / nextTarget, 1) * 100)}%`,
-                borderRadius: 9999,
-                background: 'linear-gradient(90deg,#FBBF24,#F59E0B)',
+                background: '#9A9A9F',
                 transition: 'width .5s',
               }} />
             </div>
-            <div style={{ fontSize: 11.5, color: '#5B6478', marginTop: 8 }}>
+            <div style={{ fontSize: 11.5, color: '#76767B', marginTop: 8 }}>
               {nextTarget - currentStreak} more day{nextTarget - currentStreak !== 1 ? 's' : ''} to unlock the {nextTarget}-day streak badge
             </div>
           </div>
@@ -748,27 +683,27 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
       <div style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 16, marginTop: 14 }}>
 
         {/* ----- Study activity heatmap ----- */}
-        <div style={{ borderRadius: 14, border: '1px solid #1E1E2E', background: '#0C0C13', padding: '22px 24px' }}>
+        <div style={{ borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D', padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0' }}>Study activity</div>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono, monospace)', color: '#3F485C', marginTop: 2 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#EDEDED' }}>Study activity</div>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#76767B', marginTop: 2 }}>
                 {heatData.activeDays} active days · {WEEKS_N} weeks
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ fontSize: 10, color: '#3F485C' }}>Less</span>
+              <span style={{ fontSize: 10, color: '#76767B' }}>Less</span>
               {HEATMAP_SCALE.map((c, i) => (
-                <span key={i} style={{ width: 12, height: 12, borderRadius: 3, background: c, display: 'inline-block' }} />
+                <span key={i} style={{ width: 12, height: 12, borderRadius: 2, background: c, display: 'inline-block' }} />
               ))}
-              <span style={{ fontSize: 10, color: '#3F485C' }}>More</span>
+              <span style={{ fontSize: 10, color: '#76767B' }}>More</span>
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 18, marginRight: 3 }}>
               {['M', '', 'W', '', 'F', '', ''].map((label, i) => (
-                <span key={i} style={{ height: 14, fontFamily: 'var(--font-mono, monospace)', fontSize: 9, color: '#3F485C', lineHeight: '14px', display: 'block' }}>
+                <span key={i} style={{ height: 14, fontFamily: 'var(--font-mono)', fontSize: 9, color: '#76767B', lineHeight: '14px', display: 'block' }}>
                   {label}
                 </span>
               ))}
@@ -782,8 +717,8 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                   const gap = mi === 0 ? 0 : (wIdx - prevIdx - 1) * 18
                   return (
                     <span key={`${label}-${mi}`} style={{
-                      fontFamily: 'var(--font-mono, monospace)', fontSize: 9,
-                      color: '#3F485C', whiteSpace: 'nowrap',
+                      fontFamily: 'var(--font-mono)', fontSize: 9,
+                      color: '#76767B', whiteSpace: 'nowrap',
                       marginLeft: mi === 0 ? 0 : gap,
                     }}>
                       {label}
@@ -801,7 +736,7 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                         key={di}
                         title={cell.title}
                         style={{
-                          width: 14, height: 14, borderRadius: 3,
+                          width: 14, height: 14, borderRadius: 2,
                           background: HEATMAP_SCALE[cell.lvl],
                           display: 'block',
                           cursor: 'default',
@@ -826,23 +761,23 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
 
         {/* ----- Momentum wallet ----- */}
         <div style={{
-          borderRadius: 14, border: '1px solid rgba(251,191,36,0.2)',
-          background: 'rgba(251,191,36,0.05)',
+          borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)',
+          background: '#0C0C0D',
           padding: '22px 24px',
           display: 'flex', flexDirection: 'column',
         }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono, monospace)', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#5B6478' }}>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#76767B' }}>
             Momentum wallet
           </div>
 
-          <div style={{ fontSize: 34, fontWeight: 600, fontFamily: 'var(--font-mono, monospace)', color: '#FCD34D', marginTop: 10, lineHeight: 1 }}>
+          <div style={{ fontSize: 34, fontWeight: 600, fontFamily: 'var(--font-mono)', color: '#EDEDED', marginTop: 10, lineHeight: 1 }}>
             {balance.toLocaleString()}
           </div>
-          <div style={{ fontSize: 11.5, color: '#FBBF24', marginTop: 5 }}>
+          <div style={{ fontSize: 11.5, color: '#76767B', marginTop: 5 }}>
             earned this week: +{weeklyEarnings.toLocaleString()}
           </div>
 
-          <div style={{ height: 1, background: 'rgba(251,191,36,0.12)', margin: '14px 0' }} />
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '14px 0' }} />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
             {redeemItems.map((item) => {
@@ -852,9 +787,9 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
               return (
                 <div key={item.name} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 12px', borderRadius: 8,
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  background: '#0B0B11',
+                  padding: '10px 12px', borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: '#0A0A0A',
                   opacity: enabled ? 1 : 0.5,
                   cursor: enabled ? 'pointer' : 'not-allowed',
                   transition: 'opacity .2s',
@@ -863,26 +798,26 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     <span style={{
-                      width: 28, height: 28, flexShrink: 0, borderRadius: 7,
+                      width: 28, height: 28, flexShrink: 0, borderRadius: 2,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: `rgba(${item.iconColor},0.12)`,
-                      border: `1px solid rgba(${item.iconColor},0.26)`,
-                      color: `rgb(${item.iconColor})`,
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: '#9A9A9F',
                     }}>
                       {item.icon}
                     </span>
-                    <span style={{ fontSize: 12.5, color: '#E2E8F0', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {alreadyRedeemed ? `✓ ${item.name}` : item.name}
+                    <span style={{ fontSize: 12.5, color: '#EDEDED', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {alreadyRedeemed ? `[✓] ${item.name}` : item.name}
                     </span>
                   </div>
                   <span style={{
                     flexShrink: 0, fontSize: 12, fontWeight: 600,
-                    fontFamily: 'var(--font-mono, monospace)',
-                    color: alreadyRedeemed ? '#2DD4BF' : enabled ? '#FBBF24' : '#5B6478',
-                    padding: '3px 7px', borderRadius: 8,
-                    background: `rgba(251,191,36,0.12)`,
+                    fontFamily: 'var(--font-mono)',
+                    color: alreadyRedeemed ? '#EDEDED' : enabled ? '#9A9A9F' : '#76767B',
+                    padding: '3px 7px', borderRadius: 2,
+                    background: 'rgba(255,255,255,0.05)',
                   }}>
-                    {alreadyRedeemed ? 'Done' : `${item.cost.toLocaleString()} ⚡`}
+                    {alreadyRedeemed ? 'Done' : item.cost.toLocaleString()}
                   </span>
                 </div>
               )
@@ -895,14 +830,14 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
           Section 4: Mastery by subject
           ============================== */}
       <div style={{ marginTop: 28 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#E2E8F0', marginBottom: 14 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#EDEDED', marginBottom: 14 }}>
           Mastery by subject
         </div>
         {courses.length === 0 ? (
           <div style={{
-            padding: '32px 24px', borderRadius: 14,
-            border: '1px solid #1E1E2E', background: '#0C0C13',
-            textAlign: 'center', color: '#3F485C', fontSize: 13,
+            padding: '32px 24px', borderRadius: 2,
+            border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+            textAlign: 'center', color: '#76767B', fontSize: 13,
           }}>
             Tag sessions with a subject to track mastery by course
           </div>
@@ -914,7 +849,7 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
               const isEditing = editingCourseId === course.id
               return (
                 <div key={course.id} style={{
-                  borderRadius: 14, border: '1px solid #1E1E2E', background: '#0C0C13',
+                  borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
                   padding: 22, textAlign: 'center', position: 'relative',
                 }}>
                   {/* Pencil icon — top-right corner */}
@@ -929,11 +864,11 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                       }}
                       style={{
                         position: 'absolute', top: 10, right: 10,
-                        background: 'none', border: 'none', padding: 4, borderRadius: 6,
-                        color: '#3F485C', cursor: 'pointer', lineHeight: 1,
+                        background: 'none', border: 'none', padding: 4, borderRadius: 2,
+                        color: '#76767B', cursor: 'pointer', lineHeight: 1,
                       }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#818CF8' }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#3F485C' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#EDEDED' }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#76767B' }}
                     >
                       <svg width="12" height="12" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M13 2 L16 5 L7 14 L3 15 L4 11 Z" /><path d="M11 4 L14 7" />
@@ -943,31 +878,31 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
 
                   <div style={{
                     width: 96, height: 96, borderRadius: '50%',
-                    background: `conic-gradient(#6366F1 0deg, #6366F1 ${deg}deg, #16151F ${deg}deg, #16151F 360deg)`,
+                    background: `conic-gradient(#EDEDED 0deg, #EDEDED ${deg}deg, rgba(255,255,255,0.08) ${deg}deg, rgba(255,255,255,0.08) 360deg)`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     margin: '0 auto', position: 'relative',
                   }}>
                     <div style={{
                       width: 72, height: 72, borderRadius: '50%',
-                      background: '#0C0C13',
+                      background: '#0C0C0D',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: '#E2E8F0', fontFamily: 'var(--font-mono, monospace)' }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDED', fontFamily: 'var(--font-mono)' }}>
                         {course.pct}%
                       </span>
                     </div>
                   </div>
 
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', margin: '12px 0 4px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#EDEDED', margin: '12px 0 4px' }}>
                     {course.name}
                   </div>
-                  <div style={{ fontSize: 11, color: '#5B6478', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, color: '#76767B', marginBottom: 6 }}>
                     {course.done} / {course.total} keywords
                   </div>
 
                   {/* Exam date badge */}
                   {course.exam_date && !isEditing && (
-                    <div style={{ fontSize: 11, color: '#818CF8', marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, color: '#76767B', marginBottom: 8 }}>
                       Exam {new Date(course.exam_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </div>
                   )}
@@ -975,12 +910,13 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                   {!isEditing && (
                     <span style={{
                       display: 'inline-flex', alignItems: 'center',
-                      padding: '4px 10px', borderRadius: 9999,
+                      padding: '4px 10px', borderRadius: 2,
                       fontSize: 11, fontWeight: 500,
                       color: tag.color, background: tag.bg,
                       border: `1px solid ${tag.border}`,
+                      fontFamily: tag.glyph ? 'var(--font-mono)' : undefined,
                     }}>
-                      {tag.label}
+                      {tag.glyph}{tag.label}
                     </span>
                   )}
 
@@ -998,9 +934,9 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                         placeholder="Course name"
                         style={{
                           width: '100%', boxSizing: 'border-box',
-                          background: '#16151E', border: '1px solid #2D2B45',
-                          borderRadius: 7, padding: '6px 10px',
-                          fontSize: 12, color: '#CBD5E1', outline: 'none',
+                          background: '#111112', border: '1px solid rgba(255,255,255,0.14)',
+                          borderRadius: 2, padding: '6px 10px',
+                          fontSize: 12, color: '#EDEDED', outline: 'none',
                           fontFamily: 'inherit',
                         }}
                       />
@@ -1011,9 +947,9 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                         title="Exam date (optional)"
                         style={{
                           width: '100%', boxSizing: 'border-box',
-                          background: '#16151E', border: '1px solid #2D2B45',
-                          borderRadius: 7, padding: '6px 10px',
-                          fontSize: 12, color: editCourseDate ? '#CBD5E1' : '#5B6478',
+                          background: '#111112', border: '1px solid rgba(255,255,255,0.14)',
+                          borderRadius: 2, padding: '6px 10px',
+                          fontSize: 12, color: editCourseDate ? '#EDEDED' : '#76767B',
                           outline: 'none', fontFamily: 'inherit', colorScheme: 'dark',
                         }}
                       />
@@ -1023,9 +959,9 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                           onClick={() => saveCourseEdit(course.id)}
                           disabled={courseEditSaving || !editCourseName.trim()}
                           style={{
-                            flex: 1, padding: '6px 0', borderRadius: 7,
-                            background: '#6366F1', border: 'none',
-                            fontSize: 12, color: '#fff',
+                            flex: 1, padding: '6px 0', borderRadius: 2,
+                            background: '#FF3B30', border: 'none',
+                            fontSize: 12, color: '#0A0A0A',
                             cursor: courseEditSaving || !editCourseName.trim() ? 'not-allowed' : 'pointer',
                             opacity: courseEditSaving || !editCourseName.trim() ? 0.5 : 1,
                           }}
@@ -1036,9 +972,9 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                           type="button"
                           onClick={() => setEditingCourseId(null)}
                           style={{
-                            padding: '6px 12px', borderRadius: 7,
-                            background: 'none', border: '1px solid #1E1E2E',
-                            fontSize: 12, color: '#5B6478', cursor: 'pointer',
+                            padding: '6px 12px', borderRadius: 2,
+                            background: 'none', border: '1px solid rgba(255,255,255,0.08)',
+                            fontSize: 12, color: '#76767B', cursor: 'pointer',
                           }}
                         >
                           Cancel
@@ -1058,17 +994,17 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
           ============================== */}
       <div style={{ marginTop: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <span style={{ color: '#FDA4AF', display: 'flex' }}><TriangleAlertIcon size={14} /></span>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#E2E8F0' }}>Weak spots</div>
-          <span style={{ fontSize: 11.5, color: '#5B6478' }}>Red Zone · lowest mastery × exam urgency</span>
+          <span style={{ color: '#FF3B30', display: 'flex' }}><TriangleAlertIcon size={14} /></span>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#EDEDED' }}>Weak spots</div>
+          <span style={{ fontSize: 11.5, color: '#76767B' }}>Red Zone · lowest mastery × exam urgency</span>
           {weakSpotsReady && weakSpots.length > 0 && (
             <span style={{
               marginLeft: 4,
               fontSize: 10.5, fontWeight: 600,
-              padding: '2px 7px', borderRadius: 9999,
-              background: 'rgba(251,113,133,0.1)',
-              color: '#FDA4AF',
-              border: '1px solid rgba(251,113,133,0.22)',
+              padding: '2px 7px', borderRadius: 2,
+              background: 'rgba(255,59,48,0.1)',
+              color: '#FF3B30',
+              border: '1px solid rgba(255,59,48,0.3)',
             }}>
               {weakSpots.length}
             </span>
@@ -1077,32 +1013,32 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
 
         {!weakSpotsReady ? (
           <div style={{
-            padding: '28px 24px', borderRadius: 14,
-            border: '1px solid #1E1E2E', background: '#0C0C13',
-            textAlign: 'center', color: '#3F485C', fontSize: 13,
+            padding: '28px 24px', borderRadius: 2,
+            border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+            textAlign: 'center', color: '#76767B', fontSize: 13,
           }}>
             Loading…
           </div>
         ) : weakSpots.length === 0 ? (
           <div style={{
-            padding: '28px 24px', borderRadius: 14,
-            border: '1px solid #1E1E2E', background: '#0C0C13',
-            textAlign: 'center', color: '#3F485C', fontSize: 13,
+            padding: '28px 24px', borderRadius: 2,
+            border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D',
+            textAlign: 'center', color: '#76767B', fontSize: 13,
           }}>
             No weak spots — tag sessions with courses to track urgency across exams.
           </div>
         ) : (
-          <div style={{ borderRadius: 14, border: '1px solid #1E1E2E', background: '#0C0C13', overflow: 'hidden' }}>
+          <div style={{ borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D', overflow: 'hidden' }}>
             {/* Table header */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 200px 130px 90px',
               padding: '10px 18px',
-              borderBottom: '1px solid #1A1928',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
               gap: 12,
             }}>
               {(['Term', 'Course', 'Mastery', 'Exam in'] as const).map((col) => (
-                <span key={col} style={{ fontSize: 11, fontWeight: 600, color: '#3F485C', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                <span key={col} style={{ fontSize: 11, fontWeight: 600, color: '#76767B', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                   {col}
                 </span>
               ))}
@@ -1111,8 +1047,8 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
             {/* Rows */}
             {weakSpots.map((ws) => {
               const bucketColor = ws.masteryBucket === 'new'
-                ? { text: '#5B6478', bg: 'rgba(75,85,99,0.12)', border: 'rgba(75,85,99,0.22)' }
-                : { text: '#FDE68A', bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.25)' }
+                ? { text: '#76767B', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.1)' }
+                : { text: '#9A9A9F', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.1)' }
 
               const daysLabel = ws.daysUntil === Infinity ? '—'
                 : ws.daysUntil < 1   ? 'Today'
@@ -1134,32 +1070,29 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                     padding: '12px 18px',
                     gap: 12,
                     alignItems: 'center',
-                    borderBottom: '1px solid #13121C',
                     background: 'transparent',
                     border: 'none',
-                    borderBottomColor: '#13121C',
-                    borderBottomWidth: 1,
-                    borderBottomStyle: 'solid',
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
                     cursor: 'pointer',
                     transition: 'background 0.12s',
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#111020' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)' }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
                 >
                   {/* Term */}
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#CBD5E1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#9A9A9F', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {ws.term}
                   </span>
 
                   {/* Course */}
-                  <span style={{ fontSize: 12, color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 12, color: '#76767B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {ws.courseName}
                   </span>
 
                   {/* Mastery bucket */}
                   <span style={{
                     display: 'inline-flex', alignItems: 'center',
-                    padding: '3px 9px', borderRadius: 9999,
+                    padding: '3px 9px', borderRadius: 2,
                     fontSize: 11, fontWeight: 500,
                     color: bucketColor.text,
                     background: bucketColor.bg,
@@ -1172,8 +1105,8 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                   {/* Days until exam */}
                   <span style={{
                     fontSize: 12, fontWeight: daysUrgent ? 600 : 400,
-                    color: daysUrgent ? '#FDA4AF' : '#5B6478',
-                    fontFamily: 'var(--font-mono, monospace)',
+                    color: daysUrgent ? '#FF3B30' : '#76767B',
+                    fontFamily: 'var(--font-mono)',
                   }}>
                     {daysLabel}
                   </span>
@@ -1190,46 +1123,37 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 14 }}>
 
         {/* ----- Milestones ----- */}
-        <div style={{ borderRadius: 14, border: '1px solid #1E1E2E', background: '#0C0C13', padding: '22px 24px' }}>
+        <div style={{ borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: '#0C0C0D', padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0' }}>Milestones</div>
-            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono, monospace)', color: '#5B6478' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#EDEDED' }}>Milestones</div>
+            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#76767B' }}>
               {milestonesEarned} earned
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {milestones.map((m, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
-                padding: '11px 12px', borderRadius: 12,
-                border: `1px solid ${m.earned ? `rgba(${m.color},0.22)` : '#16151F'}`,
-                background: m.earned ? `rgba(${m.color},0.05)` : '#0B0B11',
+                padding: '11px 2px',
+                borderBottom: i < milestones.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
               }}>
                 <span style={{
-                  width: 30, height: 30, flexShrink: 0, borderRadius: 9,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: `rgba(${m.color},${m.earned ? '0.14' : '0.08'})`,
-                  border: `1px solid rgba(${m.color},${m.earned ? '0.3' : '0.18'})`,
-                  color: m.earned ? `rgb(${m.color})` : '#5B6478',
-                  opacity: m.earned ? 1 : 0.7,
+                  flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 13,
+                  color: m.earned ? '#EDEDED' : '#4A4A4E',
                 }}>
-                  {m.icon}
+                  {m.earned ? '[✓]' : '[ ]'}
                 </span>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: m.earned ? '#E2E8F0' : '#CBD5E1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: m.earned ? '#EDEDED' : '#9A9A9F', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {m.title}
                   </div>
-                  <div style={{ fontSize: 11.5, color: '#5B6478' }}>{m.sub}</div>
+                  <div style={{ fontSize: 11.5, color: '#76767B' }}>{m.sub}</div>
                 </div>
 
-                {m.earned ? (
-                  <span style={{ color: '#2DD4BF', display: 'flex', flexShrink: 0 }}>
-                    <CheckCircleIcon size={16} />
-                  </span>
-                ) : (
-                  <span style={{ fontSize: 11, color: '#5B6478', fontFamily: 'var(--font-mono, monospace)', flexShrink: 0 }}>
+                {!m.earned && (
+                  <span style={{ fontSize: 11, color: '#76767B', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
                     {m.progress}
                   </span>
                 )}
@@ -1241,27 +1165,27 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
         {/* ----- Course circle ----- */}
         <div style={{
           position: 'relative', overflow: 'hidden',
-          borderRadius: 14,
-          border: '1px solid rgba(99,102,241,0.2)',
-          background: 'rgba(99,102,241,0.05)',
+          borderRadius: 2,
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: '#0C0C0D',
           padding: '22px 24px',
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0' }}>Course circle</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#EDEDED' }}>Course circle</div>
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
                   padding: '2px 8px', borderRadius: 9999,
-                  border: '1px solid rgba(129,140,248,0.3)',
-                  background: 'rgba(99,102,241,0.1)',
-                  fontSize: 10, color: '#A5B4FC',
+                  border: '1px solid rgba(255,59,48,0.3)',
+                  background: 'rgba(255,59,48,0.08)',
+                  fontSize: 10, color: '#FF3B30',
                 }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#818CF8', display: 'inline-block' }} />
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#FF3B30', display: 'inline-block' }} />
                   Opt-in
                 </span>
               </div>
-              <div style={{ fontSize: 11.5, color: '#5B6478', marginTop: 3 }}>BIBC 102 · Biochemistry</div>
+              <div style={{ fontSize: 11.5, color: '#76767B', marginTop: 3 }}>BIBC 102 · Biochemistry</div>
             </div>
 
             <button
@@ -1272,14 +1196,14 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
               style={{
                 width: 40, height: 23, flexShrink: 0, borderRadius: 9999,
                 border: 'none', padding: 2, cursor: 'pointer',
-                background: cohortOn ? '#6366F1' : '#2D2B45',
+                background: cohortOn ? '#FF3B30' : 'rgba(255,255,255,0.14)',
                 display: 'flex',
                 justifyContent: cohortOn ? 'flex-end' : 'flex-start',
                 alignItems: 'center',
                 transition: 'background .2s',
               }}
             >
-              <span style={{ width: 19, height: 19, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+              <span style={{ width: 19, height: 19, borderRadius: '50%', background: '#EDEDED' }} />
             </button>
           </div>
 
@@ -1292,35 +1216,35 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                       width: 26, height: 26,
                       marginLeft: i === 0 ? 0 : -8,
                       borderRadius: '50%',
-                      border: '2px solid #0C0C13',
+                      border: '2px solid #0C0C0D',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: g.length > 1 ? 9 : 11, fontWeight: 600,
-                      color: g.length > 1 ? '#A5B4FC' : '#09090F',
-                      background: g.length > 1 ? '#16151F' : 'linear-gradient(145deg,#6366F1,#8B5CF6)',
+                      color: g.length > 1 ? '#9A9A9F' : '#0A0A0A',
+                      background: g.length > 1 ? 'rgba(255,255,255,0.08)' : '#EDEDED',
                     }}>
                       {g}
                     </span>
                   ))}
                 </div>
-                <div style={{ fontSize: 12.5, color: '#94A3B8' }}>
-                  <span style={{ color: '#E2E8F0', fontWeight: 600 }}>14 classmates</span> reviewing for Midterm 2
+                <div style={{ fontSize: 12.5, color: '#76767B' }}>
+                  <span style={{ color: '#EDEDED', fontWeight: 600 }}>14 classmates</span> reviewing for Midterm 2
                 </div>
               </div>
 
-              <div style={{ marginTop: 16, border: '1px solid #1A1A26', borderRadius: 12, background: '#0B0B11', padding: '14px 15px' }}>
+              <div style={{ marginTop: 16, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 2, background: '#0A0A0A', padding: '14px 15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 500, color: '#E2E8F0' }}>Shared exam-prediction deck</span>
-                  <span style={{ fontSize: 10.5, color: '#FB7185', fontWeight: 500 }}>Midterm 2</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 500, color: '#EDEDED' }}>Shared exam-prediction deck</span>
+                  <span style={{ fontSize: 10.5, color: '#76767B', fontWeight: 500 }}>Midterm 2</span>
                 </div>
-                <div style={{ fontSize: 11.5, color: '#5B6478', marginBottom: 12 }}>
+                <div style={{ fontSize: 11.5, color: '#76767B', marginBottom: 12 }}>
                   47 predicted keywords · pooled anonymously from 14 vaults
                 </div>
                 <button
                   type="button"
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 7,
-                    height: 34, padding: '0 14px', borderRadius: 9,
-                    background: '#6366F1', color: '#09090F',
+                    height: 34, padding: '0 14px', borderRadius: 2,
+                    background: '#FF3B30', color: '#0A0A0A',
                     fontSize: 12.5, fontWeight: 500,
                     border: 'none', cursor: 'pointer',
                   }}
@@ -1334,42 +1258,42 @@ export function MomentumClient({ userId, userTier }: { userId: string; userTier:
                 href="/community"
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                  marginTop: 12, padding: '11px 14px', borderRadius: 12,
-                  border: '1px solid #1A1A26', background: '#0B0B11',
+                  marginTop: 12, padding: '11px 14px', borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.08)', background: '#0A0A0A',
                   textDecoration: 'none',
                 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                   <span style={{
-                    width: 28, height: 28, flexShrink: 0, borderRadius: 8,
-                    background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.22)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818CF8',
+                    width: 28, height: 28, flexShrink: 0, borderRadius: 2,
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9A9A9F',
                   }}>
                     <PeopleIcon size={14} />
                   </span>
                   <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 12.5, color: '#E2E8F0', fontWeight: 500 }}>Open the full course room →</span>
-                    <span style={{ display: 'block', fontSize: 11, color: '#5B6478' }}>Pooled keywords, threads &amp; decks in Community</span>
+                    <span style={{ display: 'block', fontSize: 12.5, color: '#EDEDED', fontWeight: 500 }}>Open the full course room →</span>
+                    <span style={{ display: 'block', fontSize: 11, color: '#76767B' }}>Pooled keywords, threads &amp; decks in Community</span>
                   </span>
                 </span>
-                <span style={{ color: '#818CF8', display: 'flex', flexShrink: 0 }}>
+                <span style={{ color: '#9A9A9F', display: 'flex', flexShrink: 0 }}>
                   <ArrowRightIcon size={14} />
                 </span>
               </a>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
-                <span style={{ color: '#818CF8', display: 'flex', flexShrink: 0 }}><LockIcon size={13} /></span>
-                <span style={{ fontSize: 11, color: '#5B6478', lineHeight: 1.45 }}>
+                <span style={{ color: '#76767B', display: 'flex', flexShrink: 0 }}><LockIcon size={13} /></span>
+                <span style={{ fontSize: 11, color: '#76767B', lineHeight: 1.45 }}>
                   Your name never appears. Only keyword counts are pooled.
                 </span>
               </div>
             </div>
           ) : (
             <div style={{ marginTop: 18, textAlign: 'center', padding: '18px 10px 8px' }}>
-              <div style={{ fontSize: 13, color: '#94A3B8', lineHeight: 1.55, marginBottom: 4 }}>
+              <div style={{ fontSize: 13, color: '#76767B', lineHeight: 1.55, marginBottom: 4 }}>
                 Join your course circle to see pooled exam predictions
               </div>
-              <div style={{ fontSize: 11.5, color: '#5B6478' }}>
+              <div style={{ fontSize: 11.5, color: '#76767B' }}>
                 Anonymous &amp; encrypted — switch on any time.
               </div>
             </div>

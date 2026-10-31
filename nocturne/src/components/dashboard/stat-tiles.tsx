@@ -52,7 +52,7 @@ function Tile({ icon, label, value, sub }: TileProps) {
 function Icon({ bg, border, color, children }: { bg: string; border: string; color: string; children: React.ReactNode }) {
   return (
     <span style={{
-      width: 30, height: 30, flexShrink: 0, borderRadius: 8,
+      width: 30, height: 30, flexShrink: 0,
       background: bg, border: `1px solid ${border}`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       color,
@@ -78,10 +78,10 @@ export function StatTiles({ redZoneTotal, sessionCount, sessionsThisWeek, studyS
 
   return (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
-      {/* Red Zone keywords */}
+      {/* Red Zone keywords — the one tile that gets the accent */}
       <Tile
         icon={
-          <Icon bg="rgba(239,68,68,0.12)" border="rgba(239,68,68,0.25)" color="#F87171">
+          <Icon bg="rgba(255,59,48,0.08)" border="rgba(255,59,48,0.3)" color="var(--color-severity)">
             <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 2 L2 16 h14 Z" />
               <line x1="9" y1="8" x2="9" y2="11" />
@@ -97,7 +97,7 @@ export function StatTiles({ redZoneTotal, sessionCount, sessionsThisWeek, studyS
       {/* Lectures captured */}
       <Tile
         icon={
-          <Icon bg="rgba(99,102,241,0.12)" border="rgba(99,102,241,0.25)" color="#818CF8">
+          <Icon bg="rgba(255,255,255,0.05)" border="rgba(255,255,255,0.14)" color="#9A9A9F">
             <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="5" width="14" height="10" rx="1.5" />
               <path d="M5 5V4a2 2 0 0 1 4 0v1" />
@@ -113,7 +113,7 @@ export function StatTiles({ redZoneTotal, sessionCount, sessionsThisWeek, studyS
       {/* Study streak */}
       <Tile
         icon={
-          <Icon bg="rgba(251,191,36,0.12)" border="rgba(251,191,36,0.3)" color="#FBBF24">
+          <Icon bg="rgba(255,255,255,0.05)" border="rgba(255,255,255,0.14)" color="#9A9A9F">
             <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 1.5 c2 3 4 4.2 4 7.5 a4 4 0 0 1 -8 0 c0 -1.6 0.8 -2.8 1.6 -3.6 C7 6.5 7.3 7.6 8 8 c0.3 -2 0 -4.5 1 -6.5 Z" />
             </svg>
@@ -127,7 +127,7 @@ export function StatTiles({ redZoneTotal, sessionCount, sessionsThisWeek, studyS
       {/* Cards exported */}
       <Tile
         icon={
-          <Icon bg="rgba(16,185,129,0.12)" border="rgba(16,185,129,0.25)" color="#34D399">
+          <Icon bg="rgba(255,255,255,0.05)" border="rgba(255,255,255,0.14)" color="#9A9A9F">
             <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="4" width="14" height="10" rx="2" />
               <line x1="2" y1="8" x2="16" y2="8" />

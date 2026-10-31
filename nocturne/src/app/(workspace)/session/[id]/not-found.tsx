@@ -1,3 +1,5 @@
+'use client'
+
 import { FileX } from 'lucide-react'
 import Link from 'next/link'
 
@@ -14,7 +16,10 @@ export default function SessionNotFound() {
         </div>
         <Link
           href="/vault"
-          className="h-8 px-4 rounded-btn text-body-sm font-medium bg-indigo-500 text-text-inverse hover:bg-indigo-600 transition-colors"
+          className="h-8 px-4 rounded-btn text-body-sm font-medium text-text-inverse transition-colors"
+          style={{ background: 'var(--color-accent)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-accent-hover)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-accent)' }}
         >
           Back to vault
         </Link>

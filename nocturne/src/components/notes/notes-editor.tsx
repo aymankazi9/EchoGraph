@@ -41,10 +41,10 @@ interface Props {
 }
 
 const STATUS_COLOR: Record<SaveStatus, string> = {
-  idle:   '#3F485C',
-  saving: '#5B6478',
-  saved:  '#6EE7B7',
-  error:  '#FDA4AF',
+  idle:   '#76767B',
+  saving: '#76767B',
+  saved:  '#EDEDED',
+  error:  '#FF3B30',
 }
 
 const STATUS_LABEL: Record<SaveStatus, string> = {
@@ -466,34 +466,34 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
           min-height: 0;
           font-size: 14.5px;
           line-height: 1.8;
-          color: #CBD5E1;
-          caret-color: #818CF8;
+          color: #EDEDED;
+          caret-color: #FF3B30;
           font-family: inherit;
           width: 100%;
         }
-        .notes-tiptap h1 { font-size: 1.45em; font-weight: 700; color: #E2E8F0; margin: 0.9em 0 0.35em; letter-spacing: -0.01em; }
-        .notes-tiptap h2 { font-size: 1.2em;  font-weight: 600; color: #E2E8F0; margin: 0.8em 0 0.3em; }
-        .notes-tiptap h3 { font-size: 1.05em; font-weight: 600; color: #CBD5E1; margin: 0.7em 0 0.25em; }
+        .notes-tiptap h1 { font-size: 1.45em; font-weight: 700; color: #EDEDED; margin: 0.9em 0 0.35em; letter-spacing: -0.01em; }
+        .notes-tiptap h2 { font-size: 1.2em;  font-weight: 600; color: #EDEDED; margin: 0.8em 0 0.3em; }
+        .notes-tiptap h3 { font-size: 1.05em; font-weight: 600; color: #EDEDED; margin: 0.7em 0 0.25em; }
         .notes-tiptap h1:first-child,
         .notes-tiptap h2:first-child,
         .notes-tiptap h3:first-child { margin-top: 0; }
         .notes-tiptap p  { margin: 0.35em 0; }
         .notes-tiptap p:first-child { margin-top: 0; }
-        .notes-tiptap strong { font-weight: 600; color: #E2E8F0; }
-        .notes-tiptap em   { font-style: italic; color: #94A3B8; }
+        .notes-tiptap strong { font-weight: 600; color: #EDEDED; }
+        .notes-tiptap em   { font-style: italic; color: #9A9A9F; }
         .notes-tiptap code {
           font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
           font-size: 0.875em;
-          background: rgba(99,102,241,0.12);
-          border: 1px solid rgba(99,102,241,0.2);
-          color: #A5B4FC;
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.14);
+          color: #EDEDED;
           padding: 0.1em 0.35em;
-          border-radius: 4px;
+          border-radius: 2px;
         }
         .notes-tiptap pre {
           background: rgba(0,0,0,0.3);
-          border: 1px solid #1E1E2E;
-          border-radius: 6px;
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 2px;
           padding: 0.9em 1.1em;
           margin: 0.6em 0;
           overflow-x: auto;
@@ -502,7 +502,7 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
           background: none;
           border: none;
           padding: 0;
-          color: #94A3B8;
+          color: #9A9A9F;
           font-size: 0.85em;
         }
         /* list-style must be set explicitly: Tailwind v4 preflight resets
@@ -513,14 +513,14 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
         .notes-tiptap li  { margin: 0.15em 0; }
         .notes-tiptap li p { margin: 0; }
         .notes-tiptap blockquote {
-          border-left: 3px solid #23222F;
+          border-left: 3px solid rgba(255,255,255,0.14);
           padding-left: 1em;
           margin: 0.5em 0;
-          color: #5B6478;
+          color: #76767B;
         }
         .notes-tiptap hr {
           border: none;
-          border-top: 1px solid #1E1E2E;
+          border-top: 1px solid rgba(255,255,255,0.08);
           margin: 1em 0;
         }
         /* Force dark text on all highlight colors so swatches remain readable against
@@ -528,42 +528,40 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
            style="color:inherit" which would otherwise leave light text on light bg. */
         .notes-tiptap mark { border-radius: 2px; padding: 0 1px; color: #09090F !important; }
         .notes-tiptap u   { text-decoration: underline; text-underline-offset: 2px; }
-        .notes-tiptap s, .notes-tiptap del { text-decoration: line-through; color: #5B6478; }
+        .notes-tiptap s, .notes-tiptap del { text-decoration: line-through; color: #76767B; }
         .notes-tiptap a {
-          color: #818CF8;
+          color: #9A9A9F;
           text-decoration: underline;
-          text-decoration-color: rgba(99,102,241,0.4);
+          text-decoration-color: rgba(255,255,255,0.3);
           text-underline-offset: 2px;
           cursor: pointer;
         }
-        .notes-tiptap a:hover { color: #A5B4FC; text-decoration-color: rgba(99,102,241,0.8); }
+        .notes-tiptap a:hover { color: #EDEDED; text-decoration-color: rgba(255,255,255,0.5); }
 
         /* ── Keyword highlights — mirrors WordSpan's Red/Likely Zone classes ── */
         .notes-kw-red {
-          color: rgb(253 164 175);
-          background: rgba(136, 19, 55, 0.2);
+          color: #FF3B30;
           text-decoration: underline;
-          text-decoration-color: rgba(136, 19, 55, 0.8);
-          border-radius: 2px;
+          text-decoration-color: #FF3B30;
           cursor: default;
         }
         .notes-kw-likely {
-          color: rgb(196 181 253);
-          background: rgba(76, 29, 149, 0.15);
-          border-radius: 2px;
+          color: inherit;
+          text-decoration: underline;
+          text-decoration-color: rgba(255,255,255,0.3);
           cursor: default;
         }
 
-        /* ── Fact-check highlights — amber wavy underline ── */
+        /* ── Fact-check highlights — neutral wavy underline ── */
         .notes-fc-flag {
           text-decoration: underline;
           text-decoration-style: wavy;
-          text-decoration-color: rgba(251, 191, 36, 0.55);
+          text-decoration-color: rgba(255,255,255,0.4);
           text-underline-offset: 3px;
           cursor: pointer;
         }
         .notes-fc-flag-active {
-          background: rgba(251, 191, 36, 0.14);
+          background: rgba(255,255,255,0.08);
           border-radius: 2px;
         }
       `}</style>
@@ -613,13 +611,13 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
 
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexShrink: 0 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 600, color: '#E2E8F0', margin: 0, letterSpacing: '-0.01em' }}>Notes</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: '#EDEDED', margin: 0, letterSpacing: '-0.01em' }}>Notes</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {!loading && !generating && (
                 <button
                   onClick={() => setShowHistory(true)}
                   title="Version history"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3F485C', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#76767B', padding: 4, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   aria-label="Open version history"
                 >
                   <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -631,7 +629,7 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
               {!editorEmpty && !generating && (
                 <button
                   onClick={handleGenerate}
-                  style={{ fontSize: 12, color: '#6366F1', background: 'none', border: 'none', cursor: 'pointer', padding: 0, opacity: 0.8 }}
+                  style={{ fontSize: 12, color: '#FF3B30', background: 'none', border: 'none', cursor: 'pointer', padding: 0, opacity: 0.8 }}
                 >
                   Regenerate
                 </button>
@@ -649,7 +647,7 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
                       alignItems: 'center',
                       gap: 4,
                       fontSize: 12,
-                      color: factCheckRunning ? '#5B6478' : '#FBBF24',
+                      color: factCheckRunning ? '#76767B' : '#FF3B30',
                       background: 'none',
                       border: 'none',
                       cursor: factCheckRunning ? 'default' : 'pointer',
@@ -670,7 +668,7 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
                       alignItems: 'center',
                       gap: 4,
                       fontSize: 12,
-                      color: '#3F485C',
+                      color: '#76767B',
                       background: 'none',
                       border: 'none',
                       cursor: 'not-allowed',
@@ -697,23 +695,23 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
           {!loading && !generating && <NotesToolbar editor={editor} />}
 
           {loading ? (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3F485C', fontSize: 13 }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#76767B', fontSize: 13 }}>
               Loading…
             </div>
           ) : generating ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#5B6478' }}>
-              <div style={{ width: 24, height: 24, border: '2px solid #6366F1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#76767B' }}>
+              <div style={{ width: 24, height: 24, border: '2px solid #FF3B30', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
               <span style={{ fontSize: 13 }}>Generating notes from your lecture…</span>
             </div>
           ) : showGenerateButton ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
               <button
                 onClick={handleGenerate}
-                style={{ height: 40, padding: '0 20px', borderRadius: 8, fontSize: 14, fontWeight: 500, background: '#6366F1', color: '#09090F', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                style={{ height: 40, padding: '0 20px', borderRadius: 2, fontSize: 14, fontWeight: 500, background: '#FF3B30', color: '#0A0A0A', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
               >
                 ✦ Generate notes from lecture
               </button>
-              <p style={{ fontSize: 12, color: '#3F485C', margin: 0 }}>
+              <p style={{ fontSize: 12, color: '#76767B', margin: 0 }}>
                 Or start writing below — notes are encrypted and auto-saved.
               </p>
               {/* Editor is mounted but visually hidden behind the generate prompt */}
@@ -725,7 +723,7 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
                 {/* Placeholder shown while editor is empty */}
                 <div
                   aria-hidden="true"
-                  style={{ position: 'absolute', top: 0, left: 0, color: '#3F485C', fontSize: 14.5, lineHeight: 1.8, pointerEvents: 'none', userSelect: 'none' }}
+                  style={{ position: 'absolute', top: 0, left: 0, color: '#76767B', fontSize: 14.5, lineHeight: 1.8, pointerEvents: 'none', userSelect: 'none' }}
                 >
                   Start writing…
                 </div>
@@ -746,8 +744,8 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
               style={{
                 width: 288,
                 flexShrink: 0,
-                borderLeft: '1px solid #1E1E2E',
-                background: '#0B0B11',
+                borderLeft: '1px solid rgba(255,255,255,0.08)',
+                background: '#0A0A0A',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -755,8 +753,8 @@ export function NotesEditor({ sessionId, userId, userTier, onGoToSlide, onConten
                 gap: 10,
               }}
             >
-              <div style={{ width: 20, height: 20, border: '2px solid #FBBF24', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-              <span style={{ fontSize: 12, color: '#5B6478' }}>Checking notes…</span>
+              <div style={{ width: 20, height: 20, border: '2px solid #FF3B30', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <span style={{ fontSize: 12, color: '#76767B' }}>Checking notes…</span>
             </div>
           ) : (
             <FactCheckPanel
