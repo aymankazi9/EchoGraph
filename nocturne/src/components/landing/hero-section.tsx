@@ -45,6 +45,7 @@ export function HeroSection() {
 
   return (
     <section
+      className="hero-section"
       style={{
         position: 'relative',
         minHeight: '100vh',
@@ -128,12 +129,12 @@ export function HeroSection() {
           </div>
 
           <h1
+            className="hero-h1"
             style={{
               margin: 0,
               fontFamily: 'var(--font-display)',
               fontStretch: '82%',
               fontWeight: 600,
-              fontSize: 'clamp(46px,6.2vw,92px)',
               lineHeight: 0.95,
               letterSpacing: '-0.035em',
               color: '#EDEDED',
@@ -388,6 +389,16 @@ export function HeroSection() {
           )}
         </div>
       </div>
+
+      <style>{`
+        .hero-h1 { font-size: clamp(46px,6.2vw,92px); }
+        @media (max-width: 767px) {
+          .hero-h1 { font-size: clamp(32px,11vw,46px); }
+          @supports (min-height: 100dvh) {
+            .hero-section { min-height: 100dvh; }
+          }
+        }
+      `}</style>
     </section>
   )
 }

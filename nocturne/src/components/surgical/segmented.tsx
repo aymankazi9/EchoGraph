@@ -16,9 +16,9 @@ export function Segmented<T extends string>({
           <button
             key={opt.value}
             type="button"
+            className="segmented-btn"
             onClick={() => onChange(opt.value)}
             style={{
-              height: 30,
               padding: '0 12px',
               border: 'none',
               cursor: 'pointer',
@@ -34,6 +34,13 @@ export function Segmented<T extends string>({
           </button>
         )
       })}
+
+      <style>{`
+        .segmented-btn { height: 30px; }
+        @media (max-width: 767px) {
+          .segmented-btn { height: 44px; }
+        }
+      `}</style>
     </div>
   )
 }

@@ -52,7 +52,7 @@ export function SiteFooter() {
   return (
     <footer style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '56px clamp(20px,4vw,40px) 40px' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-        <div data-footer-grid style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 32, marginBottom: 48 }}>
+        <div data-footer-grid className="footer-grid" style={{ display: 'grid', gap: 32, marginBottom: 48 }}>
           {FOOTER_COLS.map((col) => (
             <div key={col.heading}>
               <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.1em', color: '#76767B', margin: '0 0 16px' }}>
@@ -94,6 +94,13 @@ export function SiteFooter() {
           <p style={{ fontSize: 12, color: '#5E5E62', margin: 0 }}>Not a note-taker. A study intelligence system.</p>
         </div>
       </div>
+
+      <style>{`
+        .footer-grid { grid-template-columns: repeat(5,1fr); }
+        @media (max-width: 767px) {
+          .footer-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+        }
+      `}</style>
     </footer>
   )
 }

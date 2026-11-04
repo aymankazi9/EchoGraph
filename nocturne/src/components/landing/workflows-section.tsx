@@ -41,7 +41,7 @@ export function WorkflowsSection() {
           alignItems: 'start',
         }}
       >
-        <div data-sticky style={{ position: 'sticky', top: 120, display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <div data-sticky className="wf-sticky" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.16em', color: '#FF3B30' }}>PATH A</span>
           <h2
             style={{
@@ -105,6 +105,13 @@ export function WorkflowsSection() {
           ))}
         </div>
       </div>
+
+      <style>{`
+        .wf-sticky { position: sticky; top: 120px; }
+        @media (max-width: 767px) {
+          .wf-sticky { position: static; }
+        }
+      `}</style>
     </section>
   )
 }

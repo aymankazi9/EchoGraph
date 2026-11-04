@@ -74,7 +74,6 @@ export function BetaRequestSection() {
     background: '#111112',
     border: '1px solid rgba(255,255,255,0.08)',
     color: '#EDEDED',
-    fontSize: 14,
     outline: 'none',
     boxSizing: 'border-box',
     transition: 'border-color .15s',
@@ -134,6 +133,7 @@ export function BetaRequestSection() {
                   placeholder="Your name"
                   value={name}
                   onChange={(e) => { setName(e.target.value); setErrorMsg(null) }}
+                  className="form-input"
                   style={inputStyle}
                   onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)')}
                   onBlur={(e)  => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
@@ -150,6 +150,7 @@ export function BetaRequestSection() {
                   placeholder="your@university.edu"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setErrorMsg(null) }}
+                  className="form-input"
                   style={inputStyle}
                   onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)')}
                   onBlur={(e)  => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
@@ -166,6 +167,7 @@ export function BetaRequestSection() {
                   placeholder="e.g. UC Irvine, UC San Diego, Stanford"
                   value={school}
                   onChange={(e) => { setSchool(e.target.value); setErrorMsg(null) }}
+                  className="form-input"
                   style={inputStyle}
                   onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)')}
                   onBlur={(e)  => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
@@ -182,6 +184,7 @@ export function BetaRequestSection() {
                   value={useCase}
                   onChange={(e) => { setUseCase(e.target.value); setErrorMsg(null) }}
                   rows={4}
+                  className="form-input"
                   style={{ ...inputStyle, height: 'auto', padding: '12px 14px', resize: 'vertical', lineHeight: 1.55 }}
                   onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)')}
                   onBlur={(e)  => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
@@ -228,6 +231,13 @@ export function BetaRequestSection() {
           </form>
         )}
       </div>
+
+      <style>{`
+        .form-input { font-size: 14px; }
+        @media (max-width: 767px) {
+          .form-input { font-size: 16px; }
+        }
+      `}</style>
     </section>
   )
 }

@@ -71,6 +71,7 @@ export function NewsletterSection() {
                 type="email"
                 placeholder="your@university.edu"
                 onKeyDown={(e) => e.key === 'Enter' && onSubscribe()}
+                className="newsletter-input"
                 style={{
                   flex: 1,
                   height: 44,
@@ -78,7 +79,6 @@ export function NewsletterSection() {
                   background: '#111112',
                   border: '1px solid rgba(255,255,255,0.08)',
                   color: '#EDEDED',
-                  fontSize: 14,
                   outline: 'none',
                 }}
                 onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
@@ -111,6 +111,13 @@ export function NewsletterSection() {
           </>
         )}
       </div>
+
+      <style>{`
+        .newsletter-input { font-size: 14px; }
+        @media (max-width: 767px) {
+          .newsletter-input { font-size: 16px; }
+        }
+      `}</style>
     </section>
   )
 }

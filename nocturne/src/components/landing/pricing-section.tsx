@@ -110,7 +110,6 @@ export function PricingSection() {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 42,
     fontSize: 14,
     fontWeight: 500,
     transition: 'background .2s, border-color .2s',
@@ -229,6 +228,7 @@ export function PricingSection() {
                 {IS_BETA ? (
                   <a
                     href="#beta-request"
+                    className="pricing-cta"
                     onClick={(e) => {
                       e.preventDefault()
                       document.getElementById('beta-request')?.scrollIntoView({ behavior: 'smooth' })
@@ -245,6 +245,7 @@ export function PricingSection() {
                 ) : p.tier ? (
                   <button
                     type="button"
+                    className="pricing-cta"
                     onClick={() => handleCheckout(p.tier!)}
                     disabled={loadingTier === p.tier}
                     style={{
@@ -260,11 +261,11 @@ export function PricingSection() {
                     {loadingTier === p.tier ? 'Redirecting…' : p.cta}
                   </button>
                 ) : p.coming ? (
-                  <Link href="#newsletter" style={{ ...ctaBase, width: '100%', background: 'transparent', color: '#EDEDED', border: '1px solid rgba(255,255,255,0.16)' }}>
+                  <Link href="#newsletter" className="pricing-cta" style={{ ...ctaBase, width: '100%', background: 'transparent', color: '#EDEDED', border: '1px solid rgba(255,255,255,0.16)' }}>
                     {p.cta}
                   </Link>
                 ) : (
-                  <Link href="/setup" style={{ ...ctaBase, width: '100%', background: 'transparent', color: '#EDEDED', border: '1px solid rgba(255,255,255,0.16)' }}>
+                  <Link href="/setup" className="pricing-cta" style={{ ...ctaBase, width: '100%', background: 'transparent', color: '#EDEDED', border: '1px solid rgba(255,255,255,0.16)' }}>
                     {p.cta}
                   </Link>
                 )}
@@ -293,6 +294,13 @@ export function PricingSection() {
           })}
         </div>
       </div>
+
+      <style>{`
+        .pricing-cta { height: 42px; }
+        @media (max-width: 767px) {
+          .pricing-cta { height: 44px; }
+        }
+      `}</style>
     </section>
   )
 }

@@ -193,9 +193,9 @@ export function DemoSection() {
             ))}
           </div>
 
-          <div style={{ position: 'relative', height: 500, overflow: 'hidden' }}>
+          <div className="demo-panel" style={{ position: 'relative' }}>
             {step === 0 && (
-              <div data-demo-grid style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)' }}>
+              <div className="demo-grid demo-grid-0" data-demo-grid style={{ display: 'grid' }}>
                 <div style={{ padding: 32, borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex' }}>
                   <div
                     style={{
@@ -214,9 +214,9 @@ export function DemoSection() {
                     </span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 380 }}>
                       <div
+                        className="demo-file-row"
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: '44px 1fr auto',
                           alignItems: 'center',
                           gap: 12,
                           padding: '12px 14px',
@@ -238,13 +238,13 @@ export function DemoSection() {
                         >
                           M4A
                         </span>
-                        <span style={{ fontSize: 13.5 }}>lecture-14.m4a</span>
+                        <span className="demo-file-name" style={{ fontSize: 13.5 }}>lecture-14.m4a</span>
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#76767B' }}>48:12</span>
                       </div>
                       <div
+                        className="demo-file-row"
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: '44px 1fr auto',
                           alignItems: 'center',
                           gap: 12,
                           padding: '12px 14px',
@@ -266,7 +266,7 @@ export function DemoSection() {
                         >
                           PDF
                         </span>
-                        <span style={{ fontSize: 13.5 }}>L14-oxidative-phosphorylation.pdf</span>
+                        <span className="demo-file-name" style={{ fontSize: 13.5 }}>L14-oxidative-phosphorylation.pdf</span>
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#76767B' }}>38 pp</span>
                       </div>
                     </div>
@@ -315,7 +315,7 @@ export function DemoSection() {
             )}
 
             {step === 1 && (
-              <div data-demo-grid style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)' }}>
+              <div className="demo-grid demo-grid-1" data-demo-grid style={{ display: 'grid' }}>
                 <div
                   ref={termScrollRef}
                   style={{
@@ -393,7 +393,7 @@ export function DemoSection() {
             )}
 
             {step === 2 && (
-              <div data-demo-grid style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: 'minmax(0,1.6fr) minmax(0,1fr)' }}>
+              <div className="demo-grid demo-grid-2" data-demo-grid style={{ display: 'grid' }}>
                 <div style={{ position: 'relative', overflow: 'hidden', borderRight: '1px solid rgba(255,255,255,0.08)', background: '#0A0A0A' }}>
                   <div
                     style={{
@@ -456,6 +456,22 @@ export function DemoSection() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        .demo-panel { height: 500px; overflow: hidden; }
+        .demo-grid { position: absolute; inset: 0; }
+        .demo-grid-0 { grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); }
+        .demo-grid-1 { grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); }
+        .demo-grid-2 { grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); }
+        .demo-file-row { grid-template-columns: 44px 1fr auto; }
+        @media (max-width: 767px) {
+          .demo-panel { height: auto; overflow: visible; }
+          .demo-grid { position: static; }
+          .demo-grid-0, .demo-grid-1, .demo-grid-2 { grid-template-columns: 1fr; }
+          .demo-file-row { grid-template-columns: 44px minmax(0,1fr) auto; }
+          .demo-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        }
+      `}</style>
     </section>
   )
 }

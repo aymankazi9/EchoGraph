@@ -29,7 +29,7 @@ export function EngineSection() {
 
   return (
     <section ref={sectionRef} id="engine" style={{ position: 'relative', height: '300vh', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-      <div style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden', background: '#0A0A0A' }}>
+      <div className="engine-pin" style={{ position: 'sticky', top: 0, overflow: 'hidden', background: '#0A0A0A' }}>
         <div ref={hostRef} style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1 }}>
           {VAULT_LABELS.map(([k, val], i) => (
@@ -136,6 +136,15 @@ export function EngineSection() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        .engine-pin { height: 100vh; }
+        @media (max-width: 767px) {
+          @supports (height: 100dvh) {
+            .engine-pin { height: 100dvh; }
+          }
+        }
+      `}</style>
     </section>
   )
 }

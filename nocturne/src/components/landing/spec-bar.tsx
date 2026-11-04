@@ -3,7 +3,7 @@ const SPECS = ['100% LOCAL EXECUTION', 'ZERO-KNOWLEDGE PRIVACY', 'WASM / WHISPER
 export function SpecBar() {
   return (
     <section style={{ position: 'relative', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-      <div data-spec style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))' }}>
+      <div data-spec className="spec-grid" style={{ maxWidth: 1280, margin: '0 auto', display: 'grid' }}>
         {SPECS.map((label, i) => (
           <div
             key={label}
@@ -27,6 +27,13 @@ export function SpecBar() {
           </div>
         ))}
       </div>
+
+      <style>{`
+        .spec-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+        @media (max-width: 767px) {
+          .spec-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+        }
+      `}</style>
     </section>
   )
 }
